@@ -1,3 +1,10 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+
+# Terrain3D sample content (not used by the game)
+/demo/
+
+# Temporary / OS files
+*.tmp
+Thumbs.db
