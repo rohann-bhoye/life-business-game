@@ -17,6 +17,7 @@ static var model_scenes: Dictionary = {}
 var kenney: Node3D
 var anim_tree: AnimationTree
 var model_id := ""
+var was_airborne := false
 
 var left_arm: Node3D
 var right_arm: Node3D
@@ -150,7 +151,7 @@ func _attach_model() -> void:
 	for loop_name in LOOPED:
 		if player.has_animation(loop_name): player.get_animation(loop_name).loop_mode = Animation.LOOP_LINEAR
 	var tree := AnimationNodeBlendTree.new()
-	for entry in [["idle", "idle"], ["walk", "walk"], ["carry", "holding-both"], ["work", "interact-right"]]:
+	for entry in [["idle", "idle"], ["walk", "walk"], ["carry", "holding-both"], ["work", "interact-right"], ["jump", "jump"]]:
 		var clip := AnimationNodeAnimation.new()
 		clip.animation = entry[1]
 		tree.add_node(entry[0], clip)
@@ -172,7 +173,13 @@ func _attach_model() -> void:
 	tree.connect_node("speed", 0, "move")
 	tree.connect_node("carry_blend", 0, "speed")
 	tree.connect_node("carry_blend", 1, "carry")
-	tree.connect_node("work_shot", 0, "carry_blend")
+	var jump_shot := AnimationNodeOneShot.new()
+	jump_shot.fadein_time = 0.05
+	jump_shot.fadeout_time = 0.2
+	tree.add_node("jump_shot", jump_shot)
+	tree.connect_node("jump_shot", 0, "carry_blend")
+	tree.connect_node("jump_shot", 1, "jump")
+	tree.connect_node("work_shot", 0, "jump_shot")
 	tree.connect_node("work_shot", 1, "work")
 	tree.connect_node("output", 0, "work_shot")
 	anim_tree = AnimationTree.new()
@@ -188,6 +195,10 @@ func _update_model(delta: float, speed: float, carrying: bool) -> void:
 	anim_tree.set("parameters/move/blend_amount", walk_blend)
 	anim_tree.set("parameters/speed/scale", clampf(speed / 1.5, 0.7, 1.8) if walk_blend > 0.1 else 1.0)
 	anim_tree.set("parameters/carry_blend/blend_amount", 1.0 if carrying else 0.0)
+	var body := get_parent() as CharacterBody3D
+	var airborne := body != null and not body.is_on_floor() and body.velocity.y > 1.0
+	if airborne and not was_airborne: anim_tree.set("parameters/jump_shot/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+	was_airborne = airborne
 	anim_tree.advance(delta)
 
 func _material(color: Color) -> StandardMaterial3D:

@@ -18,11 +18,12 @@ func _run() -> void:
 	assert(state.order_stock("soap", 2) and state.receive_delivery() and state.pick_up_box())
 	assert(state.shelve_box(false, 0) and state.racks.find(0).slots[1].count == 10)
 	assert(state.pick_up_box())
-	var before: Dictionary = state.snapshot()
-	assert(not state.shelve_one(0) and state.snapshot() == before)
+	# Racks are mixed: the empty row assigned to snacks still accepts soap.
+	assert(state.shelve_one(0) and state.racks.find(0).slots[2].product == "soap" and state.racks.find(0).slots[2].count == 1)
 	assert(state.sell_basket(2, 240, 120, "soap", 0))
-	assert(state.shelve_box(false, 0) and state.carried_stock == 8)
-	assert(state.racks.find(0).slots[1].count == 10)
+	assert(state.shelve_box(false, 0) and state.carried_stock == 0)
+	assert(state.racks.find(0).slots[1].count == 10 and state.racks.find(0).slots[2].count == 8)
+	var before: Dictionary
 	assert(state._is_valid_snapshot(state.snapshot()))
 	var invalid: Dictionary = state.snapshot()
 	invalid.rack_layout[0].slots[1].count = 11
@@ -49,7 +50,7 @@ func _run() -> void:
 	var migrated = Backend.new()
 	migrated.load_progress(legacy_path)
 	assert(migrated.stock == 100 and migrated.racks.find(0).legacy_overflow == 70)
-	assert(not migrated.purchase_stock())
+	# (Racks are mixed now: empty rows on other racks could accept bottles, so no purchase check here.)
 	assert(migrated.sell_basket(3, 300, 100, "bottle", 0))
 	assert(migrated.stock == 97 and migrated.racks.find(0).legacy_overflow == 67)
 	assert(migrated._is_valid_snapshot(migrated.snapshot()))

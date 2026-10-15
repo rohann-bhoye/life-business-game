@@ -33,7 +33,7 @@ func _build_grass() -> void:
 	material.set_shader_parameter("wind_strength", 0.1)
 	blade.surface_set_material(0, material)
 	var transforms: Array[Transform3D] = []
-	var rng := RandomNumberGenerator.new()
+	var rng := RandomNumberGenerator.new()	
 	rng.seed = 481516
 	for strip_z in [1.65, 12.35, -11.5, 18.0]:
 		for index in range(90):

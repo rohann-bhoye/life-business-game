@@ -111,7 +111,16 @@ func build_room(builder: Node3D) -> void:
 	pc.name = "ShopPC"
 	pc.position = Vector3(0, 0.25, -0.08)
 	desk.add_child(pc)
-	office.attach(pc, "MonitorAsset", "computerScreen", Vector3(0.9, 0.675, 0.25), Vector3.ZERO)
+	# Same fitted casing as the warehouse PC, built around ComputerTerminal's
+	# 0.78 x 0.44 live screen so the screen sits exactly inside the bezel.
+	var casing := Color(0.06, 0.09, 0.11)
+	builder._box("MonitorBack", pc, Vector3(0.9, 0.54, 0.08), Vector3(0, 0.43, 0.075), casing)
+	builder._box("MonitorTop", pc, Vector3(0.9, 0.05, 0.08), Vector3(0, 0.695, 0.13), casing)
+	builder._box("MonitorBottom", pc, Vector3(0.9, 0.05, 0.08), Vector3(0, 0.165, 0.13), casing)
+	builder._box("MonitorLeft", pc, Vector3(0.06, 0.48, 0.08), Vector3(-0.42, 0.43, 0.13), casing)
+	builder._box("MonitorRight", pc, Vector3(0.06, 0.48, 0.08), Vector3(0.42, 0.43, 0.13), casing)
+	builder._box("MonitorNeck", pc, Vector3(0.1, 0.2, 0.1), Vector3(0, 0.05, 0.06), casing)
+	builder._box("MonitorBase", pc, Vector3(0.52, 0.055, 0.3), Vector3(0, -0.045, 0.08), casing)
 	office.attach(desk, "Keyboard", "computerKeyboard", Vector3(0.55, 0.06, 0.21), Vector3(0, 0.255, 0.17))
 	office.attach(desk, "Mouse", "computerMouse", Vector3(0.1, 0.05, 0.15), Vector3(0.45, 0.255, 0.17))
 	var terminal := Node3D.new()
@@ -308,6 +317,7 @@ func make_bottle(parent: Node3D, node_name: String, offset: Vector3) -> Node3D:
 	_mesh(bottle, "Cap", cap, Vector3(0, _asset_box("bottle", Vector3(0.18, 0.4, 0.18)).end.y - 0.015, 0), Color(0.92, 0.93, 0.9))
 	return bottle
 
+const GROCERY_SIZES := {"oil": Vector3(0.14, 0.3, 0.11), "milk": Vector3(0.14, 0.24, 0.11), "bread": Vector3(0.16, 0.13, 0.17), "chocolate": Vector3(0.16, 0.06, 0.15), "honey": Vector3(0.13, 0.16, 0.13)}
 static var asset_boxes: Dictionary = {}
 # Real size of a fitted product model, so caps/seals sit exactly on top of it.
 func _asset_box(id: String, size: Vector3) -> AABB:
@@ -329,6 +339,11 @@ func make_product(parent: Node3D, node_name: String, offset: Vector3, id: String
 	if id == "tomato":
 		preload("res://produce_assets.gd").attach(item, "tomato", Vector3(0.19, 0.18, 0.19), "ProductBody")
 		# Checkout retains its existing Cap hook; produce has no packaging cap.
+		_box(item, "Cap", Vector3(0.01, 0.01, 0.01), Vector3.ZERO, Color.WHITE).hide()
+		return item
+	if GROCERY_SIZES.has(id):
+		# Kenney Food Kit grocery models (cooking oil, milk, bread, chocolate, honey).
+		preload("res://product_assets.gd").attach(item, id, GROCERY_SIZES[id])
 		_box(item, "Cap", Vector3(0.01, 0.01, 0.01), Vector3.ZERO, Color.WHITE).hide()
 		return item
 	var height := 0.26 if id == "snack" else 0.12
@@ -787,11 +802,11 @@ func try_interact() -> bool:
 				animate_shelf_item(product, rack_id)
 				play_sound("stock")
 				ui.show_feedback("Box empty. %s stocked." % Catalog.NAMES[product] if remaining == 0 else "Shelved 1 %s. %d left in box." % [Catalog.NAMES[product], remaining])
-			else: ui.show_feedback("Rack full. Use another assigned shelf or warehouse storage.", true)
+			else: ui.show_feedback("Rack full. Use another rack with an empty row, or warehouse storage.", true)
 			return true
 		for id in Catalog.IDS:
 			if id != shop.business.pending_product and (furnishing.near_rack(id) >= 0 if is_instance_valid(furnishing) else _near(rack_target(id), 1.0)):
-				ui.show_feedback("Wrong rack. Use %s rack." % Catalog.NAMES[shop.business.pending_product], true)
+				ui.show_feedback("No free row here for %s. Use a rack with an empty row." % Catalog.NAMES[shop.business.pending_product], true)
 				return true
 		if _near(drop_point):
 			shop.business.drop_box()

@@ -95,12 +95,13 @@ func _run() -> void:
 	assert(business.boxed_stock == 10 and assistant.route.is_empty())
 	player.position = ops.drop_point + Vector3(0, 1, 0)
 	assert(ops.try_interact() and business.carried_stock == 10)
+	# Racks are mixed: the bottle rack's empty rows accept snacks too.
 	player.position = ops.rack_point + Vector3(0, 1, 0)
-	assert(ops.try_interact() and business.carried_stock == 10)
-	assert(current_scene.get_node("Ui").feedback_label.text.begins_with("Wrong rack."))
+	assert(ops.try_interact() and business.carried_stock == 9)
+	assert(current_scene.get_node("Ui").feedback_label.text.begins_with("Shelved 1"))
 	assert(not player._menu_is_open())
 	player.position = ops.rack_target("snack") + Vector3(0, 1, 0)
-	for remaining in range(9, -1, -1):
+	for remaining in range(8, -1, -1):
 		assert(ops.try_interact() and business.carried_stock == remaining)
 	assert(business.product_stock("snack") == 10)
 	menu.product_input.select(1)
@@ -199,8 +200,10 @@ func _run() -> void:
 		visitor.leave_shop()
 		visitor.queue_free()
 	await process_frame
-	for stream in ops.get_node("ShopAudio").streams.values():
-		assert(stream.data.size() > 1000 and stream.mix_rate == 22050)
+	var audio = ops.get_node("ShopAudio")
+	for effect in ["scan", "payment", "door", "delivery", "stock", "click"]:
+		assert(audio.streams[effect] is AudioStream and audio.streams[effect].get_length() > 0.02, effect)
+	assert(audio.footsteps.size() == 5)
 	for size in [Vector2i(640, 480), Vector2i(360, 640)]:
 		root.size = size
 		await process_frame

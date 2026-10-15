@@ -5,6 +5,7 @@ var invert_y := false
 
 @export var speed := 5.0
 @export var gravity := 20.0
+@export var jump_velocity := 6.5
 @export var mouse_sensitivity := 0.003
 @export var camera_distance := 4.5
 
@@ -132,7 +133,9 @@ func _physics_process(delta):
 	velocity.x = direction.x * speed
 	velocity.z = direction.z * speed
 
-	if not is_on_floor():
+	if is_on_floor() and not _menu_is_open() and Input.is_key_pressed(KEY_SPACE):
+		velocity.y = jump_velocity
+	elif not is_on_floor():
 		velocity.y -= gravity * delta
 	else:
 		velocity.y = 0

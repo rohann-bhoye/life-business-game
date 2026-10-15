@@ -14,6 +14,84 @@ Latest feature: playable tomato farming, a Farm tablet tab/seed stall, three far
 expansions, tomato warehouse/shelf/checkout integration, a road-end Coming Next
 board and a local suggestion form. See Farming section below for controls and limits.
 
+## >>> RESUME HERE (end of session 2026-10-16) <<<
+
+Status: work in progress, NOT committed. Everything listed below (visual upgrade,
+mixed racks, modern UI, 5 new products, sounds, jump, Sunil storage restock, rack
+packing) is on disk only; last commit is 26ca8b3 (First Day guide). Owner wants ONE
+commit when the work is verified, and to be asked before any push to GitHub.
+
+Added at the end of the session:
+- Jump: Space (player.gd jump_velocity 6.5, ~1 m); Kenney "jump" one-shot in
+  character_visual (jump_shot node) when the body leaves the floor upward.
+- Sunil restocks from warehouse storage when "Auto collect" is ON: backend
+  storage_restock_slot() picks a stored box whose product has <=3 on shelves and
+  fits in free shelf space; worker_retrieve_stored_box(slot) puts it in his hands.
+  stock_worker.gd: fetch_from_storage(), fetch_slot, warehouse exit/entry legs.
+- Pack rack: PC Racks tab "Pack rack into warehouse" (PackRackButton). Backend
+  pack_rack(id): only bought (id>=3), empty racks; later rack ids shift down by one;
+  restock flag handed to another rack of that product; package appended to
+  logistics.rack_delivered (saved) and can be unpacked again with E.
+  rack_furnishing.pack(id) remaps models after the id shift.
+- New test tests/storage_restock_test.gd: PASS (jump, storage restock, pack/unpack, reload).
+
+To do next session, in order:
+1. tests/mixed_shelves_test.gd still FAILS at ~line 108: it encodes the OLD rule that
+   an empty row assigned to one product refuses another. Update its expectations to
+   the mixed-rack rule (lines 21-25 and the legacy purchase_stock line were already
+   updated). Then rerun it.
+2. Run the FULL suite (38 tests incl. storage_restock_test). checkout_test line 132
+   has failed only under heavy CPU load (owner's game + suite at once) and passed on
+   a clean rerun; rerun failures individually before changing code.
+3. If all pass: single commit of all the work above, then ask owner about push.
+4. Owner to install export templates (Editor > Manage Export Templates) -> build .exe.
+5. Next feature ideas offered: daily report at sleep, reputation affecting customer
+   traffic, more farm crops, name-label overlap fix.
+
+## Visual Upgrade, Mixed Racks and Modern UI (2026-10-16, Claude Code)
+
+- Characters: character_visual.gd keeps its hidden block rig (carry grips, hands,
+  tests) and shows an animated Kenney Mini Characters model (CC0, assets/characters/
+  kenney). AnimationTree: idle/walk blend, arm-only "holding-both" carry blend,
+  "interact-right" one-shot for work/scan. Scale 2.15, model yawed PI. Player=male-d,
+  Ramesh=male-a, Sunil=male-e, Anil=male-b; customers/passers-by random (`model` export).
+  Walking now uses speed (<12 m/s) instead of per-frame distance, so legs animate
+  during frame drops. Carry boxes lowered to 0.72 m; name tags to ~1.85 m; third-person
+  block grips hidden (box_carry_visual.gd).
+- Shop decor (shop_decor.gd, wall/ceiling/counter only so rack placement is unaffected):
+  MultiMesh-batched Food Kit groceries on high wall shelves, ceiling fans, paint band,
+  signs, counter sweets, door mat. Shop PC now uses the warehouse-style fitted casing
+  so the live screen sits inside the bezel. Home (home_decor.gd): Furniture Kit bed,
+  TV, sofa, kitchen, plants with simple colliders; box bed mesh hidden, collider and
+  SleepArea unchanged. Street: 10 City Kit Suburban houses replace block buildings
+  (colliders kept; windows no longer batched). Helper: kenney_assets.gd.
+- Products: bottle cap is a small cylinder on the model's real neck; bottle label is
+  a wrap-around band; snack seal strip sits on the real bag top (_asset_box).
+- Mixed racks: an EMPTY row now accepts any SKU (rack_store supports/free_space/
+  add_stock); occupied rows keep one SKU. Rack headers show contents ("MIXED
+  PRODUCTS" / product / "OPEN SHELF - ANY PRODUCT"); empty rows say "Empty row |
+  any product". Wrong-rack tests updated to the new rule (box_carry, product_workflow).
+- UI: ui_style.gd = modern flat web-dashboard look (white rounded cards, pill tabs,
+  teal primary buttons, navy bars). menu_skin.apply now uses it (tablet + menus) and
+  computer_terminal uses it for the PC; primary buttons detected by text prefix.
+- Main menu loads main.tscn on a background thread from menu open and shows
+  "Loading game... %". Load time is dominated by GDScript compilation (~10 s on the
+  MX110 with the editor/game running); new assets add ~0.3 s.
+- Preview tools (graphical, temp saves): tools/character_preview, shelf_preview,
+  home_preview, street_preview, ui_preview, guide_preview, character_lineup.
+- Busy-shop probe with animated characters: ~13-14.5 ms median (was 11.4 ms).
+- New SKUs (Kenney Food Kit models, no packaging labels): oil (box Rs1000, sell Rs150),
+  milk (400/60), bread (350/50), chocolate (300/50), honey (1200/180). Catalog now has
+  EXTRA (all non-bottle inventory SKUs) and OPTIONAL (zeroed for old saves); backend
+  save validation and rack_store.valid loop over these lists. make_product uses
+  GROCERY_SIZES for the new models with a hidden Cap node for scan hooks.
+  tools/products_preview.gd stocks all five, verifies save/reload and screenshots.
+- Audio: shop_audio.gd loads Kenney CC0 OGGs (assets/audio/kenney): scan=select_002,
+  payment=handleCoins, door=bong_001, delivery=impactGeneric_light_002, stock=drop_002,
+  click=click_002 (every BaseButton via node_added), plus player footsteps
+  (footstep_concrete_000-004 every 0.42 s while moving on floor). Generated tones
+  remain only as fallbacks.
+
 ## Status Audit, Git and Export Preset (2026-10-15, Claude Code)
 
 - Status: COMPLETE. No gameplay scripts or scenes changed; owner saves untouched.

@@ -2,7 +2,12 @@ extends RefCounted
 
 const PATHS := {
 	"bottle": "res://assets/products/kenney/soda-bottle.glb",
-	"snack": "res://assets/products/kenney/bag.glb"
+	"snack": "res://assets/products/kenney/bag.glb",
+	"oil": "res://assets/products/kenney/bottle-oil.glb",
+	"milk": "res://assets/products/kenney/carton.glb",
+	"bread": "res://assets/products/kenney/loaf.glb",
+	"chocolate": "res://assets/products/kenney/chocolate-wrapper.glb",
+	"honey": "res://assets/products/kenney/honey.glb"
 }
 static var models: Dictionary = {}
 static var bounds: Dictionary = {}
@@ -36,6 +41,8 @@ static func attach(parent: Node3D, product: String, size: Vector3) -> void:
 	label_product(parent, product, box.size.x * factor * 0.5 + 0.002)
 
 static func label_product(parent: Node3D, product: String, face_x := 0.084) -> void:
+	# Kenney grocery models already look like their product; only the original three get packaging labels.
+	if product not in ["bottle", "snack", "soap"]: return
 	var label := Label3D.new()
 	label.name = "PackageLabel"
 	label.text = {"bottle": "REUSE", "snack": "MASALA\nCRUNCH", "soap": "SOAP"}[product]

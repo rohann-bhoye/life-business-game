@@ -13,6 +13,7 @@ var transition: Tween
 var saved_input: Array = []
 var clock: Label
 var desktop_theme: Theme
+const UiStyle := preload("res://ui_style.gd")
 @onready var world = get_tree().current_scene
 @onready var player = world.get_node("Player")
 @onready var ui = world.get_node("Ui")
@@ -41,12 +42,12 @@ func _configure() -> void:
 	add_child(screen_viewport)
 	var desktop := ColorRect.new()
 	desktop.name = "Desktop"
-	desktop.color = Color(0.88, 0.92, 0.93)
+	desktop.color = UiStyle.PAGE
 	desktop.size = Vector2(960, 540)
 	screen_viewport.add_child(desktop)
 	var topbar := ColorRect.new()
 	topbar.name = "TopBar"
-	topbar.color = Color(0.045, 0.18, 0.2)
+	topbar.color = UiStyle.NAVY
 	topbar.size = Vector2(960, 64)
 	desktop.add_child(topbar)
 	var title := Label.new()
@@ -68,13 +69,14 @@ func _configure() -> void:
 	welcome.position = Vector2(34, 100)
 	welcome.size = Vector2(620, 84)
 	welcome.add_theme_font_size_override("font_size", 20)
-	welcome.add_theme_color_override("font_color", Color(0.12, 0.2, 0.23))
+	welcome.add_theme_color_override("font_color", UiStyle.TEXT)
 	desktop.add_child(welcome)
 	var cards := [["Orders", "Buy stock and set prices"], ["Team", "Shifts and staff work"], ["Storage", "Delivery and warehouse status"]]
 	for index in range(cards.size()):
 		var entry = cards[index]
-		var card := ColorRect.new()
-		card.color = Color(0.76, 0.85, 0.84)
+		var card := Panel.new()
+		card.add_theme_stylebox_override("panel", UiStyle.card())
+
 		card.position = Vector2(34 + index * 294, 215)
 		card.size = Vector2(270, 92)
 		desktop.add_child(card)
@@ -82,14 +84,16 @@ func _configure() -> void:
 		card_title.text = entry[0]
 		card_title.position = Vector2(14, 12)
 		card_title.add_theme_font_size_override("font_size", 18)
+		card_title.add_theme_color_override("font_color", UiStyle.BRAND)
 		card.add_child(card_title)
 		var card_text := Label.new()
 		card_text.text = entry[1]
 		card_text.position = Vector2(14, 48)
 		card_text.add_theme_font_size_override("font_size", 13)
+		card_text.add_theme_color_override("font_color", UiStyle.MUTED)
 		card.add_child(card_text)
 	var taskbar := ColorRect.new()
-	taskbar.color = Color(0.12, 0.16, 0.19)
+	taskbar.color = UiStyle.NAVY
 	taskbar.position = Vector2(0, 500)
 	taskbar.size = Vector2(960, 40)
 	desktop.add_child(taskbar)
@@ -98,6 +102,7 @@ func _configure() -> void:
 		button.text = ["APNA", "Orders", "Warehouse staff"][index]
 		button.position = Vector2(12 + index * 180, 504)
 		button.size = Vector2(168, 32)
+		UiStyle.style_button(button, index == 0)
 		desktop.add_child(button)
 		button.pressed.connect(func():
 			source.tabs.current_tab = 1 if index == 2 else 0
@@ -106,19 +111,11 @@ func _configure() -> void:
 	clock.position = Vector2(720, 508)
 	clock.size = Vector2(224, 24)
 	clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	clock.add_theme_color_override("font_color", Color("e2e8f0"))
 	desktop.add_child(clock)
 	desktop_theme = Theme.new()
 	desktop_theme.default_font_size = 18
-	for type in ["Label", "Button", "LineEdit", "TabBar", "ItemList"]:
-		for state in ["font_color", "font_selected_color", "font_hover_color"]: desktop_theme.set_color(state, type, Color(0.13, 0.19, 0.23))
-	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
-		desktop_theme.set_stylebox(state, "Button", _style(Color(0.94, 0.96, 0.98) if state == "normal" else Color(0.85, 0.92, 0.98)))
-	desktop_theme.set_stylebox("panel", "Panel", _style(Color(0.98, 0.99, 1)))
-	desktop_theme.set_stylebox("normal", "LineEdit", _style(Color.WHITE))
-	desktop_theme.set_stylebox("panel", "ItemList", _style(Color(0.94, 0.97, 0.99)))
-	desktop_theme.set_stylebox("selected", "ItemList", _style(Color(0.8, 0.9, 0.98)))
-	for state in ["tab_selected", "tab_unselected", "tab_hovered", "tab_disabled"]:
-		desktop_theme.set_stylebox(state, "TabBar", _style(Color(0.82, 0.91, 0.98) if state == "tab_selected" else Color(0.96, 0.98, 1)))
+	UiStyle.apply(desktop_theme, true)
 	screen_menu = source.duplicate(0) as Panel
 	screen_menu.name = "OperationsWindow"
 	screen_menu.modulate = Color.WHITE
@@ -224,12 +221,16 @@ func _sync() -> void:
 		elif original is TabBar: copy.current_tab = original.current_tab
 		elif original is ProgressBar: copy.value = original.value
 		if original.get_parent() == source and is_equal_approx(original.position.x + original.size.x, source.size.x - 16): copy.size.x += 912 - source.size.x
-		if copy is Button:
-			for state in ["normal", "hover", "pressed", "disabled", "focus"]: copy.add_theme_stylebox_override(state, desktop_theme.get_stylebox(state, "Button"))
+		if copy is Button and not copy is OptionButton:
+			# Restyle only when the primary/secondary role changes (button text can change).
+			var primary := UiStyle.is_primary(copy)
+			if not copy.has_meta("ui_primary") or copy.get_meta("ui_primary") != primary:
+				copy.set_meta("ui_primary", primary)
+				UiStyle.style_button(copy, primary)
 		if copy is Label or copy is Button or copy is TabBar:
 			copy.add_theme_constant_override("outline_size", 0)
-			for state in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_selected_color", "font_unselected_color"]: copy.add_theme_color_override(state, Color(0.13, 0.19, 0.23))
-			copy.add_theme_color_override("font_disabled_color", Color(0.4, 0.47, 0.52))
+		if copy is Label:
+			copy.add_theme_color_override("font_color", UiStyle.TEXT)
 		if copy is Label:
 			copy.add_theme_color_override("font_shadow_color", Color.TRANSPARENT)
 			copy.add_theme_constant_override("shadow_offset_x", 0)

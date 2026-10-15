@@ -175,6 +175,39 @@ func retrieve_product_box(slot: int) -> bool:
 	logistics.storage.erase(box)
 	return _commit_logistics(old)
 
+## Warehouse slot Sunil should fetch: a stored box whose product is low on the
+## shelves (3 or fewer) and fits entirely in free shelf space. -1 when none.
+func storage_restock_slot() -> int:
+	if carried_stock + worker_carried_stock > 0 or boxed_stock > 0 or not queued_boxes.is_empty(): return -1
+	var best := -1
+	var best_stock := 1000000
+	for box in logistics.storage:
+		var shelf := product_stock(box.product)
+		if shelf > 3 or shelf >= best_stock: continue
+		var space := 0
+		for record in racks.records: space += racks.free_space(record.id, box.product)
+		if space < int(box.amount): continue
+		best = int(box.slot)
+		best_stock = shelf
+	return best
+
+## Sunil takes a stored warehouse box into his hands (then shelves it like a delivery).
+func worker_retrieve_stored_box(slot: int) -> bool:
+	var box: Dictionary = logistics.at_slot(slot)
+	if box.is_empty() or not stock_worker_on_shift() or carried_stock + worker_carried_stock > 0 or boxed_stock > 0: return false
+	var old: Dictionary = snapshot()
+	pending_product = box.product
+	worker_carried_stock = int(box.amount)
+	stock_collection_assigned = false
+	logistics.storage.erase(box)
+	if not save_progress():
+		pending_product = old.pending_product
+		worker_carried_stock = int(old.worker_carried_stock)
+		logistics.restore(old.logistics)
+		return false
+	changed.emit()
+	return true
+
 func _commit_logistics(old: Dictionary) -> bool:
 	if not save_progress():
 		money = int(old.money)
@@ -706,6 +739,29 @@ func place_rack(product: String, position: Vector2, turn: int, id := -1, from_de
 	changed.emit()
 	return true
 
+## Packs an empty purchased rack back into a warehouse furniture package; it can be
+## unpacked and placed again later. The three starting racks always stay in the shop.
+func pack_rack(id: int) -> bool:
+	var record := racks.find(id)
+	if record.is_empty() or id < 3 or int(record.amount) != 0 or int(record.get("legacy_overflow", 0)) != 0: return false
+	var old_layout: Array = racks.records.duplicate(true)
+	var old_delivered: Array = logistics.rack_delivered.duplicate()
+	racks.records.erase(record)
+	for item in racks.records:
+		if int(item.id) > id: item.id = int(item.id) - 1
+	if record.get("restock", false):
+		for item in racks.records:
+			if item.product == record.product:
+				item.restock = true
+				break
+	logistics.rack_delivered.append("tomato" if record.get("display", "shelf") == "produce" else record.product)
+	if not save_progress():
+		racks.records = old_layout
+		logistics.rack_delivered = old_delivered
+		return false
+	changed.emit()
+	return true
+
 func set_stock_rack(id: int) -> bool:
 	var selected := racks.find(id)
 	if selected.is_empty(): return false
@@ -785,7 +841,8 @@ func load_progress(path: String) -> void:
 	staff.restore(data.staff_relations)
 	overtime_expenses = int(data.overtime_expenses)
 	inventory = data.inventory.duplicate(true)
-	if not inventory.has("tomato"): inventory.tomato = Catalog.fresh_inventory().tomato
+	for id in Catalog.OPTIONAL:
+		if not inventory.has(id): inventory[id] = Catalog.fresh_item(id)
 	farm.restore(data.get("farm", FarmStore.new().snapshot()))
 	for id in inventory:
 		for field in inventory[id]: inventory[id][field] = int(inventory[id][field])
@@ -995,7 +1052,8 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 		if not valid_shift(int(data[role + "_shift_start"]), int(data[role + "_shift_end"])): return false
 	var level := int(data["shop_level"])
 	var stored_supply := 0
-	var supply_by_product := {"bottle": 0, "snack": 0, "soap": 0, "tomato": 0}
+	var supply_by_product := {}
+	for id in Catalog.IDS: supply_by_product[id] = 0
 	var incoming_amount := 0
 	var box_count := 0
 	for box in delivery_data.get("storage", []):
@@ -1111,8 +1169,8 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	var extra_sold := 0
 	var extra_stock := 0
 	var extra_purchased := 0
-	for id in ["snack", "soap", "tomato"]:
-		var item: Dictionary = data.inventory.get(id, Catalog.fresh_inventory().tomato)
+	for id in Catalog.EXTRA:
+		var item: Dictionary = data.inventory.get(id, Catalog.fresh_item(id))
 		var farm_units: int = farm_data.harvested if id == "tomato" else 0
 		if farm_units > item.purchased: return false
 		extra_cost += (int(item.purchased) - farm_units) / 10 * Catalog.COSTS[id]

@@ -1,18 +1,28 @@
 extends RefCounted
 
-const IDS := ["bottle", "snack", "soap", "tomato"]
-const NAMES := {"bottle": "Reusable bottles", "snack": "Snack packs", "soap": "Soap bars", "tomato": "Farm tomatoes"}
-const COSTS := {"bottle": 500, "snack": 400, "soap": 600, "tomato": 500}
+const IDS := ["bottle", "snack", "soap", "tomato", "oil", "milk", "bread", "chocolate", "honey"]
+const NAMES := {"bottle": "Reusable bottles", "snack": "Snack packs", "soap": "Soap bars", "tomato": "Farm tomatoes", "oil": "Cooking oil", "milk": "Milk cartons", "bread": "Bread loaves", "chocolate": "Chocolate bars", "honey": "Honey jars"}
+const COSTS := {"bottle": 500, "snack": 400, "soap": 600, "tomato": 500, "oil": 1000, "milk": 400, "bread": 350, "chocolate": 300, "honey": 1200}
+const PRICES := {"snack": 80, "soap": 120, "tomato": 80, "oil": 150, "milk": 60, "bread": 50, "chocolate": 50, "honey": 180}
+## Every SKU tracked in the inventory dictionary (bottle stock is derived from the aggregate).
+const EXTRA := ["snack", "soap", "tomato", "oil", "milk", "bread", "chocolate", "honey"]
+## SKUs added after the original save format; old saves get zeroed entries for them.
+const OPTIONAL := ["tomato", "oil", "milk", "bread", "chocolate", "honey"]
+
+static func fresh_item(id: String) -> Dictionary:
+	return {"stock": 0, "purchased": 0, "sold": 0, "price": PRICES[id]}
 
 static func fresh_inventory() -> Dictionary:
-	return {"snack": {"stock": 0, "purchased": 0, "sold": 0, "price": 80}, "soap": {"stock": 0, "purchased": 0, "sold": 0, "price": 120}, "tomato": {"stock": 0, "purchased": 0, "sold": 0, "price": 80}}
+	var result := {}
+	for id in EXTRA: result[id] = fresh_item(id)
+	return result
 
 static func valid(data) -> bool:
-	if not data is Dictionary or data.size() not in [2, 3]: return false
+	if not data is Dictionary or not data.has("snack") or not data.has("soap"): return false
 	for key in data:
-		if key not in ["snack", "soap", "tomato"]: return false
-	for id in ["snack", "soap", "tomato"]:
-		var item = data.get(id, fresh_inventory().tomato if id == "tomato" else null)
+		if key not in EXTRA: return false
+	for id in EXTRA:
+		var item = data.get(id, fresh_item(id) if id in OPTIONAL else null)
 		if not item is Dictionary: return false
 		for field in ["stock", "purchased", "sold", "price"]:
 			var value = item.get(field)

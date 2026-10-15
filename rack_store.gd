@@ -38,7 +38,7 @@ static func count_product(record: Dictionary, product: String) -> int:
 static func supports(record: Dictionary, product: String) -> bool:
 	if not record.has("slots"): return record.product == product
 	for slot in record.slots:
-		if slot.product in [product, ""]: return true
+		if slot.product in [product, ""] or int(slot.count) == 0: return true
 	return false
 
 func free_space(id: int, product: String) -> int:
@@ -48,7 +48,7 @@ func free_space(id: int, product: String) -> int:
 	if int(record.legacy_overflow) > 0: return 0
 	var space := 0
 	for slot in record.slots:
-		if slot.product in [product, ""]: space += SHELF_CAPACITY - int(slot.count)
+		if slot.product in [product, ""] or int(slot.count) == 0: space += SHELF_CAPACITY - int(slot.count)
 	return space
 
 func restock_rack(product: String) -> int:
@@ -161,11 +161,12 @@ func add_stock(product: String, amount: int, id := -1) -> bool:
 	var record := find(id)
 	if record.is_empty() or free_space(id, product) < amount: return false
 	var remaining := amount
-	# Fill assigned rows first; unassigned rows become this SKU only when needed.
+	# Fill rows already holding/assigned to this SKU first; any empty row then
+	# takes it, so every rack can hold a mix of products (one SKU per row).
 	for empty in [false, true]:
 		for index in range(slot_count(record)):
 			var slot: Dictionary = record.slots[index]
-			if slot.product != ("" if empty else product) or remaining == 0: continue
+			if remaining == 0 or (int(slot.count) > 0 if empty else slot.product != product): continue
 			var added := mini(remaining, SHELF_CAPACITY - int(slot.count))
 			if added <= 0: continue
 			slot.product = product
@@ -204,7 +205,8 @@ func remove_stock(product: String, amount: int, id := -1) -> bool:
 
 static func valid(layout, stock: int, inventory: Dictionary) -> bool:
 	if not layout is Array or layout.size() < 3 or layout.size() > MAX_RACKS: return false
-	var totals := {"bottle": 0, "snack": 0, "soap": 0, "tomato": 0}
+	var totals := {}
+	for id in Catalog.IDS: totals[id] = 0
 	var destinations := {"bottle": 0, "snack": 0, "soap": 0}
 	for index in range(layout.size()):
 		var item = layout[index]
@@ -240,4 +242,8 @@ static func valid(layout, stock: int, inventory: Dictionary) -> bool:
 			if total != int(item.amount): return false
 		else: totals[item.product] += int(item.amount)
 	if not geometry_error(layout).is_empty() or destinations.values().any(func(count): return count != 1): return false
-	return totals.snack == int(inventory.snack.stock) and totals.soap == int(inventory.soap.stock) and totals.tomato == int(inventory.get("tomato", {}).get("stock", 0)) and totals.bottle == stock - totals.snack - totals.soap - totals.tomato
+	var extras := 0
+	for id in Catalog.EXTRA:
+		if totals[id] != int(inventory.get(id, {}).get("stock", 0)): return false
+		extras += totals[id]
+	return totals.bottle == stock - extras

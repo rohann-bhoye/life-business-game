@@ -113,7 +113,7 @@ func refresh_stock() -> void:
 			var slot: Dictionary = record.slots[level]
 			var count := int(slot.count)
 			if slot.product != "":
-				if slot.product not in types: types.append(slot.product)
+				if slot.product not in types and count > 0: types.append(slot.product)
 				var reserved := mini(count, int(reservations[slot.product]))
 				count -= reserved
 				reservations[slot.product] -= reserved
@@ -131,8 +131,8 @@ func refresh_stock() -> void:
 				model.items[index].visible = offset < count
 			_update_slot_label(model.node, level, slot, record)
 		var category: Label3D = model.node.get_node_or_null("CategoryName")
-		if category != null: category.text = "MIXED PRODUCTS" if types.size() > 1 else (Catalog.NAMES[types[0]].to_upper() if not types.is_empty() else "EMPTY RACK")
-		model.label.text = "%s: %d / %d" % ["MIXED" if types.size() > 1 else Catalog.NAMES[types[0]].to_upper() if not types.is_empty() else "UNASSIGNED", visible_total, Store.slot_count(record) * 10]
+		if category != null: category.text = "MIXED PRODUCTS" if types.size() > 1 else (Catalog.NAMES[types[0]].to_upper() if not types.is_empty() else "OPEN SHELF - ANY PRODUCT")
+		model.label.text = "%s: %d / %d" % ["MIXED" if types.size() > 1 else Catalog.NAMES[types[0]].to_upper() if not types.is_empty() else "OPEN SHELF", visible_total, Store.slot_count(record) * 10]
 		if record.legacy_overflow > 0: model.label.text += " | surplus %d" % record.legacy_overflow
 
 func _update_slot_label(node: Node3D, level: int, slot: Dictionary, record: Dictionary) -> void:
@@ -143,7 +143,7 @@ func _update_slot_label(node: Node3D, level: int, slot: Dictionary, record: Dict
 			basket_label.rotation.y = PI / 2
 			basket_label.font_size = 16
 			basket_label.pixel_size = 0.0012
-		basket_label.text = "UNASSIGNED" if slot.product == "" else "%s\n%s%d | %d/10" % [Catalog.NAMES[slot.product], String.chr(8377), business.product_price(slot.product), slot.count]
+		basket_label.text = "EMPTY\nany product" if slot.product == "" or int(slot.count) == 0 else "%s\n%s%d | %d/10" % [Catalog.NAMES[slot.product], String.chr(8377), business.product_price(slot.product), slot.count]
 		return
 	if not node.has_node("CategoryName"): return
 	var name := "ShelfSlotLabel%d" % level
@@ -151,8 +151,8 @@ func _update_slot_label(node: Node3D, level: int, slot: Dictionary, record: Dict
 	if label == null:
 		label = world.get_node("ShopPresentation")._label(node, name, "", Vector3(0.41, 0.2 + level * 0.55, 0), 24, 0.002, Color(0.08, 0.13, 0.15))
 		label.rotation.y = PI / 2
-	label.text = "Empty | 0 / 10" if slot.product == "" else "%s | %s%d | %d / 10" % [Catalog.NAMES[slot.product], String.chr(8377), business.product_price(slot.product), slot.count]
-	label.visible = level > 0 or slot.product != business.racks.find(_model_id(node)).product
+	label.text = "Empty row | any product" if slot.product == "" or int(slot.count) == 0 else "%s | %s%d | %d / 10" % [Catalog.NAMES[slot.product], String.chr(8377), business.product_price(slot.product), slot.count]
+	label.visible = level > 0 or int(slot.count) == 0 or slot.product != business.racks.find(_model_id(node)).product
 	if level == 0:
 		node.get_node("ShelfPrice").visible = not label.visible
 		node.get_node("PriceCard").visible = not label.visible
@@ -169,6 +169,26 @@ func busy(id: int) -> bool:
 		if child.get("rack_id") == id and child.get("state") in [1, 5]: return true
 	var worker = operations.stock_worker
 	return is_instance_valid(worker) and not worker.route.is_empty()
+
+## Packs an empty bought rack into a warehouse package (PC Racks tab).
+func pack(id: int) -> bool:
+	for record in business.racks.records:
+		if int(record.id) >= id and busy(int(record.id)):
+			ui.show_feedback("Rack is in use. Wait until stocking and browsing finish.", true)
+			return false
+	if active or not business.pack_rack(id):
+		ui.show_feedback("Only an empty rack you bought can be packed.", true)
+		return false
+	# Record ids above the packed rack shifted down by one; keep models matched.
+	models[id].node.queue_free()
+	var shifted := {}
+	for key in models:
+		if key < id: shifted[key] = models[key]
+		elif key > id: shifted[key - 1] = models[key]
+	models = shifted
+	_sync()
+	ui.show_feedback("Rack packed. Its package is waiting in the warehouse.")
+	return true
 
 func begin_buy(sku: String) -> bool:
 	if sku not in business.logistics.rack_delivered or business.racks.records.size() >= Store.MAX_RACKS: return false

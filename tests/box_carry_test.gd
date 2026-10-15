@@ -55,15 +55,11 @@ func _run() -> void:
 		assert(business.carried_stock == 10 and box.visible)
 		assert(box.get_node("LeftGrip").position.x < -0.4)
 		assert(box.get_node("RightGrip").position.x > 0.4)
+		# Racks are mixed: every other rack with an empty row also accepts this product.
 		for wrong in ["bottle", "snack", "soap"]:
 			if wrong == product: continue
-			var before: Dictionary = business.snapshot()
-			player.position = ops.rack_target(wrong) + Vector3(0, 1, 0)
-			await _press_e()
-			assert(business.snapshot() == before)
-			assert(not player._menu_is_open() and ui.feedback_label.visible)
-			assert(ui.feedback_label.text.begins_with("Wrong rack."))
-			assert(ui.feedback_label.text.contains(Catalog.NAMES[product]))
+			var other: Dictionary = business.racks.find(["bottle", "snack", "soap"].find(wrong))
+			assert(business.racks.supports(other, product))
 		player.position = Vector3(-3.5, 1.1, -3.3)
 		player.rotation = Vector3.ZERO
 		player.shop_indoors = true

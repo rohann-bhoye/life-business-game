@@ -160,6 +160,7 @@ func _ready() -> void:
 	ui._label("RackInfoLabel", self)
 	_button("MoveRackButton", _move_rack).text = "Move / rotate rack"
 	_button("SetRestockRackButton", _set_restock_rack).text = "Restock here"
+	_button("PackRackButton", _pack_rack).text = "Pack rack into warehouse"
 	shelf_selector = OptionButton.new()
 	shelf_selector.name = "ShelfSlotSelector"
 	for row in ["Lower shelf", "Middle shelf", "Upper shelf"]: shelf_selector.add_item(row)
@@ -220,7 +221,7 @@ func _select_tab(index: int) -> void:
 	role_input.visible = index in [1, 3]
 	for node_name in ["HappinessLabel", "HappinessBar", "EmployeeMessageLabel", "TalkEmployeeButton", "PayOvertimeButton"]:
 		get_node(node_name).visible = index == 3
-	for node_name in ["RackProductSelector", "FurnitureQuoteLabel", "RackQuantity", "BuyRackButton", "RackDeliveryLabel", "RackSelector", "RackInfoLabel", "MoveRackButton", "SetRestockRackButton"]:
+	for node_name in ["RackProductSelector", "FurnitureQuoteLabel", "RackQuantity", "BuyRackButton", "RackDeliveryLabel", "RackSelector", "RackInfoLabel", "MoveRackButton", "SetRestockRackButton", "PackRackButton"]:
 		get_node(node_name).visible = index == 4
 	rack_selector.visible = index in [4, 5]
 	for node_name in ["ShelfSlotSelector", "ShelfProductSelector", "ShelfCapacityLabel", "ShelfSummaryLabel", "AssignShelfButton"]: get_node(node_name).visible = index == 5
@@ -302,6 +303,7 @@ func _layout() -> void:
 	ui._place(get_node("RackInfoLabel"), 16, 316, width - 32, 24)
 	ui._place(get_node("MoveRackButton"), 16, 348, width - 32, 28)
 	ui._place(get_node("SetRestockRackButton"), 16, 384, width - 32, 28)
+	ui._place(get_node("PackRackButton"), 16, 420, width - 32, 28)
 	ui._place(get_node("WarehouseStaffLabel"), 16, 166, width - 32, 24)
 	ui._place(warehouse_work, 16, 196, width - 32, 32)
 	ui._place(get_node("WarehouseWageLabel"), 16, 234, width - 32, 24)
@@ -318,7 +320,7 @@ func _layout() -> void:
 		ui._place(company_column.get_node("CompanyHeading"), 0, 0, 176, 24)
 		ui._place(company_list, 0, 34, 176, 144)
 		company_list.select(0 if selected_tab == 0 else 1)
-		for node_name in ["ProductSelector", "ProductLabel", "PriceLabel", "OrderStatusLabel", "OrderButton", "RetailPriceLabel", "RetailPriceInput", "BoxQuantityLabel", "BoxQuantityInput", "RackProductSelector", "FurnitureQuoteLabel", "BuyRackButton", "RackDeliveryLabel", "RackSelector", "RackInfoLabel", "MoveRackButton", "SetRestockRackButton"]:
+		for node_name in ["ProductSelector", "ProductLabel", "PriceLabel", "OrderStatusLabel", "OrderButton", "RetailPriceLabel", "RetailPriceInput", "BoxQuantityLabel", "BoxQuantityInput", "RackProductSelector", "FurnitureQuoteLabel", "BuyRackButton", "RackDeliveryLabel", "RackSelector", "RackInfoLabel", "MoveRackButton", "SetRestockRackButton", "PackRackButton"]:
 			var control: Control = get_node(node_name)
 			control.position.x += 192
 			if node_name not in ["RetailPriceLabel", "BoxQuantityLabel"]: control.size.x -= 192
@@ -464,6 +466,8 @@ func _refresh_racks() -> void:
 	get_node("BuyRackButton").disabled = not business.can_order_racks(Catalog.IDS[rack_product.selected], quantity)
 	get_node("MoveRackButton").disabled = business.carried_stock > 0
 	get_node("SetRestockRackButton").disabled = record.get("restock", false) or business.worker_carried_stock > 0
+	get_node("PackRackButton").disabled = int(record.id) < 3 or int(record.amount) > 0 or business.carried_stock > 0
+	get_node("PackRackButton").tooltip_text = "Starting racks stay in the shop." if int(record.id) < 3 else ("Empty the rack first." if int(record.amount) > 0 else "Send this rack to the warehouse as a package.")
 	if not is_instance_valid(shelf_selector): return
 	var slots: int = business.RackStore.slot_count(record)
 	if shelf_selector.item_count != slots:
@@ -505,6 +509,9 @@ func _buy_rack() -> void:
 func _move_rack() -> void:
 	var furnishing = get_tree().current_scene.get_node("RackFurnishing")
 	if furnishing.begin_move(rack_selector.get_selected_id()): close_menu()
+
+func _pack_rack() -> void:
+	get_tree().current_scene.get_node("RackFurnishing").pack(rack_selector.get_selected_id())
 
 func _set_restock_rack() -> void:
 	if shop.business.set_stock_rack(rack_selector.get_selected_id()): ui.show_feedback("Restocking destination updated.")
