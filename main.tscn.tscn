@@ -1,0 +1,509 @@
+[gd_scene format=3 uid="uid://d2b6qylnkqsuu"]
+
+[ext_resource type="Script" uid="uid://c7d2cvf27vsr7" path="res://player.gd" id="1_2h1pa"]
+[ext_resource type="Script" uid="uid://d0t1awntx0fsi" path="res://shop_area.gd" id="2_a336g"]
+[ext_resource type="PackedScene" path="res://customer.tscn" id="3_customer"]
+[ext_resource type="Script" uid="uid://4tqbunte817c" path="res://customer_spawner.gd" id="4_spawner"]
+[ext_resource type="PackedScene" path="res://worker.tscn" id="5_worker"]
+[ext_resource type="PackedScene" path="res://house.tscn" id="6_house"]
+[ext_resource type="Script" uid="uid://cbnmkumnhj1hl" path="res://day_clock.gd" id="7_clock"]
+[ext_resource type="Script" uid="uid://cd7arr68gmsvm" path="res://game_ui.gd" id="8_ui"]
+[ext_resource type="Script" uid="uid://cxdvsqux0jjkl" path="res://character_visual.gd" id="9_character"]
+[ext_resource type="Script" uid="uid://cpwye3yuyvbmd" path="res://neighbourhood.gd" id="10_neighbourhood"]
+[ext_resource type="Script" uid="uid://k87rphuvlwym" path="res://day_night.gd" id="11_daynight"]
+[ext_resource type="Script" uid="uid://suqi766j1emb" path="res://shop_operations.gd" id="12_operations"]
+[ext_resource type="PackedScene" path="res://neighbourhood_landscape.tscn" id="13_landscape"]
+[ext_resource type="Script" path="res://shop_presentation.gd" id="14_presentation"]
+[ext_resource type="Script" path="res://rack_furnishing.gd" id="15_furnishing"]
+[ext_resource type="Script" path="res://warehouse.gd" id="16_warehouse"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_wp5od"]
+size = Vector3(64, 0.2, 64)
+
+[sub_resource type="BoxShape3D" id="NeighbourhoodGroundShape"]
+size = Vector3(64, 0.2, 64)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_wp5od"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_wp5od"]
+
+[sub_resource type="SphereShape3D" id="CameraCollisionShape"]
+radius = 0.18
+
+[sub_resource type="ProceduralSkyMaterial" id="NeighbourhoodSkyMaterial"]
+sky_top_color = Color(0.3, 0.52, 0.75, 1)
+sky_horizon_color = Color(0.77, 0.86, 0.9, 1)
+ground_bottom_color = Color(0.2, 0.28, 0.24, 1)
+ground_horizon_color = Color(0.77, 0.86, 0.9, 1)
+
+[sub_resource type="Sky" id="NeighbourhoodSky"]
+sky_material = SubResource("NeighbourhoodSkyMaterial")
+
+[sub_resource type="Environment" id="Environment_wp5od"]
+background_mode = 2
+background_color = Color(0.5294118, 0.80784315, 0.92156863, 1)
+sky = SubResource("NeighbourhoodSky")
+ambient_light_source = 2
+ambient_light_color = Color(0.84, 0.9, 1, 1)
+ambient_light_energy = 0.4
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wp5od"]
+albedo_color = Color(0.16, 0.18, 0.19, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_k56px"]
+material = SubResource("StandardMaterial3D_wp5od")
+size = Vector3(64, 0.012, 5.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dagrs"]
+albedo_color = Color(0.8, 0.82, 0.79, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_vkdpk"]
+material = SubResource("StandardMaterial3D_dagrs")
+custom_aabb = AABB(4, 3, 4, 0, 0, 0)
+size = Vector3(4, 3, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_dagrs"]
+size = Vector3(1, 2, 0.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_k56px"]
+size = Vector3(5, 3, 5)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_a336g"]
+bg_color = Color(0.10980392, 0.16470589, 0.22745098, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.43137255, 0.65882355, 0.84313726, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+corner_detail = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lxlcg"]
+bg_color = Color(0.08627451, 0.6392157, 0.2901961, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sff6v"]
+bg_color = Color(0.08235294, 0.5019608, 0.23921569, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_72s7c"]
+bg_color = Color(0.13333334, 0.77254903, 0.36862746, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[node name="Node3D" type="Node3D" unique_id=2121090124]
+
+[node name="DayClock" type="Node" parent="." unique_id=1316765906]
+script = ExtResource("7_clock")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=35891545]
+mesh = SubResource("BoxMesh_wp5od")
+
+[node name="Ground" type="StaticBody3D" parent="." unique_id=929406678]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground" unique_id=18405646]
+shape = SubResource("NeighbourhoodGroundShape")
+
+[node name="Player" type="CharacterBody3D" parent="." unique_id=1929573078]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+script = ExtResource("1_2h1pa")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player" unique_id=1530413651]
+shape = SubResource("CapsuleShape3D_wp5od")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Player" unique_id=1528264195]
+mesh = SubResource("CapsuleMesh_wp5od")
+script = ExtResource("9_character")
+feet_offset = -1.0
+face_movement = true
+
+[node name="CameraPivot" type="Node3D" parent="Player" unique_id=431017728]
+transform = Transform3D(1, 0, 0, 0, 0.9781476, 0.20791169, 0, -0.20791169, 0.9781476, 0, 0.7, 0)
+
+[node name="SpringArm3D" type="SpringArm3D" parent="Player/CameraPivot" unique_id=1841384550]
+shape = SubResource("CameraCollisionShape")
+spring_length = 4.5
+margin = 0.15
+
+[node name="Camera3D" type="Camera3D" parent="Player/CameraPivot/SpringArm3D" unique_id=619774796]
+current = true
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1640793771]
+transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
+light_color = Color(1, 0.94, 0.84, 1)
+light_energy = 0.9
+shadow_enabled = true
+directional_shadow_max_distance = 60.0
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=236390905]
+environment = SubResource("Environment_wp5od")
+
+[node name="Road" type="MeshInstance3D" parent="." unique_id=1422779734]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.111, 7)
+mesh = SubResource("BoxMesh_k56px")
+
+[node name="Shop" type="MeshInstance3D" parent="." unique_id=1263636824]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 1.5, 0)
+mesh = SubResource("BoxMesh_vkdpk")
+
+[node name="ShopDoor" type="MeshInstance3D" parent="Shop" unique_id=78118027]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 2.1)
+mesh = SubResource("BoxMesh_dagrs")
+
+[node name="ShopSign" type="Label3D" parent="Shop" unique_id=1640276208]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.62, 2.29)
+pixel_size = 0.007
+text = "SHOP"
+font_size = 96
+outline_size = 4
+uppercase = true
+
+[node name="ShopArea" type="Area3D" parent="Shop" unique_id=116948451]
+script = ExtResource("2_a336g")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Shop/ShopArea" unique_id=1668266164]
+shape = SubResource("BoxShape3D_k56px")
+
+[node name="MarketingTimer" type="Timer" parent="Shop/ShopArea" unique_id=1405288608]
+wait_time = 60.0
+one_shot = true
+
+[node name="AutosaveTimer" type="Timer" parent="Shop/ShopArea" unique_id=1550244]
+wait_time = 5.0
+autostart = true
+
+[node name="CustomerSpawnPoint" type="Marker3D" parent="." unique_id=171473119]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.1, 6)
+
+[node name="CustomerPurchasePoint" type="Marker3D" parent="." unique_id=266112171]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.1, 2.8)
+
+[node name="CustomerExitPoint" type="Marker3D" parent="." unique_id=1180789548]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.1, 8)
+
+[node name="Customer" parent="." unique_id=275240603 instance=ExtResource("3_customer")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.1, 6)
+shop_area_path = NodePath("../Shop/ShopArea")
+purchase_point_path = NodePath("../CustomerPurchasePoint")
+exit_point_path = NodePath("../CustomerExitPoint")
+
+[node name="CustomerSpawner" type="Node3D" parent="." unique_id=572537810]
+script = ExtResource("4_spawner")
+
+[node name="SpawnTimer" type="Timer" parent="CustomerSpawner" unique_id=1051843680]
+wait_time = 10.0
+autostart = true
+
+[node name="Worker" parent="." unique_id=1384622102 instance=ExtResource("5_worker")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.8, 0.1, 2.8)
+shop_area_path = NodePath("../Shop/ShopArea")
+
+[node name="House" parent="." unique_id=192175459 instance=ExtResource("6_house")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0.1, -4)
+
+[node name="Neighbourhood" type="Node3D" parent="." unique_id=1244416149]
+script = ExtResource("10_neighbourhood")
+
+[node name="DayNight" type="Node" parent="." unique_id=1955834186]
+script = ExtResource("11_daynight")
+
+[node name="ShopOperations" type="Node3D" parent="." unique_id=1637873224]
+script = ExtResource("12_operations")
+
+[node name="Ui" type="CanvasLayer" parent="." unique_id=282110634]
+script = ExtResource("8_ui")
+
+[node name="ShopMenu" type="Panel" parent="Ui" unique_id=1808964186]
+visible = false
+offset_left = 22.0
+offset_top = 9.0
+offset_right = 582.0
+offset_bottom = 545.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_a336g")
+
+[node name="TitleLabel" type="Label" parent="Ui/ShopMenu" unique_id=731651848]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 5.0
+offset_right = 82.0
+offset_bottom = 28.0
+text = "MY SHOP"
+
+[node name="MoneyLabel" type="Label" parent="Ui/ShopMenu" unique_id=779528762]
+custom_minimum_size = Vector2(20, 24)
+layout_mode = 0
+offset_left = 20.0
+offset_top = 50.0
+offset_right = 260.0
+offset_bottom = 74.0
+text = "Money: ₹50,000"
+
+[node name="StockLabel" type="Label" parent="Ui/ShopMenu" unique_id=1011560788]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 82.0
+offset_right = 260.0
+offset_bottom = 106.0
+text = "Stock: 10"
+
+[node name="SalePriceLabel" type="Label" parent="Ui/ShopMenu" unique_id=1407677040]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 114.0
+offset_right = 140.0
+offset_bottom = 146.0
+text = "Sale price"
+
+[node name="SalePriceInput" type="SpinBox" parent="Ui/ShopMenu" unique_id=521615271]
+layout_mode = 0
+offset_left = 144.0
+offset_top = 114.0
+offset_right = 260.0
+offset_bottom = 146.0
+min_value = 50.0
+max_value = 200.0
+step = 10.0
+value = 100.0
+prefix = "₹"
+
+[node name="SalesLabel" type="Label" parent="Ui/ShopMenu" unique_id=1351129606]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 160.0
+offset_right = 260.0
+offset_bottom = 184.0
+text = "Items sold: 0"
+
+[node name="RevenueLabel" type="Label" parent="Ui/ShopMenu" unique_id=1533634835]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 192.0
+offset_right = 260.0
+offset_bottom = 216.0
+text = "Revenue: ₹0"
+
+[node name="ExpensesLabel" type="Label" parent="Ui/ShopMenu" unique_id=2089671169]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 224.0
+offset_right = 260.0
+offset_bottom = 248.0
+text = "Expenses: ₹0"
+
+[node name="ProfitLabel" type="Label" parent="Ui/ShopMenu" unique_id=1879309901]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 256.0
+offset_right = 260.0
+offset_bottom = 280.0
+text = "Net profit: ₹0"
+
+[node name="MissedSalesLabel" type="Label" parent="Ui/ShopMenu" unique_id=817872997]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 288.0
+offset_right = 260.0
+offset_bottom = 312.0
+text = "Missed sales: 0"
+
+[node name="LastVisitLabel" type="Label" parent="Ui/ShopMenu" unique_id=1166040005]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 320.0
+offset_right = 260.0
+offset_bottom = 344.0
+text = "Last visit: No customers yet"
+
+[node name="BuyStockButton" type="Button" parent="Ui/ShopMenu" unique_id=1497727738]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 370.0
+offset_right = 188.0
+offset_bottom = 401.0
+theme_override_styles/normal = SubResource("StyleBoxFlat_lxlcg")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_sff6v")
+theme_override_styles/hover = SubResource("StyleBoxFlat_72s7c")
+text = "BUY 10 STOCK - ₹500"
+
+[node name="MarketingLabel" type="Label" parent="Ui/ShopMenu" unique_id=625137639]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 408.0
+offset_right = 260.0
+offset_bottom = 432.0
+text = "Marketing: Inactive"
+
+[node name="MarketingButton" type="Button" parent="Ui/ShopMenu" unique_id=192906390]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 440.0
+offset_right = 260.0
+offset_bottom = 471.0
+text = "MARKETING - ₹200"
+
+[node name="WorkerLabel" type="Label" parent="Ui/ShopMenu" unique_id=1293902581]
+layout_mode = 0
+offset_left = 300.0
+offset_top = 50.0
+offset_right = 540.0
+offset_bottom = 74.0
+text = "Worker: Not hired"
+
+[node name="HireWorkerButton" type="Button" parent="Ui/ShopMenu" unique_id=423312865]
+layout_mode = 0
+offset_left = 300.0
+offset_top = 82.0
+offset_right = 540.0
+offset_bottom = 113.0
+text = "HIRE WORKER - ₹1,000"
+
+[node name="WorkerStatusLabel" type="Label" parent="Ui/ShopMenu" unique_id=328089303]
+layout_mode = 0
+offset_left = 300.0
+offset_top = 128.0
+offset_right = 540.0
+offset_bottom = 152.0
+text = "Status: Vacant"
+
+[node name="SaveStatusLabel" type="Label" parent="Ui/ShopMenu" unique_id=1206369652]
+layout_mode = 0
+offset_left = 300.0
+offset_top = 176.0
+offset_right = 540.0
+offset_bottom = 224.0
+text = "Save: New game"
+autowrap_mode = 2
+
+[node name="HomeOwnershipLabel" type="Label" parent="Ui/ShopMenu" unique_id=2048416453]
+layout_mode = 0
+offset_left = 300.0
+offset_top = 240.0
+offset_right = 540.0
+offset_bottom = 264.0
+text = "Home: Not owned"
+
+[node name="DailyCostLabel" type="Label" parent="Ui/ShopMenu" unique_id=392059157]
+layout_mode = 0
+offset_left = 300.0
+offset_top = 280.0
+offset_right = 540.0
+offset_bottom = 304.0
+text = "Daily bills:"
+
+[node name="UnpaidBillsLabel" type="Label" parent="Ui/ShopMenu" unique_id=2069311244]
+layout_mode = 0
+offset_left = 300.0
+offset_top = 312.0
+offset_right = 540.0
+offset_bottom = 360.0
+text = "Unpaid bills:"
+autowrap_mode = 2
+
+[node name="PayBillsButton" type="Button" parent="Ui/ShopMenu" unique_id=912628327]
+layout_mode = 0
+offset_left = 300.0
+offset_top = 376.0
+offset_right = 540.0
+offset_bottom = 407.0
+text = "PAY BILLS"
+
+[node name="CloseButton" type="Button" parent="Ui/ShopMenu" unique_id=1207580180]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 486.0
+offset_right = 78.0
+offset_bottom = 517.0
+text = "CLOSE"
+
+[node name="HouseMenu" type="Panel" parent="Ui" unique_id=495359376]
+visible = false
+offset_left = 22.0
+offset_top = 9.0
+offset_right = 342.0
+offset_bottom = 289.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_a336g")
+
+[node name="HouseTitleLabel" type="Label" parent="Ui/HouseMenu" unique_id=1964549767]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 10.0
+offset_right = 300.0
+offset_bottom = 34.0
+text = "HOME"
+
+[node name="HouseMoneyLabel" type="Label" parent="Ui/HouseMenu" unique_id=590887353]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 50.0
+offset_right = 300.0
+offset_bottom = 74.0
+text = "Money: ₹50,000"
+
+[node name="HousePriceLabel" type="Label" parent="Ui/HouseMenu" unique_id=79099459]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 82.0
+offset_right = 300.0
+offset_bottom = 106.0
+text = "Price: ₹15,000"
+
+[node name="OwnershipLabel" type="Label" parent="Ui/HouseMenu" unique_id=1336861333]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 114.0
+offset_right = 300.0
+offset_bottom = 138.0
+text = "Ownership: For sale"
+
+[node name="BuyHouseButton" type="Button" parent="Ui/HouseMenu" unique_id=803889681]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 182.0
+offset_right = 300.0
+offset_bottom = 213.0
+text = "BUY HOME - ₹15,000"
+
+[node name="CloseHouseButton" type="Button" parent="Ui/HouseMenu" unique_id=1483243752]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 226.0
+offset_right = 100.0
+offset_bottom = 257.0
+text = "CLOSE"
+
+[node name="ClockLabel" type="Label" parent="Ui" unique_id=565202574]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -220.0
+offset_top = 12.0
+offset_right = -16.0
+offset_bottom = 42.0
+grow_horizontal = 0
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+text = "Day 1 | 08:00"
+horizontal_alignment = 2
+
+[node name="Landscape" parent="." instance=ExtResource("13_landscape")]
+
+[node name="ShopPresentation" type="Node" parent="."]
+script = ExtResource("14_presentation")
+
+[node name="RackFurnishing" type="Node3D" parent="."]
+script = ExtResource("15_furnishing")
+
+[node name="Warehouse" type="Node3D" parent="."]
+script = ExtResource("16_warehouse")

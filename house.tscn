@@ -1,0 +1,241 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://house_area.gd" id="1_house"]
+[ext_resource type="Script" path="res://sleep_area.gd" id="2_sleep"]
+
+[sub_resource type="StandardMaterial3D" id="WallMaterial"]
+albedo_color = Color(0.86, 0.9, 0.88, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="RoofMaterial"]
+albedo_color = Color(0.16, 0.3, 0.32, 1)
+
+[sub_resource type="StandardMaterial3D" id="DoorMaterial"]
+albedo_color = Color(0.66, 0.3, 0.22, 1)
+
+[sub_resource type="StandardMaterial3D" id="WindowMaterial"]
+albedo_color = Color(0.35, 0.61, 0.68, 1)
+
+[sub_resource type="StandardMaterial3D" id="FloorMaterial"]
+albedo_color = Color(0.65, 0.68, 0.66, 1)
+
+[sub_resource type="StandardMaterial3D" id="BedMaterial"]
+albedo_color = Color(0.65, 0.25, 0.4, 1)
+
+[sub_resource type="BoxMesh" id="SideWallMesh"]
+material = SubResource("WallMaterial")
+size = Vector3(0.2, 3, 4)
+
+[sub_resource type="BoxShape3D" id="SideWallShape"]
+size = Vector3(0.2, 3, 4)
+
+[sub_resource type="BoxMesh" id="BackWallMesh"]
+material = SubResource("WallMaterial")
+size = Vector3(4, 3, 0.2)
+
+[sub_resource type="BoxShape3D" id="BackWallShape"]
+size = Vector3(4, 3, 0.2)
+
+[sub_resource type="BoxMesh" id="FrontWallMesh"]
+material = SubResource("WallMaterial")
+size = Vector3(1.3, 3, 0.2)
+
+[sub_resource type="BoxShape3D" id="FrontWallShape"]
+size = Vector3(1.3, 3, 0.2)
+
+[sub_resource type="BoxMesh" id="DoorHeaderMesh"]
+material = SubResource("WallMaterial")
+size = Vector3(1.4, 0.7, 0.2)
+
+[sub_resource type="BoxShape3D" id="DoorHeaderShape"]
+size = Vector3(1.4, 0.7, 0.2)
+
+[sub_resource type="BoxMesh" id="FloorMesh"]
+material = SubResource("FloorMaterial")
+size = Vector3(4, 0.1, 4)
+
+[sub_resource type="BoxShape3D" id="FloorShape"]
+size = Vector3(4, 0.1, 4)
+
+[sub_resource type="BoxMesh" id="DoorMesh"]
+material = SubResource("DoorMaterial")
+size = Vector3(1.4, 2.3, 0.15)
+
+[sub_resource type="BoxShape3D" id="DoorShape"]
+size = Vector3(1.4, 2.3, 0.15)
+
+[sub_resource type="BoxMesh" id="WindowMesh"]
+material = SubResource("WindowMaterial")
+size = Vector3(0.75, 0.75, 0.06)
+
+[sub_resource type="CylinderMesh" id="RoofMesh"]
+material = SubResource("RoofMaterial")
+top_radius = 0.0
+bottom_radius = 3.3
+height = 1.2
+radial_segments = 4
+rings = 1
+cap_top = false
+
+[sub_resource type="BoxMesh" id="BedMesh"]
+material = SubResource("BedMaterial")
+size = Vector3(1, 0.5, 1.8)
+
+[sub_resource type="BoxShape3D" id="BedShape"]
+size = Vector3(1, 0.5, 1.8)
+
+[sub_resource type="BoxMesh" id="PillowMesh"]
+material = SubResource("WallMaterial")
+size = Vector3(0.7, 0.15, 0.35)
+
+[sub_resource type="BoxShape3D" id="InteractionShape"]
+size = Vector3(3, 2.5, 2)
+
+[sub_resource type="BoxShape3D" id="InteriorShape"]
+size = Vector3(3.6, 2.8, 3.6)
+
+[sub_resource type="BoxShape3D" id="SleepShape"]
+size = Vector3(2.6, 2.5, 2.4)
+
+[sub_resource type="ConvexPolygonShape3D" id="RoofCollisionShape"]
+points = PackedVector3Array(-2.333452, -0.6, -2.333452, 2.333452, -0.6, -2.333452, 2.333452, -0.6, 2.333452, -2.333452, -0.6, 2.333452, 0, 0.6, 0)
+
+[node name="House" type="Node3D"]
+
+[node name="Walls" type="StaticBody3D" parent="."]
+
+[node name="LeftWall" type="MeshInstance3D" parent="Walls"]
+position = Vector3(-1.9, 1.5, 0)
+mesh = SubResource("SideWallMesh")
+
+[node name="LeftCollision" type="CollisionShape3D" parent="Walls"]
+position = Vector3(-1.9, 1.5, 0)
+shape = SubResource("SideWallShape")
+
+[node name="RightWall" type="MeshInstance3D" parent="Walls"]
+position = Vector3(1.9, 1.5, 0)
+mesh = SubResource("SideWallMesh")
+
+[node name="RightCollision" type="CollisionShape3D" parent="Walls"]
+position = Vector3(1.9, 1.5, 0)
+shape = SubResource("SideWallShape")
+
+[node name="BackWall" type="MeshInstance3D" parent="Walls"]
+position = Vector3(0, 1.5, -1.9)
+mesh = SubResource("BackWallMesh")
+
+[node name="BackCollision" type="CollisionShape3D" parent="Walls"]
+position = Vector3(0, 1.5, -1.9)
+shape = SubResource("BackWallShape")
+
+[node name="FrontLeftWall" type="MeshInstance3D" parent="Walls"]
+position = Vector3(-1.35, 1.5, 1.9)
+mesh = SubResource("FrontWallMesh")
+
+[node name="FrontLeftCollision" type="CollisionShape3D" parent="Walls"]
+position = Vector3(-1.35, 1.5, 1.9)
+shape = SubResource("FrontWallShape")
+
+[node name="FrontRightWall" type="MeshInstance3D" parent="Walls"]
+position = Vector3(1.35, 1.5, 1.9)
+mesh = SubResource("FrontWallMesh")
+
+[node name="FrontRightCollision" type="CollisionShape3D" parent="Walls"]
+position = Vector3(1.35, 1.5, 1.9)
+shape = SubResource("FrontWallShape")
+
+[node name="DoorHeader" type="MeshInstance3D" parent="Walls"]
+position = Vector3(0, 2.65, 1.9)
+mesh = SubResource("DoorHeaderMesh")
+
+[node name="DoorHeaderCollision" type="CollisionShape3D" parent="Walls"]
+position = Vector3(0, 2.65, 1.9)
+shape = SubResource("DoorHeaderShape")
+
+[node name="Floor" type="MeshInstance3D" parent="Walls"]
+position = Vector3(0, -0.049, 0)
+mesh = SubResource("FloorMesh")
+
+[node name="FloorCollision" type="CollisionShape3D" parent="Walls"]
+position = Vector3(0, -0.05, 0)
+shape = SubResource("FloorShape")
+
+[node name="FrontDoor" type="StaticBody3D" parent="."]
+position = Vector3(0, 1.15, 1.9)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="FrontDoor"]
+mesh = SubResource("DoorMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FrontDoor"]
+shape = SubResource("DoorShape")
+
+[node name="LeftWindow" type="MeshInstance3D" parent="."]
+position = Vector3(-1.35, 1.65, 2.02)
+mesh = SubResource("WindowMesh")
+
+[node name="RightWindow" type="MeshInstance3D" parent="."]
+position = Vector3(1.35, 1.65, 2.02)
+mesh = SubResource("WindowMesh")
+
+[node name="Roof" type="MeshInstance3D" parent="."]
+position = Vector3(0, 3.6, 0)
+rotation = Vector3(0, 0.7853982, 0)
+mesh = SubResource("RoofMesh")
+
+[node name="RoofBody" type="StaticBody3D" parent="."]
+position = Vector3(0, 3.6, 0)
+
+[node name="RoofCollision" type="CollisionShape3D" parent="RoofBody"]
+shape = SubResource("RoofCollisionShape")
+
+[node name="Bed" type="StaticBody3D" parent="."]
+position = Vector3(-1.1, 0.3, -0.8)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Bed"]
+mesh = SubResource("BedMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Bed"]
+shape = SubResource("BedShape")
+
+[node name="Pillow" type="MeshInstance3D" parent="Bed"]
+position = Vector3(0, 0.325, -0.55)
+mesh = SubResource("PillowMesh")
+
+[node name="HouseSign" type="Label3D" parent="."]
+position = Vector3(0, 3.25, 2.3)
+billboard = 1
+text = "HOME"
+font_size = 36
+
+[node name="HouseArea" type="Area3D" parent="."]
+position = Vector3(0, 1.2, 2.8)
+collision_layer = 0
+script = ExtResource("1_house")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HouseArea"]
+shape = SubResource("InteractionShape")
+
+[node name="InteriorArea" type="Area3D" parent="."]
+position = Vector3(0, 1.5, 0)
+collision_layer = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="InteriorArea"]
+shape = SubResource("InteriorShape")
+
+[node name="SleepArea" type="Area3D" parent="Bed"]
+position = Vector3(0.3, 0.9, 0.2)
+collision_layer = 0
+script = ExtResource("2_sleep")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Bed/SleepArea"]
+shape = SubResource("SleepShape")
+
+[node name="SleepSign" type="Label3D" parent="Bed/SleepArea"]
+visible = false
+position = Vector3(-0.3, 0.1, 0)
+billboard = 1
+text = "Sleep until morning"
+font_size = 24
+pixel_size = 0.002
+fixed_size = true
+outline_size = 2
