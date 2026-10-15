@@ -30,6 +30,7 @@ var feedback_label: Label
 var controls_panel: Panel
 var first_day_panel: Panel
 var first_day_label: Label
+var first_day_step: Label
 var feedback_seconds := 0.0
 var employee_refresh_seconds := 0.0
 var selected_tab := 0
@@ -399,9 +400,10 @@ func _layout() -> void:
 	house.close_house_button.size.x = 80.0
 	_place(hud_money, 16, 12, maxf(120, viewport_size.x - 240), 28)
 	_place($ClockLabel, viewport_size.x - 176, 12, 160, 28)
-	_place(first_day_panel, viewport_size.x - 276, 50, 260, 82)
+	_place(first_day_panel, viewport_size.x - 276, 50, 260, 156)
 	_place(first_day_panel.get_node("Title"), 12, 8, 236, 20)
-	_place(first_day_label, 12, 30, 236, 44)
+	_place(first_day_label, 12, 30, 236, 64)
+	_place(first_day_step, 12, 98, 236, 52)
 	_place(interaction_label, 16, viewport_size.y - 46, maxf(120, viewport_size.x - 250), 24)
 	_place(feedback_label, 16, viewport_size.y - 80, viewport_size.x - 32, 28)
 	_place(controls_panel, viewport_size.x - 218, viewport_size.y - 132, 202, 116)
@@ -593,6 +595,10 @@ func _build_first_day_guide(theme: Theme) -> void:
 	first_day_label = _label("NextAction", first_day_panel)
 	first_day_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	first_day_label.add_theme_font_size_override("font_size", 14)
+	first_day_step = _label("NextStep", first_day_panel)
+	first_day_step.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	first_day_step.add_theme_font_size_override("font_size", 13)
+	first_day_step.modulate = Color(1, 0.85, 0.45)
 	_update_first_day_guide()
 
 func _update_first_day_guide() -> void:
@@ -611,6 +617,7 @@ func _update_first_day_guide() -> void:
 	first_day_panel.visible = next >= 0 and not player._menu_is_open()
 	if next >= 0:
 		first_day_label.text = "%d/5  %s\n%s" % [next + 1, actions[next], lines[next]]
+		first_day_step.text = "> " + demo.next_step(shop.business)
 
 func _present_demo_completion() -> void:
 	var demo = shop.business.demo

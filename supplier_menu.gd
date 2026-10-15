@@ -416,7 +416,7 @@ func _order() -> void:
 	box_quantity.apply()
 	var product: String = Catalog.IDS[product_input.selected]
 	if shop.business.order_stock(product, int(box_quantity.value)):
-		ui.show_feedback("Ordered %d boxes: %s." % [int(box_quantity.value), Catalog.NAMES[product]])
+		ui.show_feedback("Ordered %d %s: %s." % [int(box_quantity.value), "box" if int(box_quantity.value) == 1 else "boxes", Catalog.NAMES[product]])
 	else: ui.show_feedback("Cannot order: check funds or supply limit.", true)
 	_refresh()
 

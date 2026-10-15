@@ -67,7 +67,8 @@ func refresh() -> void:
 	if business.worker_carried_stock > 0 and business.racks.restock_rack(business.pending_product) < 0:
 		next["shelf_space"] = _entry("Sunil needs shelf space", "%d %s held. No shelf space available." % [business.worker_carried_stock, business.Catalog.NAMES[business.pending_product]], "", true)
 	if business.boxed_stock > 0 or not business.queued_boxes.is_empty():
-		next["delivery"] = _entry("Delivery ready", "%d boxes in the warehouse product bay." % (business.queued_boxes.size() + (1 if business.boxed_stock > 0 else 0)))
+		var ready_boxes: int = business.queued_boxes.size() + (1 if business.boxed_stock > 0 else 0)
+		next["delivery"] = _entry("Delivery ready", "%d %s in the warehouse product bay." % [ready_boxes, "box" if ready_boxes == 1 else "boxes"])
 	if not business.logistics.rack_delivered.is_empty():
 		next["furniture"] = _entry("Furniture delivery ready", "%d packages outside the warehouse." % business.logistics.rack_delivered.size())
 	elif not business.logistics.rack_incoming.is_empty():

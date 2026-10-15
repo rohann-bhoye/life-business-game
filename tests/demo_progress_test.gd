@@ -34,9 +34,30 @@ func _run() -> void:
 	assert(not state.demo.completed() and state.demo.done_flags().count(true) == 0)
 	assert(not state.order_stock("bad") and not state.shelve_one() and not state.sell_basket(0, 100))
 	assert(state.demo.done_flags().count(true) == 0)
-	assert(state.order_stock("bottle", 2) and state.receive_delivery() and state.pick_up_box())
+	assert(state.demo.next_step(state).contains("warehouse office"))
+	assert(state.order_stock("bottle", 2))
+	assert(state.demo.next_step(state).contains("on the way"))
+	assert(state.receive_delivery())
+	assert(state.demo.next_step(state).contains("delivery bay"))
+	assert(state.pick_up_box())
+	assert(state.demo.next_step(state).contains("aim at a shelf"))
 	for index in range(10): assert(state.shelve_one())
 	assert(state.demo.player_shelved == 10 and state.demo.ordered)
+	assert(state.demo.next_step(state).contains("scan each item"))
+	state.minutes_of_day = 1260.0
+	assert(state.demo.next_step(state).contains("08:00"))
+	state.minutes_of_day = 480.0
+	var sunil = Backend.new()
+	sunil.save_path = _path()
+	assert(sunil.order_stock("bottle") and sunil.receive_delivery())
+	sunil.demo.ordered = true
+	sunil.demo.player_shelved = 10
+	sunil.demo.customers_served = 10
+	assert(sunil.demo.next_step(sunil).contains("Hire Sunil"))
+	assert(sunil.hire_stock_worker())
+	assert(sunil.demo.next_step(sunil).contains("Collect delivery"))
+	assert(sunil.pick_up_box(true))
+	assert(sunil.demo.next_step(sunil).contains("Sunil is carrying"))
 	assert(state.hire_stock_worker() and not state.demo.worker_stocked)
 	assert(state.pick_up_box(true) and state.shelve_box(true))
 	assert(state.demo.worker_stocked)

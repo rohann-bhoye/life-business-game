@@ -30,6 +30,32 @@ func goal_lines() -> Array[String]:
 		"Sales: %s%d / %s2,000" % [String.chr(8377), mini(2000, revenue), String.chr(8377)]
 	]
 
+# Live "what to do right now" hint for the current goal, read from backend state.
+func next_step(business) -> String:
+	if completed(): return ""
+	var has_box: bool = business.boxed_stock > 0 or not business.queued_boxes.is_empty()
+	var stored: bool = not business.logistics.storage.is_empty()
+	var box_step := ""
+	if business.carried_stock > 0: box_step = "Walk into the shop, aim at a shelf and press E to place items."
+	elif has_box: box_step = "Pick up the box at the warehouse delivery bay (E)."
+	elif stored: box_step = "Pick up a stored box from the warehouse racks (E)."
+	elif business.supply_in_transit > 0: box_step = "Delivery truck is on the way to the warehouse."
+	match done_flags().find(false):
+		0:
+			return "Cross the road to the warehouse office. Aim at the PC, press E and open Orders."
+		1:
+			return box_step if not box_step.is_empty() else "Order another box at the warehouse PC."
+		3:
+			if not business.stock_worker_hired: return "Hire Sunil: warehouse PC > Team (Rs1,000)."
+			if not business.stock_worker_on_shift(): return "Wait for Sunil's shift, or change his hours on the PC."
+			if business.worker_carried_stock > 0: return "Sunil is carrying a box to the shelves."
+			if has_box: return "Open the tablet (E in shop) > Staff and press Collect delivery."
+			return "Order a box so Sunil has something to stock."
+	# Goals 2 and 4: serve customers / reach sales.
+	if not business.shop_is_open(): return "Shop opens at 08:00. Sleep at home or wait."
+	if business.stock <= 0: return box_step if not box_step.is_empty() else "Shelves are empty. Order and stock products."
+	return "Stand behind the counter and scan each item when customers queue."
+
 func done_flags() -> Array[bool]:
 	return [ordered, player_shelved >= 10, customers_served >= 10, worker_stocked, revenue >= 2000]
 
