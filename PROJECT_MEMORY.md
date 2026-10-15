@@ -14,6 +14,29 @@ Latest feature: playable tomato farming, a Farm tablet tab/seed stall, three far
 expansions, tomato warehouse/shelf/checkout integration, a road-end Coming Next
 board and a local suggestion form. See Farming section below for controls and limits.
 
+## Status Audit, Git and Export Preset (2026-10-15, Claude Code)
+
+- Status: COMPLETE. No gameplay scripts or scenes changed; owner saves untouched.
+- Full suite rerun headless: 37/37 tests PASS, zero SCRIPT ERROR/assertion lines.
+- Busy-shop probe rerun on the MX110 with the owner's settings (Auto -> Low Fast),
+  Godot editor open in background: frame median 11.41 ms, p95 21.59 ms, physics
+  1.30 ms, 550 draws; save median 1.34 ms. Previous record (2026-10-14) was
+  55.29 ms median / 40.15 ms physics. The busy-shop stutter is largely resolved;
+  no further performance work is urgent. Re-measure after large scene additions.
+- Git: repo exists with GitHub remote origin (rohann-bhoye/life-business-game),
+  branch main. The "no Git repository" note in section 4 is outdated. /demo/
+  (Terrain3D sample content, unused by the game) is untracked and git-ignored but
+  still on disk. /build/ and *.tmp are ignored. Deleted a stray .uid*.tmp test file.
+- Added export_presets.cfg: "Windows Desktop", x86_64, output
+  build/windows/LifeBusinessGame.exe, excludes demo/, tests/, tools/ and this file.
+  Godot recognises the preset; export is BLOCKED only by missing 4.7.2 export
+  templates (Editor > Manage Export Templates > Download and Install).
+- Correction: project.godot main scene is res://main_menu.tscn (it loads
+  main.tscn.tscn). Catalog now has 4 SKUs (tomato added); section 5/10 tables
+  listing three products are historical.
+- Next recommendation: install templates, export, then owner plays one full day
+  in the exported build and lists bugs; then onboarding polish.
+
 ## Farming and Player Roadmap (2026-10-14)
 
 ### Low (Fast) Graphics Preset (2026-10-15)
