@@ -35,5 +35,6 @@ wait_time = 2.0
 [node name="CharacterVisual" type="Node3D" parent="."]
 script = ExtResource("2_visual")
 shirt_color = Color(0.12, 0.62, 0.38, 1)
+model = "male-a"
 skin_color = Color(0.63, 0.4, 0.26, 1)
 hair_color = Color(0.07, 0.065, 0.06, 1)

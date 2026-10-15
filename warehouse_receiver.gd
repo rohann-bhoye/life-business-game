@@ -11,7 +11,7 @@ var parked_box: Node3D
 
 func _ready() -> void:
 	box = operations._crate(self, "ReceiverBox")
-	box.position = Vector3(0, 1.05, -0.62)
+	box.position = Vector3(0, 0.72, -0.5)
 	box.scale = Vector3.ONE * 0.75
 	$CharacterVisual.carry_target = box
 	parked_box = operations._crate(warehouse, "ReceiverParkedBox")

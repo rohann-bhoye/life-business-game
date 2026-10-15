@@ -46,10 +46,23 @@ static func label_product(parent: Node3D, product: String, face_x := 0.084) -> v
 	label.position = Vector3(face_x, 0.21 if product == "bottle" else (0.13 if product == "snack" else 0.06), 0)
 	var patch := MeshInstance3D.new()
 	patch.name = "PackageSleeve"
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(0.005, 0.11 if product != "soap" else 0.07, 0.1)
-	patch.mesh = mesh
-	patch.position = label.position - Vector3(0.003, 0, 0)
+	if product == "bottle":
+		# Round bottles get a wrap-around label band instead of a flat card.
+		var band := CylinderMesh.new()
+		band.top_radius = face_x * 0.92
+		band.bottom_radius = face_x * 0.96
+		band.height = 0.075
+		band.radial_segments = 12
+		band.rings = 1
+		patch.mesh = band
+		patch.position = Vector3(0, label.position.y, 0)
+		label.position.x = face_x * 0.94 + 0.003
+		label.font_size = 26
+	else:
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(0.005, 0.11 if product != "soap" else 0.07, 0.1)
+		patch.mesh = mesh
+		patch.position = label.position - Vector3(0.003, 0, 0)
 	var material := StandardMaterial3D.new()
 	material.albedo_color = {"bottle": Color(0.04, 0.43, 0.44), "snack": Color(0.8, 0.19, 0.19), "soap": Color(0.18, 0.35, 0.67)}[product]
 	material.roughness = 0.9

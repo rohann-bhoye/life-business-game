@@ -5,6 +5,18 @@ extends Node3D
 @export var hair_color := Color(0.1, 0.085, 0.07)
 @export var feet_offset := 0.0
 @export var face_movement := false
+## Kenney Mini character id ("male-a".."female-f"); empty picks a random customer look.
+@export var model := ""
+
+const MODEL_DIR := "res://assets/characters/kenney/character-%s.glb"
+const RANDOM_MODELS := ["female-a", "female-b", "female-c", "female-d", "female-e", "female-f", "male-c", "male-f"]
+const MODEL_SCALE := 2.15
+const LOOPED := ["idle", "walk", "holding-both"]
+static var model_scenes: Dictionary = {}
+
+var kenney: Node3D
+var anim_tree: AnimationTree
+var model_id := ""
 
 var left_arm: Node3D
 var right_arm: Node3D
@@ -114,6 +126,69 @@ func _ready() -> void:
 	left_leg = _leg("LeftLeg", -1, trousers, shoes)
 	right_leg = _leg("RightLeg", 1, trousers, shoes)
 	previous_position = global_position
+	_attach_model()
+
+# The block-built rig above stays (hidden) so carry grips, hands and tests keep
+# working; the visible body is an animated Kenney Mini character.
+func _attach_model() -> void:
+	model_id = model if not model.is_empty() else RANDOM_MODELS.pick_random()
+	var path := MODEL_DIR % model_id
+	if not model_scenes.has(model_id):
+		model_scenes[model_id] = load(path) as PackedScene if ResourceLoader.exists(path) else null
+	if model_scenes[model_id] == null: return
+	kenney = model_scenes[model_id].instantiate()
+	kenney.name = "KenneyModel"
+	kenney.scale = Vector3.ONE * MODEL_SCALE
+	kenney.position.y = feet_offset
+	kenney.rotation.y = PI
+	add_child(kenney)
+	for part in [body, head, left_arm, right_arm, left_leg, right_leg, get_node("Neck"), get_node("Waist")]:
+		part.visible = false
+	var players := kenney.find_children("*", "AnimationPlayer", true, false)
+	if players.is_empty(): return
+	var player: AnimationPlayer = players[0]
+	for loop_name in LOOPED:
+		if player.has_animation(loop_name): player.get_animation(loop_name).loop_mode = Animation.LOOP_LINEAR
+	var tree := AnimationNodeBlendTree.new()
+	for entry in [["idle", "idle"], ["walk", "walk"], ["carry", "holding-both"], ["work", "interact-right"]]:
+		var clip := AnimationNodeAnimation.new()
+		clip.animation = entry[1]
+		tree.add_node(entry[0], clip)
+	tree.add_node("move", AnimationNodeBlend2.new())
+	var carry_blend := AnimationNodeBlend2.new()
+	carry_blend.filter_enabled = true
+	var holding := player.get_animation("holding-both")
+	for track in range(holding.get_track_count()):
+		var track_path := holding.track_get_path(track)
+		if str(track_path).contains("arm"): carry_blend.set_filter_path(track_path, true)
+	tree.add_node("carry_blend", carry_blend)
+	var work_shot := AnimationNodeOneShot.new()
+	work_shot.fadein_time = 0.1
+	work_shot.fadeout_time = 0.15
+	tree.add_node("work_shot", work_shot)
+	tree.add_node("speed", AnimationNodeTimeScale.new())
+	tree.connect_node("move", 0, "idle")
+	tree.connect_node("move", 1, "walk")
+	tree.connect_node("speed", 0, "move")
+	tree.connect_node("carry_blend", 0, "speed")
+	tree.connect_node("carry_blend", 1, "carry")
+	tree.connect_node("work_shot", 0, "carry_blend")
+	tree.connect_node("work_shot", 1, "work")
+	tree.connect_node("output", 0, "work_shot")
+	anim_tree = AnimationTree.new()
+	anim_tree.name = "KenneyAnimation"
+	anim_tree.tree_root = tree
+	anim_tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+	kenney.add_child(anim_tree)
+	anim_tree.anim_player = anim_tree.get_path_to(player)
+	anim_tree.active = true
+
+func _update_model(delta: float, speed: float, carrying: bool) -> void:
+	if not is_instance_valid(anim_tree): return
+	anim_tree.set("parameters/move/blend_amount", walk_blend)
+	anim_tree.set("parameters/speed/scale", clampf(speed / 1.5, 0.7, 1.8) if walk_blend > 0.1 else 1.0)
+	anim_tree.set("parameters/carry_blend/blend_amount", 1.0 if carrying else 0.0)
+	anim_tree.advance(delta)
 
 func _material(color: Color) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
@@ -166,6 +241,8 @@ func _bend_knee(leg: Node3D, angle: float) -> void:
 
 func play_work_animation() -> void:
 	work_remaining = 1.0
+	if is_instance_valid(anim_tree):
+		anim_tree.set("parameters/work_shot/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
 
 var animation_elapsed := 0.0
 
@@ -183,7 +260,8 @@ func _process(delta: float) -> void:
 	displacement.y = 0.0
 	var speed := displacement.length() / maxf(delta, 0.001)
 	# Ignore teleports so scene placement does not trigger a walking pose.
-	var walking := speed > 0.08 and displacement.length() < 0.5
+	# Speed-based so walking still animates during frame drops; only real teleports (>12 m/s) are ignored.
+	var walking := speed > 0.08 and speed < 12.0
 	walk_blend = move_toward(walk_blend, 1.0 if walking else 0.0, delta * 8.0)
 	phase += delta * clampf(speed * 3.0, 5.0, 13.0)
 	idle_phase += delta * 2.0
@@ -207,3 +285,4 @@ func _process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, atan2(-direction.x, -direction.z), minf(delta * 12.0, 1.0))
 	if carrying:
 		pose_carry(carry_target.to_global(Vector3(-0.45, -0.08, 0.18)), carry_target.to_global(Vector3(0.45, -0.08, 0.18)))
+	_update_model(delta, speed, carrying)

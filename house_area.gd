@@ -18,6 +18,9 @@ func _ready() -> void:
 	close_house_button.pressed.connect(_on_close_house_pressed)
 	shop_area.business.changed.connect(_update_house_state)
 	_update_house_state()
+	var decor := Node3D.new()
+	decor.set_script(preload("res://home_decor.gd"))
+	get_parent().add_child.call_deferred(decor)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if player_inside and event is InputEventKey:

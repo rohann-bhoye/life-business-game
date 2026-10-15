@@ -396,7 +396,7 @@ func _run_checks() -> void:
 	await create_timer(0.2).timeout
 	await process_frame
 	assert(not house_player.indoors and house_player.player_mesh.visible)
-	assert(house_player.player_mesh.get_node("Body").is_visible_in_tree())
+	assert(house_player.player_mesh.get_node("KenneyModel").is_visible_in_tree())
 	assert(house_player.camera_distance == outdoor_zoom)
 	assert(camera.global_position.distance_to(house_player.camera_pivot.global_position) > 1.8)
 	shop.marketing_timer.start(35.0)

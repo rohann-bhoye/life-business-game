@@ -59,12 +59,14 @@ func _process(delta: float) -> void:
 	if first_person:
 		global_transform = player.camera.global_transform * Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.7), Vector3(0, -0.35, -1.15) + bob + place_offset)
 	else:
-		transform = Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.85), Vector3(0, 0.08, -0.65) + bob + place_offset)
+		transform = Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.85), Vector3(0, -0.3, -0.5) + bob + place_offset)
 	rotate_object_local(Vector3.FORWARD, sin(phase) * 0.015 * walk_blend)
 	get_node("RightGrip").position = Vector3(0.45, -0.08, 0.18) + Vector3(0.22, 0.14, -0.08) * place_arc
 	get_node("RightThumb").position = Vector3(0.39, 0.025, 0.18) + Vector3(0.22, 0.14, -0.08) * place_arc
 	forearms[1].position = Vector3(0.46, -0.11, 0.52) + Vector3(0.11, 0.07, -0.04) * place_arc
 	for arm in forearms: arm.visible = first_person
+	# Third person: the animated character model's own arms hold the box.
+	for part in ["LeftGrip", "RightGrip", "LeftThumb", "RightThumb"]: get_node(part).visible = first_person or not is_instance_valid(visual.kenney)
 	if visible and not first_person: visual.pose_carry(get_node("LeftGrip").global_position, get_node("RightGrip").global_position)
 	elif not visible: visual.reset_carry_pose()
 	for arm in [visual.left_arm, visual.right_arm]: arm.get_node("Hand").visible = not visible

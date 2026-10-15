@@ -130,6 +130,10 @@ func build_room(builder: Node3D) -> void:
 	light.omni_range = 6
 	add_child(light)
 	_update_room_size()
+	var decor := Node3D.new()
+	decor.set_script(preload("res://shop_decor.gd"))
+	add_child(decor)
+	decor.build(counter)
 	for id in ["snack", "soap"]:
 		var extra := build_stock_rack(builder, "SnackRack" if id == "snack" else "SoapRack", id, Vector3(-5.6, 0.1, -3.3 if id == "snack" else -6.0))
 		product_racks[id] = extra.node
@@ -213,7 +217,7 @@ func _update_room_size() -> void:
 		player.shop_indoors = absf(point.x) < 2.9 and point.z > -2.5 - extension and point.z < 2.4 and point.y < 2.4
 
 func employee_tag(employee: Node3D, text: String) -> Label3D:
-	var label := _sign(employee, "EmployeeNameLabel", text, Vector3(0, 2.3, 0))
+	var label := _sign(employee, "EmployeeNameLabel", text, Vector3(0, 1.85, 0))
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.font_size = 28
 	label.pixel_size = 0.0035
@@ -250,6 +254,7 @@ func _ready() -> void:
 	stock_worker.set_script(load("res://stock_worker.gd"))
 	stock_worker.position = Vector3(-4.6, 0.1, -1.8)
 	stock_worker.get_node("CharacterVisual").shirt_color = Color(0.7, 0.42, 0.18)
+	stock_worker.get_node("CharacterVisual").model = "male-e"
 	employee_tag(shop.worker, "Ramesh")
 	employee_tag(stock_worker, "Sunil")
 	get_parent().add_child.call_deferred(stock_worker)
@@ -294,8 +299,26 @@ func make_bottle(parent: Node3D, node_name: String, offset: Vector3) -> Node3D:
 	_mesh(bottle, "BottleBody", mesh, Vector3(0, 0.17, 0), Color(0.2, 0.66, 0.67))
 	bottle.get_node("BottleBody").hide()
 	preload("res://product_assets.gd").attach(bottle, "bottle", Vector3(0.18, 0.4, 0.18))
-	_box(bottle, "Cap", Vector3(0.12, 0.07, 0.12), Vector3(0, 0.375, 0), Color(0.92, 0.93, 0.9))
+	# Small screw cap fitted over the model's own neck; it still turns green when scanned.
+	var cap := CylinderMesh.new()
+	cap.top_radius = 0.03
+	cap.bottom_radius = 0.032
+	cap.height = 0.035
+	cap.radial_segments = 10
+	_mesh(bottle, "Cap", cap, Vector3(0, _asset_box("bottle", Vector3(0.18, 0.4, 0.18)).end.y - 0.015, 0), Color(0.92, 0.93, 0.9))
 	return bottle
+
+static var asset_boxes: Dictionary = {}
+# Real size of a fitted product model, so caps/seals sit exactly on top of it.
+func _asset_box(id: String, size: Vector3) -> AABB:
+	if not asset_boxes.has(id):
+		var Assets = preload("res://product_assets.gd")
+		var probe := Node3D.new()
+		Assets.attach(probe, id, size)
+		var asset: Node3D = probe.get_node("ProductAsset")
+		asset_boxes[id] = Assets._bounds(asset, Transform3D.IDENTITY)
+		probe.free()
+	return asset_boxes[id]
 
 func make_product(parent: Node3D, node_name: String, offset: Vector3, id: String) -> Node3D:
 	if id == "bottle": return make_bottle(parent, node_name, offset)
@@ -315,7 +338,12 @@ func make_product(parent: Node3D, node_name: String, offset: Vector3, id: String
 		preload("res://product_assets.gd").attach(item, id, Vector3(0.16, height, 0.11))
 	else:
 		preload("res://product_assets.gd").label_product(item, id)
-	_box(item, "Cap", Vector3(0.165, 0.025, 0.115), Vector3(0, height, 0), Color(0.92, 0.93, 0.9))
+	if id == "snack":
+		# Thin heat-seal strip along the real top edge of the bag model.
+		var bag := _asset_box(id, Vector3(0.16, height, 0.11))
+		_box(item, "Cap", Vector3(bag.size.x * 0.92, 0.018, minf(bag.size.z * 0.5, 0.04)), Vector3(0, bag.end.y - 0.009, 0), Color(0.92, 0.93, 0.9))
+	else:
+		_box(item, "Cap", Vector3(0.165, 0.025, 0.115), Vector3(0, height, 0), Color(0.92, 0.93, 0.9))
 	return item
 
 func rack_target(id: String, rack_id := -1) -> Vector3:

@@ -59,7 +59,7 @@ func _ready() -> void:
 	wait_remaining = spawn_delay
 	patience_label = Label3D.new()
 	patience_label.name = "PatienceLabel"
-	patience_label.position = Vector3(0, 2.35, 0)
+	patience_label.position = Vector3(0, 1.9, 0)
 	patience_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	patience_label.font_size = 28
 	patience_label.pixel_size = 0.006

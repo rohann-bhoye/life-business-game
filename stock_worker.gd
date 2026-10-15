@@ -10,7 +10,7 @@ var carrying_box: Node3D
 
 func _ready() -> void:
 	carrying_box = operations._crate(self, "WorkerBox")
-	carrying_box.position = Vector3(0, 1.1, -0.65)
+	carrying_box.position = Vector3(0, 0.72, -0.5)
 	carrying_box.scale = Vector3.ONE * 0.75
 	$CharacterVisual.carry_target = carrying_box
 	business.changed.connect(_sync)

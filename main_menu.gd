@@ -15,6 +15,8 @@ var settings_menu: Panel
 var confirmation: Panel
 var footer: Label
 var launching := false
+var waiting_for_game := false
+const GAME_SCENE := "res://main.tscn.tscn"
 
 static func make_theme() -> Theme:
 	var result := Theme.new()
@@ -26,6 +28,7 @@ static func make_theme() -> Theme:
 	return result
 
 func _ready() -> void:
+	if not ResourceLoader.has_cached(GAME_SCENE): ResourceLoader.load_threaded_request(GAME_SCENE, "", true)
 	get_tree().root.content_scale_size = Vector2i.ZERO
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	theme = make_theme()
@@ -165,6 +168,20 @@ func _new_game() -> void:
 
 func _start_game() -> void:
 	launching = true
+	waiting_for_game = true
+	status_label.text = "Loading game..."
+
+# The game scene loads on a background thread from the moment the menu opens,
+# so Continue/New Game show progress instead of freezing the window.
+func _process(_delta: float) -> void:
+	if not waiting_for_game: return
+	var progress := []
+	var status := ResourceLoader.load_threaded_get_status(GAME_SCENE, progress)
+	if status == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+		status_label.text = "Loading game... %d%%" % int(100.0 * float(progress[0]))
+		return
+	waiting_for_game = false
+	if status == ResourceLoader.THREAD_LOAD_LOADED: ResourceLoader.load_threaded_get(GAME_SCENE)
 	var error := Session.launch_game(get_tree(), save_path, settings_path)
 	if error != OK:
 		launching = false

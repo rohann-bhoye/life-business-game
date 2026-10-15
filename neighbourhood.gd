@@ -212,7 +212,9 @@ func _batch_scenery() -> void:
 			for part in child.get_children():
 				if part is MeshInstance3D and part.mesh is SphereMesh: sources.append(part)
 		elif child is MeshInstance3D:
-			for prefix in ["LaneMark", "Crossing", "RoadPatch", "Drain", "Bench", "NeighbourWindow", "SouthShopWindow"]:
+			# Building windows are hidden behind the Kenney houses (_dress_buildings), so skip them.
+			if not child.visible: continue
+			for prefix in ["LaneMark", "Crossing", "RoadPatch", "Drain", "Bench"]:
 				if child.name.begins_with(prefix): sources.append(child); break
 	preload("res://scenery_batch.gd").build(self, sources, "StreetBatch")
 
@@ -295,3 +297,23 @@ func _build_background() -> void:
 		_box("SouthDoor%d" % index, self, Vector3(1, 2.2, 0.08), Vector3(x, 1.2, depth - 2.54), Color(0.15, 0.28, 0.31))
 		for side in [-1, 1]:
 			_box("SouthShopWindow%d_%d" % [index, side], self, Vector3(2, 1.6, 0.06), Vector3(x + side * 2.1, 1.7, depth - 2.54), Color(0.36, 0.65, 0.72))
+	_dress_buildings()
+
+# Show Kenney City Kit Suburban houses in place of the block buildings. The
+# original box colliders stay; only their visible meshes are hidden.
+const HOUSE_MODELS := ["a", "c", "e", "g", "i", "k", "m", "o", "q", "s"]
+func _dress_buildings() -> void:
+	var Kenney = preload("res://kenney_assets.gd")
+	var spots: Array = []
+	for index in range(4):
+		spots.append(["NeighbourHouse%d" % index, 0.0, Vector3(6.2, 6.0, 5.2), ["NeighbourBuilding%d", "NeighbourRoof%d", "NeighbourWindow%d_0", "NeighbourWindow%d_1", "NeighbourWindow%d_2"], index])
+	for index in range(6):
+		spots.append(["SouthHouse%d" % index, PI, Vector3(7.2, 6.0, 5.2), ["SouthBuilding%d", "SouthRoof%d", "SouthDoor%d", "SouthShopWindow%d_-1", "SouthShopWindow%d_1"], index])
+	for number in range(spots.size()):
+		var spot: Array = spots[number]
+		var building := get_node_or_null(spot[3][0] % spot[4]) as Node3D
+		if building == null: continue
+		for pattern in spot[3]:
+			var part := get_node_or_null(String(pattern % spot[4]).validate_node_name()) as Node3D
+			if part != null: part.visible = false
+		Kenney.fit(self, spot[0], "res://assets/buildings/kenney/building-type-%s.glb" % HOUSE_MODELS[number], spot[2], Vector3(building.position.x, 0.1, building.position.z), spot[1])

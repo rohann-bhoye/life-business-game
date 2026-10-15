@@ -79,13 +79,16 @@ func _run() -> void:
 	visual.rotation.y = 1.1
 	box._process(0.016)
 	assert(is_zero_approx(visual.rotation.y))
-	for entry in [[visual.left_arm, "LeftGrip"], [visual.right_arm, "RightGrip"]]:
-		var arm: Node3D = entry[0]
+	# Third person uses the animated Kenney model; its carry pose holds the box
+	# at hand height in front of the body and the block grips are hidden.
+	assert(visual.kenney.is_visible_in_tree())
+	assert(not box.get_node("LeftGrip").visible and not box.get_node("RightGrip").visible)
+	var box_offset: Vector3 = visual.global_basis.inverse() * (box.global_position - visual.kenney.global_position)
+	assert(box_offset.z < -0.3 and box_offset.y > 0.5 and box_offset.y < 0.95, str(box_offset))
+	visual._process(0.016)
+	assert(is_equal_approx(visual.anim_tree.get("parameters/carry_blend/blend_amount"), 1.0))
+	for arm in [visual.left_arm, visual.right_arm]:
 		assert(arm.scale.is_equal_approx(Vector3.ONE), "Shoulder must not stretch")
-		assert(arm.get_node("Hand").global_position.distance_to(box.get_node(entry[1]).global_position) < 0.04)
-		var upper: Vector3 = -arm.get_node("Sleeve").global_basis.y.normalized()
-		var lower: Vector3 = -arm.get_node("Forearm").global_basis.y.normalized()
-		assert(upper.dot(lower) < 0.98, "Carry elbows must bend")
 	visual.previous_position = visual.global_position - Vector3(0.03, 0, 0)
 	visual._process(0.03)
 	assert(absf(visual.left_leg.rotation.x) > 0.001 and is_equal_approx(visual.left_leg.rotation.x, -visual.right_leg.rotation.x))
