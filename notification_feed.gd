@@ -41,7 +41,7 @@ func refresh() -> void:
 	for index in range(business.farm.PLOTS[business.farm.level - 1]):
 		if business.farm.ready(index, business.farm_time()): ready_beds += 1
 	if ready_beds > 0:
-		next["farm_ready"] = _entry("Tomatoes ready to harvest", "%d farm beds ready. Carry produce to storage or shop shelves." % ready_beds)
+		next["farm_ready"] = _entry("Crops ready to harvest", "%d farm %s ready. Carry produce to storage or shop shelves." % [ready_beds, "bed" if ready_beds == 1 else "beds"])
 	var operations = ui.get_tree().current_scene.get_node_or_null("ShopOperations")
 	if is_instance_valid(operations) and operations.enabled:
 		for customer in operations.queue:

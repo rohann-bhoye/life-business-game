@@ -14,6 +14,42 @@ Latest feature: playable tomato farming, a Farm tablet tab/seed stall, three far
 expansions, tomato warehouse/shelf/checkout integration, a road-end Coming Next
 board and a local suggestion form. See Farming section below for controls and limits.
 
+## More Farm Crops (2026-10-17)
+
+- farm_store.gd: CROPS tomato/carrot/cabbage/corn/apple with SEED_COSTS 100/80/120/
+  100/150 and CROP_NAMES. Selected `crop` plus per-crop crop_seeds/crop_bought/
+  crop_harvested dicts (sums must equal the old totals seeds/bought/harvested); each
+  plot has optional "crop" (missing = tomato). Older saves restore all counts as
+  tomato. expenses() sums per-crop seed costs.
+- Backend: buy_seeds(q, crop), set_farm_crop(crop), plant_crop(index, crop),
+  harvest_crop uses the plot's crop for the box/inventory. Save validation counts
+  farm-grown units per crop (crop_harvested) instead of tomato only.
+- Catalog: new SKUs carrot (box 400 / sell 60), cabbage (450/70), corn (400/60),
+  apple (600/90); shop_operations PRODUCE_SIZES renders all crops with Kenney produce
+  models (shelves, baskets, checkout, beds).
+- UI: Farm tab "Crop: X >" button (FarmCropButton) cycles crops (dropdowns do not work
+  well inside the 3D tablet); SeedQuantityLabel kept in place but hidden. Bed labels
+  "EMPTY | E: PLANT CARROT (n)", "CARROT | 120m remaining", "HARVEST CARROT"; farm_world
+  swaps fruit models per bed (_show_crop). Seed sign "FARM CROPS"; notification
+  "Crops ready to harvest".
+- tests/farm_crops_test.gd (new) and tools/farm_preview.gd.
+
+## Daily Report and Reputation Traffic (2026-10-17)
+
+- day_report.gd: `start` = counters at the start of the current day (items sold,
+  revenue, total_expenses, missed sales, reputation, review count, per-SKU sold);
+  close() builds `last` (day, items_sold, revenue, expenses, profit, missed, best
+  seller, reputation change, reviews) and starts the next day. Closed in
+  advance_clock on midnight rollover and in sleep_until_morning when the day changes,
+  BEFORE _bill_new_day, so a day's bills land in the following day's report.
+  Saved as optional "day_report" {start, last} (validated; numbers int-normalised).
+- game_ui: non-blocking "Day N summary" card (DayReport panel, UiStyle card) shown
+  for 15 s after sleeping (sleep_area.try_sleep -> ui.show_day_report()).
+- Reputation traffic: customer_spawn_interval *= reputation_traffic_factor() =
+  1 - (reputation - 50) / 200 (100 -> 0.75x wait, 0 -> 1.25x, 50 unchanged).
+  Tablet reputation tooltip shows "Customer visits +N%".
+- tests/day_report_test.gd and tools/day_report_preview.gd added.
+
 ## Current status (2026-10-17)
 
 COMMITTED as one commit after the full suite passed 38/38 (400 s, headless, only the

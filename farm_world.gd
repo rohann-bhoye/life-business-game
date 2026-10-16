@@ -3,6 +3,9 @@ extends Node3D
 var beds: Array[Node3D] = []
 var labels: Array[Label3D] = []
 var crop_models: Array[Node3D] = []
+## Crop whose fruit models each bed currently shows.
+var crop_kinds: Array[String] = []
+const FarmStore := preload("res://farm_store.gd")
 var farm_title: Label3D
 var roadmap: Panel
 var suggestion: TextEdit
@@ -28,6 +31,7 @@ func _ready() -> void:
 		crop.name = "Crop"
 		bed.add_child(crop)
 		crop_models.append(crop)
+		crop_kinds.append("tomato")
 		for x in [-0.5, 0, 0.5]:
 			builder._box("Stem%s" % x, crop, Vector3(0.05, 0.6, 0.05), Vector3(x, 0.3, 0), Color(0.2, 0.43, 0.08))
 			builder._box("Leaves%s" % x, crop, Vector3(0.35, 0.08, 0.24), Vector3(x, 0.35, 0), Color(0.17, 0.44, 0.11))
@@ -52,7 +56,7 @@ func _ready() -> void:
 	for index in range(produce.size()):
 		var display := preload("res://produce_assets.gd").attach(self, produce[index], Vector3(0.25, 0.27, 0.25), "Display" + produce[index])
 		display.position = Vector3(-18.62 + index * 0.31, 0.93, -5.55)
-	var sign: Label3D = world.get_node("ShopOperations")._sign(self, "SeedSign", "APNA SEEDS\nTOMATO FARM", Vector3(-18, 2.2, -3.4))
+	var sign: Label3D = world.get_node("ShopOperations")._sign(self, "SeedSign", "APNA SEEDS\nFARM CROPS", Vector3(-18, 2.2, -3.4))
 	builder._box("SeedSignBoard", self, Vector3(1.5, 0.42, 0.08), Vector3(-18, 2.2, -3.45), Color(0.08, 0.29, 0.2))
 	sign.font_size = 28
 	sign.pixel_size = 0.003
@@ -114,7 +118,26 @@ func refresh() -> void:
 		crop_models[index].scale.y = lerpf(0.2, 1.0, progress)
 		for part in crop_models[index].get_children():
 			if part.name.begins_with("Fruit"): part.visible = ready
-		labels[index].text = "LOCKED" if not unlocked else ("EMPTY" if not plot.planted else ("HARVEST" if ready else ("NEEDS WATER" if plot.watered_at < 0 else "%dm remaining" % maxi(0, plot.watered_at + plot.grow_minutes - business.farm_time()))))
+		var kind: String = FarmStore.plot_crop(plot)
+		if plot.planted and kind != crop_kinds[index]: _show_crop(index, kind)
+		var crop_label: String = FarmStore.CROP_NAMES[kind].to_upper()
+		var choice: String = business.farm.crop
+		labels[index].text = "LOCKED" if not unlocked else ("EMPTY | E: PLANT %s (%d)" % [FarmStore.CROP_NAMES[choice].to_upper(), business.farm.crop_seeds[choice]] if not plot.planted else ("HARVEST %s" % crop_label if ready else ("%s | NEEDS WATER" % crop_label if plot.watered_at < 0 else "%s | %dm remaining" % [crop_label, maxi(0, plot.watered_at + plot.grow_minutes - business.farm_time())])))
+
+# Swap a bed's fruit models to the crop planted there.
+func _show_crop(index: int, kind: String) -> void:
+	var crop := crop_models[index]
+	var visible_fruit := false
+	for part in crop.get_children():
+		if part.name.begins_with("Fruit"):
+			visible_fruit = visible_fruit or part.visible
+			crop.remove_child(part)
+			part.queue_free()
+	for x in [-0.5, 0, 0.5]:
+		var fruit = world.get_node("ShopOperations").make_product(crop, "Fruit%s" % x, Vector3(x, 0.38, 0), kind)
+		fruit.scale = Vector3.ONE * 1.1
+		fruit.visible = visible_fruit
+	crop_kinds[index] = kind
 
 func near(point: Vector3, distance := 1.8) -> bool:
 	var offset: Vector3 = player.global_position - point
@@ -161,14 +184,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		var success: bool
 		var text: String
 		if not plot.planted:
+			var choice: String = FarmStore.CROP_NAMES[business.farm.crop]
 			success = business.plant_crop(index)
-			text = "Seed planted. Water the bed." if success else "Buy seeds or unlock this farm bed first."
+			text = "%s planted. Water the bed." % choice if success else "Buy %s seeds at the seed stall (Farm tab), or unlock this bed." % choice.to_lower()
 		elif plot.watered_at < 0:
 			success = business.water_crop(index)
 			text = "Watered. Growth has started." if success else "Could not water/save this bed."
 		else:
+			var crop: String = FarmStore.plot_crop(plot)
 			success = business.harvest_crop(index)
-			text = "Harvested 10 tomatoes. Carry the box to storage or an assigned shelf." if success else "Crop is growing, hands are occupied, or delivery capacity is full."
+			text = "Harvested 10 %s. Carry the box to storage or a shelf." % business.Catalog.NAMES[crop].to_lower() if success else "Crop is growing, hands are occupied, or delivery capacity is full."
 		ui.show_feedback(text, not success)
 		if success:
 			player.player_mesh.play_work_animation()

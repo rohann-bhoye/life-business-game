@@ -317,6 +317,7 @@ func make_bottle(parent: Node3D, node_name: String, offset: Vector3) -> Node3D:
 	_mesh(bottle, "Cap", cap, Vector3(0, _asset_box("bottle", Vector3(0.18, 0.4, 0.18)).end.y - 0.015, 0), Color(0.92, 0.93, 0.9))
 	return bottle
 
+const PRODUCE_SIZES := {"tomato": Vector3(0.19, 0.18, 0.19), "carrot": Vector3(0.2, 0.2, 0.2), "cabbage": Vector3(0.2, 0.19, 0.2), "corn": Vector3(0.2, 0.22, 0.2), "apple": Vector3(0.17, 0.17, 0.17)}
 const GROCERY_SIZES := {"oil": Vector3(0.14, 0.3, 0.11), "milk": Vector3(0.14, 0.24, 0.11), "bread": Vector3(0.16, 0.13, 0.17), "chocolate": Vector3(0.16, 0.06, 0.15), "honey": Vector3(0.13, 0.16, 0.13)}
 static var asset_boxes: Dictionary = {}
 # Real size of a fitted product model, so caps/seals sit exactly on top of it.
@@ -336,8 +337,8 @@ func make_product(parent: Node3D, node_name: String, offset: Vector3, id: String
 	item.name = node_name
 	item.position = offset
 	parent.add_child(item)
-	if id == "tomato":
-		preload("res://produce_assets.gd").attach(item, "tomato", Vector3(0.19, 0.18, 0.19), "ProductBody")
+	if PRODUCE_SIZES.has(id):
+		preload("res://produce_assets.gd").attach(item, id, PRODUCE_SIZES[id], "ProductBody")
 		# Checkout retains its existing Cap hook; produce has no packaging cap.
 		_box(item, "Cap", Vector3(0.01, 0.01, 0.01), Vector3.ZERO, Color.WHITE).hide()
 		return item

@@ -20,7 +20,7 @@ const TAB_CONTROLS := [
 	["WorkerLabel", "WorkerStatusLabel", "HireWorkerButton", "WageLabel"],
 	["MarketingLabel", "MarketingButton", "MissedSalesLabel", "LastVisitLabel", "ReputationLabel"],
 	["DemoStatusLabel", "DemoGoal0", "DemoGoal1", "DemoGoal2", "DemoGoal3", "DemoGoal4", "DemoResultsLabel", "DemoContinueButton"],
-	["FarmSummary", "BuySeedsButton", "FarmUpgradeButton", "SeedQuantityLabel", "SeedQuantityInput", "BuyProduceTableButton"]
+	["FarmSummary", "BuySeedsButton", "FarmUpgradeButton", "FarmCropButton", "SeedQuantityInput", "BuyProduceTableButton"]
 ]
 
 var tabs: TabBar
@@ -31,6 +31,11 @@ var controls_panel: Panel
 var first_day_panel: Panel
 var first_day_label: Label
 var first_day_step: Label
+var day_report_panel: Panel
+var day_report_title: Label
+var day_report_body: Label
+var day_report_seconds := 0.0
+const UiStyle := preload("res://ui_style.gd")
 var feedback_seconds := 0.0
 var employee_refresh_seconds := 0.0
 var selected_tab := 0
@@ -63,9 +68,19 @@ func _ready() -> void:
 	interaction_label = _label("InteractionLabel", self)
 	feedback_label = _label("FeedbackLabel", self)
 	_build_first_day_guide(theme)
+	_build_day_report()
 	_build_controls_hint()
 	_label("FarmSummary", shop_menu)
 	_label("SeedQuantityLabel", shop_menu).text = "Seed packets"
+	shop_menu.get_node("SeedQuantityLabel").hide()
+	# Cycles the farm crop used for buying seeds and planting (works on the tablet too).
+	var crop_button := Button.new()
+	crop_button.name = "FarmCropButton"
+	shop_menu.add_child(crop_button)
+	crop_button.pressed.connect(func():
+		var crops: Array = shop.business.farm.CROPS
+		shop.business.set_farm_crop(crops[(crops.find(shop.business.farm.crop) + 1) % crops.size()])
+		_refresh_farm())
 	var seed_quantity := SpinBox.new()
 	seed_quantity.name = "SeedQuantityInput"
 	seed_quantity.min_value = 1
@@ -81,7 +96,7 @@ func _ready() -> void:
 		shop_menu.add_child(button)
 	shop_menu.get_node("BuySeedsButton").pressed.connect(func():
 		var success: bool = shop.business.buy_seeds(int(shop_menu.get_node("SeedQuantityInput").value))
-		show_feedback("Tomato seed purchased." if success else "Not enough money or save failed.", not success))
+		show_feedback("%s seeds purchased." % shop.business.farm.CROP_NAMES[shop.business.farm.crop] if success else "Not enough money or save failed.", not success))
 	shop_menu.get_node("FarmUpgradeButton").pressed.connect(func():
 		var success: bool = shop.business.upgrade_farm()
 		show_feedback("Farm expanded." if success else "Farm needs the next shop level, money, or a successful save.", not success))
@@ -388,6 +403,7 @@ func _layout() -> void:
 	_place(shop_menu.get_node("FarmSummary"), 16, 140, content_width, 116)
 	shop_menu.get_node("FarmSummary").add_theme_font_size_override("font_size", 16)
 	_place(shop_menu.get_node("SeedQuantityLabel"), 16, 260, content_width * 0.5, 32)
+	_place(shop_menu.get_node("FarmCropButton"), 16, 260, content_width * 0.5 - 6, 32)
 	_place(shop_menu.get_node("SeedQuantityInput"), 16 + content_width * 0.5, 260, content_width * 0.5, 32)
 	_place(shop_menu.get_node("BuySeedsButton"), 16, 304, content_width, 36)
 	_place(shop_menu.get_node("FarmUpgradeButton"), 16, 348, content_width, 36)
@@ -404,6 +420,10 @@ func _layout() -> void:
 	_place(first_day_panel.get_node("Title"), 12, 8, 236, 20)
 	_place(first_day_label, 12, 30, 236, 64)
 	_place(first_day_step, 12, 98, 236, 52)
+	var report_width := minf(400.0, viewport_size.x - 32.0)
+	_place(day_report_panel, (viewport_size.x - report_width) / 2.0, 64, report_width, 214)
+	_place(day_report_title, 18, 12, report_width - 36, 28)
+	_place(day_report_body, 18, 46, report_width - 36, 160)
 	_place(interaction_label, 16, viewport_size.y - 46, maxf(120, viewport_size.x - 250), 24)
 	_place(feedback_label, 16, viewport_size.y - 80, viewport_size.x - 32, 28)
 	_place(controls_panel, viewport_size.x - 218, viewport_size.y - 132, 202, 116)
@@ -525,6 +545,7 @@ func _layout_tablet() -> void:
 	_place(shop_menu.get_node("FarmSummary"), 24, 236, width, 144)
 	shop_menu.get_node("FarmSummary").add_theme_font_size_override("font_size", 18)
 	_place(shop_menu.get_node("SeedQuantityLabel"), 24, 386, width * 0.5, 34)
+	_place(shop_menu.get_node("FarmCropButton"), 24, 386, width * 0.5 - 8, 34)
 	_place(shop_menu.get_node("SeedQuantityInput"), 24 + width * 0.5, 386, width * 0.5, 34)
 	_place(shop_menu.get_node("BuySeedsButton"), 24, 434, width, 38)
 	_place(shop_menu.get_node("FarmUpgradeButton"), 24, 478, width * 0.48, 42)
@@ -561,7 +582,7 @@ func _update_hud() -> void:
 	_update_first_day_guide()
 	var reviews = shop.business.customer_reviews
 	shop_menu.get_node("ReputationLabel").text = "Reputation: %d/100\n%s" % [reviews.reputation, "No reviews yet" if reviews.review_count == 0 else "Last satisfaction: %d/100" % reviews.last_score]
-	shop_menu.get_node("ReputationLabel").tooltip_text = "%d customer reviews" % reviews.review_count
+	shop_menu.get_node("ReputationLabel").tooltip_text = "%d customer reviews | Customer visits %+d%%" % [reviews.review_count, roundi((1.0 / shop.business.reputation_traffic_factor() - 1.0) * 100.0)]
 	hud_money.text = "Money: %s%s" % [String.chr(8377), shop._format_money(shop.money)]
 	shop.profit_label.modulate = Color(0.48, 0.88, 0.67) if shop.business.net_profit() >= 0 else Color(1, 0.61, 0.57)
 	shop.unpaid_bills_label.modulate = Color(1, 0.74, 0.43) if shop.business.unpaid_bills() > 0 else Color.WHITE
@@ -600,6 +621,33 @@ func _build_first_day_guide(theme: Theme) -> void:
 	first_day_step.add_theme_font_size_override("font_size", 13)
 	first_day_step.modulate = Color(1, 0.85, 0.45)
 	_update_first_day_guide()
+
+# End-of-day summary card shown after sleeping; it never blocks movement.
+func _build_day_report() -> void:
+	day_report_panel = Panel.new()
+	day_report_panel.name = "DayReport"
+	day_report_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	day_report_panel.add_theme_stylebox_override("panel", UiStyle.card(14))
+	day_report_panel.hide()
+	add_child(day_report_panel)
+	day_report_title = _label("Title", day_report_panel)
+	day_report_title.add_theme_font_size_override("font_size", 20)
+	day_report_title.add_theme_color_override("font_color", UiStyle.BRAND)
+	day_report_body = _label("Body", day_report_panel)
+	day_report_body.add_theme_font_size_override("font_size", 15)
+	day_report_body.add_theme_color_override("font_color", UiStyle.TEXT)
+	day_report_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	for label in [day_report_title, day_report_body]:
+		label.add_theme_constant_override("outline_size", 0)
+		label.add_theme_color_override("font_shadow_color", Color.TRANSPARENT)
+
+func show_day_report() -> void:
+	var report = shop.business.day_report
+	if report.last.is_empty(): return
+	day_report_title.text = "Day %d summary" % report.last.day
+	day_report_body.text = "\n".join(report.lines())
+	day_report_seconds = 15.0
+	day_report_panel.visible = not player._menu_is_open()
 
 func _update_first_day_guide() -> void:
 	if not is_instance_valid(first_day_panel): return
@@ -661,10 +709,12 @@ func _refresh_farm() -> void:
 	var farm = shop.business.farm
 	shop_menu.get_node("BuyProduceTableButton").disabled = not shop.business.can_order_racks("tomato", 1)
 	var count: int = farm.PLOTS[farm.level - 1]
-	shop_menu.get_node("FarmSummary").text = "Farm level %d | %d beds\nTomato seeds: %d\nGrowth after water: %d game min\nHarvest: 10 tomatoes per bed\nTotal harvested: %d" % [farm.level, count, farm.seeds, farm.GROW_MINUTES[farm.level - 1], farm.harvested]
-	var seed_cost: int = int(shop_menu.get_node("SeedQuantityInput").value) * farm.SEED_COST
+	var crop_name: String = farm.CROP_NAMES[farm.crop]
+	shop_menu.get_node("FarmSummary").text = "Farm level %d | %d beds\n%s seeds: %d (all seeds: %d)\nGrowth after water: %d game min\nHarvest: 10 per bed\nTotal harvested: %d" % [farm.level, count, crop_name, farm.crop_seeds[farm.crop], farm.seeds, farm.GROW_MINUTES[farm.level - 1], farm.harvested]
+	shop_menu.get_node("FarmCropButton").text = "Crop: %s >" % crop_name
+	var seed_cost: int = int(shop_menu.get_node("SeedQuantityInput").value) * farm.SEED_COSTS[farm.crop]
 	shop_menu.get_node("BuySeedsButton").disabled = shop.business.money < seed_cost
-	shop_menu.get_node("BuySeedsButton").text = "Buy tomato seeds - Rs%d" % seed_cost
+	shop_menu.get_node("BuySeedsButton").text = "Buy %s seeds - Rs%d" % [crop_name.to_lower(), seed_cost]
 	var button: Button = shop_menu.get_node("FarmUpgradeButton")
 	button.text = "Maximum farm size" if farm.level == 3 else "Expand to %d beds - Rs%d" % [farm.PLOTS[farm.level], farm.UPGRADE_COSTS[farm.level - 1]]
 	button.disabled = farm.level == 3 or shop.business.shop_level <= farm.level or shop.business.money < farm.UPGRADE_COSTS[mini(farm.level - 1, 1)]
@@ -683,6 +733,8 @@ func _update_save_footer() -> void:
 func _process(delta: float) -> void:
 	_present_demo_completion()
 	feedback_seconds = maxf(0, feedback_seconds - delta)
+	day_report_seconds = maxf(0, day_report_seconds - delta)
+	day_report_panel.visible = day_report_seconds > 0 and not player._menu_is_open()
 	feedback_label.visible = feedback_seconds > 0 and not shop_menu.visible and not bargain_menu.visible and not supplier_menu.visible and not checkout_menu.visible
 	_update_save_footer()
 	employee_refresh_seconds -= delta

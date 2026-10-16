@@ -60,7 +60,7 @@ func _run() -> void:
 	current_scene.get_node("Customer").set_physics_process(false)
 	var ui = current_scene.get_node("Ui")
 	var farm = current_scene.get_node("Farm")
-	assert(farm.beds.size() == 24 and farm.labels[0].text == "EMPTY")
+	assert(farm.beds.size() == 24 and farm.labels[0].text.begins_with("EMPTY"))
 	for index in range(4):
 		assert(is_equal_approx(farm.beds[index].position.z, -3.0))
 	assert(farm.beds[4].position.z < farm.beds[0].position.z)

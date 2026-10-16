@@ -181,7 +181,7 @@ func _run() -> void:
 	shop.business.save_path = ""
 	assert(shop.business.shop_level == 3 and shop.money == saved_money)
 	assert(shop.business.upgrade_expenses == 7500 and ui.upgrade_button.disabled)
-	assert(spawner.get_node("SpawnTimer").wait_time == 6.0)
+	assert(is_equal_approx(spawner.get_node("SpawnTimer").wait_time, 6.0 * shop.business.reputation_traffic_factor()))
 	assert(current_scene.get_node("Shop/ShopSign").text == "SHOP III")
 	assert(not shop.business.shop_is_open())
 	for path in paths:

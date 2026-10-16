@@ -1,13 +1,13 @@
 extends RefCounted
 
-const IDS := ["bottle", "snack", "soap", "tomato", "oil", "milk", "bread", "chocolate", "honey"]
-const NAMES := {"bottle": "Reusable bottles", "snack": "Snack packs", "soap": "Soap bars", "tomato": "Farm tomatoes", "oil": "Cooking oil", "milk": "Milk cartons", "bread": "Bread loaves", "chocolate": "Chocolate bars", "honey": "Honey jars"}
-const COSTS := {"bottle": 500, "snack": 400, "soap": 600, "tomato": 500, "oil": 1000, "milk": 400, "bread": 350, "chocolate": 300, "honey": 1200}
-const PRICES := {"snack": 80, "soap": 120, "tomato": 80, "oil": 150, "milk": 60, "bread": 50, "chocolate": 50, "honey": 180}
+const IDS := ["bottle", "snack", "soap", "tomato", "oil", "milk", "bread", "chocolate", "honey", "carrot", "cabbage", "corn", "apple"]
+const NAMES := {"bottle": "Reusable bottles", "snack": "Snack packs", "soap": "Soap bars", "tomato": "Farm tomatoes", "oil": "Cooking oil", "milk": "Milk cartons", "bread": "Bread loaves", "chocolate": "Chocolate bars", "honey": "Honey jars", "carrot": "Farm carrots", "cabbage": "Cabbages", "corn": "Sweet corn", "apple": "Apples"}
+const COSTS := {"bottle": 500, "snack": 400, "soap": 600, "tomato": 500, "oil": 1000, "milk": 400, "bread": 350, "chocolate": 300, "honey": 1200, "carrot": 400, "cabbage": 450, "corn": 400, "apple": 600}
+const PRICES := {"snack": 80, "soap": 120, "tomato": 80, "oil": 150, "milk": 60, "bread": 50, "chocolate": 50, "honey": 180, "carrot": 60, "cabbage": 70, "corn": 60, "apple": 90}
 ## Every SKU tracked in the inventory dictionary (bottle stock is derived from the aggregate).
-const EXTRA := ["snack", "soap", "tomato", "oil", "milk", "bread", "chocolate", "honey"]
+const EXTRA := ["snack", "soap", "tomato", "oil", "milk", "bread", "chocolate", "honey", "carrot", "cabbage", "corn", "apple"]
 ## SKUs added after the original save format; old saves get zeroed entries for them.
-const OPTIONAL := ["tomato", "oil", "milk", "bread", "chocolate", "honey"]
+const OPTIONAL := ["tomato", "oil", "milk", "bread", "chocolate", "honey", "carrot", "cabbage", "corn", "apple"]
 
 static func fresh_item(id: String) -> Dictionary:
 	return {"stock": 0, "purchased": 0, "sold": 0, "price": PRICES[id]}

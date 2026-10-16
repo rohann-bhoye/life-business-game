@@ -31,4 +31,5 @@ func try_sleep() -> bool:
 		return false
 	next_sleep_msec = Time.get_ticks_msec() + 1000
 	get_tree().current_scene.get_node("Ui").show_feedback("Day %d. Rested until morning." % business.day)
+	get_tree().current_scene.get_node("Ui").show_day_report()
 	return true

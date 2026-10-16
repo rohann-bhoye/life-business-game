@@ -14,12 +14,25 @@ var farm := FarmStore.new()
 func farm_time() -> int:
 	return day * 1440 + int(minutes_of_day)
 
-func buy_seeds(quantity := 1) -> bool:
-	if quantity < 1 or quantity > 10 or farm.bought + quantity > 10000000 or money < quantity * FarmStore.SEED_COST: return false
+func buy_seeds(quantity := 1, crop := "") -> bool:
+	if crop == "": crop = farm.crop
+	if crop not in FarmStore.CROPS: return false
+	var cost: int = quantity * FarmStore.SEED_COSTS[crop]
+	if quantity < 1 or quantity > 10 or farm.bought + quantity > 10000000 or money < cost: return false
 	var old := snapshot()
-	money -= quantity * FarmStore.SEED_COST
+	money -= cost
 	farm.seeds += quantity
 	farm.bought += quantity
+	farm.crop_seeds[crop] += quantity
+	farm.crop_bought[crop] += quantity
+	return _commit_farm(old)
+
+## Crop chosen at the seed stall; used when buying seeds and planting.
+func set_farm_crop(crop: String) -> bool:
+	if crop not in FarmStore.CROPS: return false
+	if farm.crop == crop: return true
+	var old := snapshot()
+	farm.crop = crop
 	return _commit_farm(old)
 
 func upgrade_farm() -> bool:
@@ -31,12 +44,14 @@ func upgrade_farm() -> bool:
 	farm.level += 1
 	return _commit_farm(old)
 
-func plant_crop(index: int) -> bool:
-	if carried_stock > 0 or index < 0 or index >= FarmStore.PLOTS[farm.level - 1] or farm.seeds <= 0 or farm.plots[index].planted: return false
+func plant_crop(index: int, crop := "") -> bool:
+	if crop == "": crop = farm.crop
+	if crop not in FarmStore.CROPS or carried_stock > 0 or index < 0 or index >= FarmStore.PLOTS[farm.level - 1] or int(farm.crop_seeds[crop]) <= 0 or farm.plots[index].planted: return false
 	var old := snapshot()
 	farm.seeds -= 1
+	farm.crop_seeds[crop] -= 1
 	farm.planted += 1
-	farm.plots[index] = {"planted": true, "watered_at": -1, "grow_minutes": FarmStore.GROW_MINUTES[farm.level - 1]}
+	farm.plots[index] = {"planted": true, "watered_at": -1, "grow_minutes": FarmStore.GROW_MINUTES[farm.level - 1], "crop": crop}
 	return _commit_farm(old)
 
 func water_crop(index: int) -> bool:
@@ -48,11 +63,13 @@ func water_crop(index: int) -> bool:
 func harvest_crop(index: int) -> bool:
 	if not farm.ready(index, farm_time()) or carried_stock + worker_carried_stock > 0 or supply_box_count() >= MAX_SUPPLY_BOXES: return false
 	var old := snapshot()
+	var crop: String = FarmStore.plot_crop(farm.plots[index])
 	farm.plots[index] = FarmStore.empty_plot()
 	farm.harvested += 10
-	inventory.tomato.purchased += 10
+	farm.crop_harvested[crop] += 10
+	inventory[crop].purchased += 10
 	if boxed_stock > 0: queued_boxes.push_front({"product": pending_product, "amount": boxed_stock})
-	pending_product = "tomato"
+	pending_product = crop
 	boxed_stock = 0
 	carried_stock = 10
 	stock_collection_assigned = false
@@ -223,6 +240,8 @@ func _commit_logistics(old: Dictionary) -> bool:
 	return true
 var demo = DemoProgress.new()
 var customer_reviews = CustomerReviews.new()
+const DayReport := preload("res://day_report.gd")
+var day_report = DayReport.new()
 var staff = EmployeeRelations.new()
 var overtime_expenses := 0
 const Catalog := preload("res://product_catalog.gd")
@@ -502,7 +521,12 @@ func upgrade_shop() -> bool:
 	return true
 
 func customer_spawn_interval(marketing := false) -> float:
-	return CUSTOMER_INTERVALS[shop_level - 1] * (0.85 if marketing else 1.0)
+	return CUSTOMER_INTERVALS[shop_level - 1] * (0.85 if marketing else 1.0) * reputation_traffic_factor()
+
+## Good reputation brings customers more often: 100 -> 25% shorter waits,
+## 0 -> 25% longer, 50 (the starting value) -> unchanged.
+func reputation_traffic_factor() -> float:
+	return 1.0 - (customer_reviews.reputation - 50) / 200.0
 
 func shop_is_open() -> bool:
 	return minutes_of_day >= SHOP_OPEN_MINUTE and minutes_of_day < SHOP_CLOSE_MINUTE
@@ -565,6 +589,7 @@ func advance_clock(minutes: float) -> void:
 	day += elapsed_days
 	minutes_of_day = fmod(total, 1440.0)
 	if elapsed_days > 0:
+		day_report.close(self)
 		_bill_new_day()
 	staff.tick(self)
 	if elapsed_days > 0: _commit()
@@ -577,7 +602,9 @@ func sleep_until_morning() -> bool:
 	var next_day := day + int(minutes_of_day >= SHOP_CLOSE_MINUTE)
 	if not house_owned or not sleep_time_allowed() or next_day > MAX_SAVED_VALUE or not _can_bill(next_day):
 		return false
-	day = next_day
+	if next_day != day:
+		day = next_day
+		day_report.close(self)
 	minutes_of_day = float(SHOP_OPEN_MINUTE)
 	if day > last_billed_day:
 		_bill_new_day()
@@ -809,6 +836,8 @@ func snapshot() -> Dictionary:
 	var data := {"version": 10, "inventory": inventory.duplicate(true), "pending_product": pending_product, "assistant_auto_collect": assistant_auto_collect, "staff_relations": staff.snapshot(), "overtime_expenses": overtime_expenses, "day": day, "minutes_of_day": minutes_of_day, "last_visit": last_visit, "worker_hired": worker_hired, "stock_worker_hired": stock_worker_hired, "house_owned": house_owned, "marketing_seconds_left": marketing_seconds_left}
 	data["customer_reviews"] = customer_reviews.snapshot()
 	data["farm"] = farm.snapshot()
+	if day_report.start.is_empty(): day_report.begin(self)
+	data["day_report"] = day_report.snapshot()
 	data["incoming_boxes"] = incoming_boxes.duplicate(true)
 	data["queued_boxes"] = queued_boxes.duplicate(true)
 	data["demo_progress"] = demo.snapshot()
@@ -854,6 +883,7 @@ func load_progress(path: String) -> void:
 	for id in Catalog.OPTIONAL:
 		if not inventory.has(id): inventory[id] = Catalog.fresh_item(id)
 	farm.restore(data.get("farm", FarmStore.new().snapshot()))
+	day_report.restore(data.get("day_report", {}))
 	for id in inventory:
 		for field in inventory[id]: inventory[id][field] = int(inventory[id][field])
 	pending_product = data.pending_product
@@ -1015,6 +1045,7 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	var demo_data = data.get("demo_progress", DemoProgress.new().snapshot())
 	if not DemoProgress.valid(demo_data): return false
 	if not CustomerReviews.valid(data.get("customer_reviews", CustomerReviews.new().snapshot())): return false
+	if not DayReport.valid(data.get("day_report", {})): return false
 	var version = data.get("version")
 	if not (version is int or version is float) or version != 10:
 		return false
@@ -1182,7 +1213,7 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	var extra_purchased := 0
 	for id in Catalog.EXTRA:
 		var item: Dictionary = data.inventory.get(id, Catalog.fresh_item(id))
-		var farm_units: int = farm_data.harvested if id == "tomato" else 0
+		var farm_units: int = int(farm_data.get("crop_harvested", {"tomato": farm_data.harvested}).get(id, 0))
 		if farm_units > item.purchased: return false
 		extra_cost += (int(item.purchased) - farm_units) / 10 * Catalog.COSTS[id]
 		extra_purchased += int(item.purchased)
