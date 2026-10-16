@@ -454,9 +454,31 @@ func order_cost(id: String, boxes: int) -> int:
 	var full: int = Catalog.COSTS[id] * boxes
 	return full - (full * BULK_DISCOUNT_PERCENT / 100 if boxes >= BULK_BOXES else 0)
 
+## Several different products in one order (the PC store cart): {id: boxes}.
+## All-or-nothing: checks money and the supply-box limit for the whole cart first.
+func order_cart(cart: Dictionary) -> bool:
+	if cart.is_empty(): return false
+	var total := 0
+	var boxes := 0
+	for id in cart:
+		var count := int(cart[id])
+		if id not in Catalog.IDS or count < 1 or count > 10: return false
+		total += order_cost(id, count)
+		boxes += count
+	if supply_box_count() + boxes > MAX_SUPPLY_BOXES or money < total: return false
+	for id in Catalog.IDS:
+		if cart.has(id): _place_order(id, int(cart[id]))
+	_commit()
+	return true
+
 func order_stock(id := "bottle", boxes := 1) -> bool:
 	if not can_order_stock(id, boxes):
 		return false
+	_place_order(id, boxes)
+	_commit()
+	return true
+
+func _place_order(id: String, boxes: int) -> void:
 	var paid := order_cost(id, boxes)
 	money -= paid
 	supplier_discounts += Catalog.COSTS[id] * boxes - paid
@@ -466,8 +488,6 @@ func order_stock(id := "bottle", boxes := 1) -> bool:
 	for index in range(boxes): incoming_boxes.append({"product": id, "amount": STOCK_AMOUNT})
 	supply_in_transit += STOCK_AMOUNT * boxes
 	demo.record("order")
-	_commit()
-	return true
 
 func receive_delivery() -> bool:
 	if supply_in_transit <= 0 or incoming_boxes.is_empty():

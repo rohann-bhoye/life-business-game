@@ -109,15 +109,15 @@ func _run() -> void:
 		tablet._process(1)
 		var safe := Rect2(Vector2(20, 52), Vector2(size) - Vector2(40, 72))
 		assert(safe.encloses(tablet.device_pixel_bounds(player.camera)), "Bezel/hands clipped at %s: %s" % [size, tablet.device_pixel_bounds(player.camera)])
-		assert(tablet.screen_menu.theme.get_stylebox("panel", "Panel") is StyleBoxFlat)
+		assert(tablet.screen_menu.theme.get_stylebox("panel", "Panel") is StyleBoxTexture)
 		await process_frame
 		await process_frame
 		var menu_tabs := tablet.screen_menu.get_node("ShopTabs") as TabBar
 		assert(menu_tabs.get_theme_constant("tab_separation") >= 6)
 		for tab_index in range(1, 5):
 			assert(menu_tabs.get_tab_rect(tab_index).position.x - menu_tabs.get_tab_rect(tab_index - 1).end.x >= 6, "viewport=%s tab=%d previous=%s next=%s" % [size, tab_index, menu_tabs.get_tab_rect(tab_index - 1), menu_tabs.get_tab_rect(tab_index)])
-		assert(tablet.screen_menu.theme.get_stylebox("tab_selected", "TabBar") is StyleBoxFlat and tablet.screen_menu.theme.get_stylebox("tab_selected", "TabBar").bg_color == preload("res://ui_style.gd").BRAND)
-		assert(tablet.screen_menu.theme.get_stylebox("hover_pressed", "Button") is StyleBoxFlat)
+		assert(tablet.screen_menu.theme.get_stylebox("tab_selected", "TabBar").texture.resource_path.ends_with("green_button.png"))
+		assert(tablet.screen_menu.theme.get_stylebox("hover_pressed", "Button").texture.resource_path.ends_with("green_button_pressed.png"))
 		for grip in tablet.grips:
 			for part in grip.get_children():
 				assert(part.material_override.render_priority > tablet.screen_mesh.material_override.render_priority)

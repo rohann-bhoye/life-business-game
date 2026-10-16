@@ -14,6 +14,27 @@ Latest feature: playable tomato farming, a Farm tablet tab/seed stall, three far
 expansions, tomato warehouse/shelf/checkout integration, a road-end Coming Next
 board and a local suggestion form. See Farming section below for controls and limits.
 
+## Kenney UI Theme and PC Wholesale Store (2026-10-17)
+
+- kenney_theme.gd: Kenney UI Pack (assets/ui/kenney_pack, owner's local CC0 download)
+  9-slice depth buttons (grey normal, blue hover, green pressed/primary), card panels,
+  inputs, green selected tabs, Kenney Future Narrow font on buttons/tabs/headings.
+  Type variations: PrimaryButton (green), DangerButton (red), HeadingLabel. Applied
+  on top of ui_style.gd by menu_skin.apply (tablet/menus) and the PC desktop_theme;
+  PC copies use theme_type_variation instead of flat style overrides. Tab font 15.
+- Product pictures: tools/product_thumbnails.gd renders the in-game product models
+  to assets/ui/products/<id>.png (256 px, transparent). Re-run it after adding SKUs.
+- pc_store.gd "APNA WHOLESALE": website-style page drawn over the PC operations
+  window (opened by the green "Shop online" header button or the taskbar "Store"
+  button; Back/close hide it). Category sidebar (All, Groceries, Fresh produce,
+  Household), product cards (picture, price per box, shelf/warehouse stock, Add to
+  cart), cart with +/- per line, per-line 10% bulk discount, totals and Place order.
+  Backend order_cart({id: boxes}) is all-or-nothing (money + 20-box supply limit);
+  order_stock now shares _place_order().
+- Dropdowns (PopupMenu) got dark readable text and a teal hover row.
+- Tests: pc_store_test (new); tablet_test now checks Kenney textures. Preview tool:
+  tools/store_preview.gd, tools/dropdown_preview.gd.
+
 ## Mixed Baskets, Bulk Discount, Queue Labels, Farm Worker (2026-10-17)
 
 - Mixed baskets (customer.gd): with scene meta "mixed_baskets" (set by

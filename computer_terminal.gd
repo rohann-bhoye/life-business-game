@@ -13,6 +13,8 @@ var transition: Tween
 var saved_input: Array = []
 var clock: Label
 var desktop_theme: Theme
+var store: Panel
+const KenneyTheme := preload("res://kenney_theme.gd")
 const UiStyle := preload("res://ui_style.gd")
 @onready var world = get_tree().current_scene
 @onready var player = world.get_node("Player")
@@ -99,10 +101,11 @@ func _configure() -> void:
 	desktop.add_child(taskbar)
 	for index in range(3):
 		var button := Button.new()
-		button.text = ["APNA", "Orders", "Warehouse staff"][index]
-		button.position = Vector2(12 + index * 180, 504)
-		button.size = Vector2(168, 32)
-		UiStyle.style_button(button, index == 0)
+		button.text = ["APNA", "Orders", "Staff"][index]
+		button.add_theme_font_size_override("font_size", 15)
+		button.position = Vector2(12 + index * 160, 504)
+		button.size = Vector2(150, 32)
+		button.theme_type_variation = "PrimaryButton" if index == 0 else ""
 		desktop.add_child(button)
 		button.pressed.connect(func():
 			source.tabs.current_tab = 1 if index == 2 else 0
@@ -116,6 +119,8 @@ func _configure() -> void:
 	desktop_theme = Theme.new()
 	desktop_theme.default_font_size = 18
 	UiStyle.apply(desktop_theme, true)
+	KenneyTheme.apply(desktop_theme)
+	desktop.theme = desktop_theme
 	screen_menu = source.duplicate(0) as Panel
 	screen_menu.name = "OperationsWindow"
 	screen_menu.modulate = Color.WHITE
@@ -123,6 +128,7 @@ func _configure() -> void:
 	screen_viewport.add_child(screen_menu)
 	_bind(source, screen_menu)
 	screen_menu.hide()
+	_build_store(desktop)
 	screen_mesh = MeshInstance3D.new()
 	screen_mesh.name = "LiveScreen"
 	var quad := QuadMesh.new()
@@ -169,6 +175,40 @@ func _configure() -> void:
 	source.visibility_changed.connect(func():
 		if active and not source.visible: close())
 	_sync()
+
+# APNA Wholesale shopping page (pc_store.gd), drawn over the operations window.
+# Opened from the green "Shop online" header button or the taskbar "Store" button.
+func _build_store(desktop: Control) -> void:
+	store = Panel.new()
+	store.set_script(preload("res://pc_store.gd"))
+	store.position = Vector2(24, 12)
+	screen_viewport.add_child(store)
+	store.setup(ui.shop.business, ui.shop._format_money)
+	store.hide()
+	store.back_requested.connect(func(): store.hide())
+	var shop_online := Button.new()
+	shop_online.name = "ShopOnlineButton"
+	shop_online.text = "Shop online"
+	shop_online.theme_type_variation = "PrimaryButton"
+	shop_online.position = Vector2(680, 8)
+	shop_online.size = Vector2(170, 34)
+	shop_online.focus_mode = Control.FOCUS_NONE
+	screen_menu.add_child(shop_online)
+	shop_online.pressed.connect(open_store)
+	var store_button := Button.new()
+	store_button.name = "StoreTaskbarButton"
+	store_button.text = "Store"
+	store_button.theme_type_variation = "PrimaryButton"
+	store_button.position = Vector2(492, 504)
+	store_button.size = Vector2(150, 32)
+	store_button.add_theme_font_size_override("font_size", 15)
+	desktop.add_child(store_button)
+	store_button.pressed.connect(open_store)
+
+func open_store() -> void:
+	if not is_instance_valid(store): return
+	store.refresh()
+	store.show()
 
 func _bind(original: Control, copy: Control) -> void:
 	pairs.append([original, copy])
@@ -226,7 +266,7 @@ func _sync() -> void:
 			var primary := UiStyle.is_primary(copy)
 			if not copy.has_meta("ui_primary") or copy.get_meta("ui_primary") != primary:
 				copy.set_meta("ui_primary", primary)
-				UiStyle.style_button(copy, primary)
+				copy.theme_type_variation = "PrimaryButton" if primary else ""
 		if copy is Label or copy is Button or copy is TabBar:
 			copy.add_theme_constant_override("outline_size", 0)
 		if copy is Label:
@@ -295,6 +335,7 @@ func close() -> void:
 		var landscape = world.get_node_or_null("Landscape")
 		if landscape != null: landscape.set_camera(previous_camera)
 	screen_menu.hide()
+	if is_instance_valid(store): store.hide()
 	screen_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 func screen_point(pixel: Vector2) -> Vector2:

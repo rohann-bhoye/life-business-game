@@ -2,6 +2,7 @@ extends RefCounted
 
 const ROOT := "res://assets/ui/kenney/"
 const UiStyle := preload("res://ui_style.gd")
+const KenneyTheme := preload("res://kenney_theme.gd")
 
 static func texture(asset: String, icon_size := 0) -> Texture2D:
 	var resource := load(ROOT + asset + ".png") as Texture2D
@@ -24,6 +25,8 @@ static func surface(asset: String, tint: Color, inset := 6.0) -> StyleBoxTexture
 # Modern flat web-dashboard styling (ui_style.gd) with the licensed Kenney icons.
 static func apply(theme: Theme, light := false) -> void:
 	UiStyle.apply(theme, light)
+	# Kenney UI Pack buttons, tabs, cards and inputs on top of the base colours.
+	KenneyTheme.apply(theme)
 	for type in ["Button", "OptionButton", "TabBar"]:
 		theme.set_constant("icon_max_width", type, 16)
 	theme.set_icon("checked", "CheckBox", texture("checked", 18))
