@@ -25,6 +25,7 @@ static func launch_game(tree: SceneTree, path: String, settings_path: String) ->
 	scene.get_node("Shop/ShopArea").save_path = path
 	scene.set_meta("session_save_path", path)
 	scene.set_meta("session_settings_path", settings_path)
+	scene.set_meta("mixed_baskets", true)
 	return _launch(tree, scene)
 
 static func launch_menu(tree: SceneTree, path: String, settings_path: String) -> Error:

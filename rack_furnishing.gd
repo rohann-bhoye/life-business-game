@@ -80,6 +80,9 @@ func available(id: int, sku := "") -> int:
 		if child.get("has_product") == true and child.get("product_id") == sku and not child.get("deal_sold"):
 			var source: int = child.rack_id if child.rack_id >= 0 else Catalog.IDS.find(child.product_id)
 			if source == id: count -= child.basket_count
+		if child.get("has_product") == true and not child.get("deal_sold") and child.get("extra_lines") is Array:
+			for line in child.extra_lines:
+				if line.taken and line.product == sku and int(line.rack) == id: count -= int(line.count)
 	return maxi(0, count)
 
 func choose_rack(sku: String) -> int:
@@ -167,6 +170,7 @@ func busy(id: int) -> bool:
 	if record.is_empty(): return false
 	for child in world.get_children():
 		if child.get("rack_id") == id and child.get("state") in [1, 5]: return true
+		if child.get("state") == 11 and child.get("extra_lines") is Array and child.extra_lines.any(func(line): return int(line.rack) == id): return true
 	var worker = operations.stock_worker
 	return is_instance_valid(worker) and not worker.route.is_empty()
 

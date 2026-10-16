@@ -75,10 +75,78 @@ func harvest_crop(index: int) -> bool:
 	stock_collection_assigned = false
 	return _commit_farm(old)
 
+func hire_farm_worker() -> bool:
+	if farm.worker_hired or money < FarmStore.WORKER_COST: return false
+	var old := snapshot()
+	money -= FarmStore.WORKER_COST
+	farm.worker_hired = true
+	farm.worker_fees += FarmStore.WORKER_COST
+	return _commit_farm(old)
+
+func farm_worker_hours() -> bool:
+	return farm.worker_hired and minutes_of_day >= 360 and minutes_of_day < 1200
+
+## Crop the farm worker plants: the selected crop, or any crop that still has seeds.
+func _farm_worker_crop() -> String:
+	if int(farm.crop_seeds[farm.crop]) > 0: return farm.crop
+	for id in FarmStore.CROPS:
+		if int(farm.crop_seeds[id]) > 0: return id
+	return ""
+
+func _free_storage_slot() -> int:
+	for rack in range(Logistics.STORAGE_RACKS):
+		var slot: int = logistics.free_slot(rack)
+		if slot >= 0: return slot
+	return -1
+
+## Next bed the farm worker can do something useful at (-1 when nothing to do).
+## Harvests come first, then watering, then planting.
+func farm_worker_next_bed() -> int:
+	if not farm_worker_hours(): return -1
+	var open: int = FarmStore.PLOTS[farm.level - 1]
+	var now := farm_time()
+	for pass_index in range(3):
+		for index in range(open):
+			var plot: Dictionary = farm.plots[index]
+			if pass_index == 0 and farm.ready(index, now) and _free_storage_slot() >= 0 and money >= FarmStore.HARVEST_FEE: return index
+			if pass_index == 1 and plot.planted and plot.watered_at < 0: return index
+			if pass_index == 2 and not plot.planted and _farm_worker_crop() != "": return index
+	return -1
+
+## The farm worker plants, waters or harvests one bed. He needs no free hands:
+## harvested crops go straight into warehouse storage for Sunil to shelve.
+func farm_worker_work(index: int) -> bool:
+	if not farm_worker_hours() or index < 0 or index >= FarmStore.PLOTS[farm.level - 1]: return false
+	var plot: Dictionary = farm.plots[index]
+	var old := snapshot()
+	if farm.ready(index, farm_time()):
+		var slot := _free_storage_slot()
+		if slot < 0 or money < FarmStore.HARVEST_FEE: return false
+		var crop: String = FarmStore.plot_crop(plot)
+		farm.plots[index] = FarmStore.empty_plot()
+		farm.harvested += 10
+		farm.crop_harvested[crop] += 10
+		inventory[crop].purchased += 10
+		logistics.storage.append({"slot": slot, "product": crop, "amount": 10})
+		money -= FarmStore.HARVEST_FEE
+		farm.worker_fees += FarmStore.HARVEST_FEE
+	elif plot.planted and plot.watered_at < 0:
+		farm.plots[index].watered_at = farm_time()
+	elif not plot.planted:
+		var crop := _farm_worker_crop()
+		if crop == "": return false
+		farm.seeds -= 1
+		farm.crop_seeds[crop] -= 1
+		farm.planted += 1
+		farm.plots[index] = {"planted": true, "watered_at": -1, "grow_minutes": FarmStore.GROW_MINUTES[farm.level - 1], "crop": crop}
+	else: return false
+	return _commit_farm(old)
+
 func _commit_farm(old: Dictionary) -> bool:
 	if not save_progress():
 		money = int(old.money)
 		farm.restore(old.farm)
+		logistics.restore(old.logistics)
 		inventory = old.inventory.duplicate(true)
 		pending_product = old.pending_product
 		boxed_stock = int(old.boxed_stock)
@@ -376,13 +444,23 @@ func supply_box_count() -> int:
 	return logistics.ground_boxes.size() + incoming_boxes.size() + queued_boxes.size() + (1 if boxed_stock + carried_stock + worker_carried_stock > 0 else 0)
 
 func can_order_stock(id := "bottle", boxes := 1) -> bool:
-	return id in Catalog.IDS and boxes >= 1 and boxes <= 10 and supply_box_count() + boxes <= MAX_SUPPLY_BOXES and money >= Catalog.COSTS[id] * boxes
+	return id in Catalog.IDS and boxes >= 1 and boxes <= 10 and supply_box_count() + boxes <= MAX_SUPPLY_BOXES and money >= order_cost(id, boxes)
+
+## Bulk orders of BULK_BOXES or more boxes get BULK_DISCOUNT_PERCENT off.
+const BULK_BOXES := 5
+const BULK_DISCOUNT_PERCENT := 10
+var supplier_discounts := 0
+func order_cost(id: String, boxes: int) -> int:
+	var full: int = Catalog.COSTS[id] * boxes
+	return full - (full * BULK_DISCOUNT_PERCENT / 100 if boxes >= BULK_BOXES else 0)
 
 func order_stock(id := "bottle", boxes := 1) -> bool:
 	if not can_order_stock(id, boxes):
 		return false
-	money -= Catalog.COSTS[id] * boxes
-	restocking_expenses += Catalog.COSTS[id] * boxes
+	var paid := order_cost(id, boxes)
+	money -= paid
+	supplier_discounts += Catalog.COSTS[id] * boxes - paid
+	restocking_expenses += paid
 	if supply_box_count() == 0: pending_product = id
 	if inventory.has(id): inventory[id].purchased += STOCK_AMOUNT * boxes
 	for index in range(boxes): incoming_boxes.append({"product": id, "amount": STOCK_AMOUNT})
@@ -658,6 +736,54 @@ func sell_basket(quantity: int, customer_budget: int, agreed_price: int = -1, pr
 	_commit()
 	return true
 
+## One payment for a basket with several products. Each line is
+## {product, count (1-3), rack, price}. All-or-nothing: stock, money and racks
+## only change if every line can be sold.
+func sell_mixed_basket(lines: Array, customer_budget: int) -> bool:
+	if lines.is_empty() or lines.size() > 3 or customer_budget < 0 or not shop_is_open(): return false
+	var needed := {}
+	var total := 0
+	var units := 0
+	for line in lines:
+		var product = line.get("product")
+		var count := int(line.get("count", 0))
+		if product not in Catalog.IDS or count < 1 or count > 3: return false
+		var retail := product_price(product)
+		var price := int(line.get("price", retail))
+		if price < 50 or price > retail or price % 10 != 0: return false
+		if price > customer_budget:
+			missed_sales += 1
+			last_visit = "Price too high"
+			_commit()
+			return false
+		needed[product] = int(needed.get(product, 0)) + count
+		total += price * count
+		units += count
+	for product in needed:
+		if product_stock(product) < needed[product]:
+			missed_sales += 1
+			last_visit = "Out of stock"
+			_commit()
+			return false
+	var old_layout: Array = racks.records.duplicate(true)
+	for line in lines:
+		if not racks.remove_stock(line.product, int(line.count), int(line.get("rack", -1))):
+			racks.records = old_layout
+			return false
+	for line in lines:
+		var count := int(line.count)
+		stock -= count
+		if inventory.has(line.product):
+			inventory[line.product].stock -= count
+			inventory[line.product].sold += count
+	money += total
+	items_sold += units
+	sales_revenue += total
+	demo.record("sale", total)
+	last_visit = "Basket of %d items for %s%d" % [units, String.chr(8377), total]
+	_commit()
+	return true
+
 func record_bargain_refusal(timed_out := false) -> void:
 	if not shop_is_open():
 		return
@@ -838,6 +964,7 @@ func snapshot() -> Dictionary:
 	data["farm"] = farm.snapshot()
 	if day_report.start.is_empty(): day_report.begin(self)
 	data["day_report"] = day_report.snapshot()
+	data["supplier_discounts"] = supplier_discounts
 	data["incoming_boxes"] = incoming_boxes.duplicate(true)
 	data["queued_boxes"] = queued_boxes.duplicate(true)
 	data["demo_progress"] = demo.snapshot()
@@ -884,6 +1011,7 @@ func load_progress(path: String) -> void:
 		if not inventory.has(id): inventory[id] = Catalog.fresh_item(id)
 	farm.restore(data.get("farm", FarmStore.new().snapshot()))
 	day_report.restore(data.get("day_report", {}))
+	supplier_discounts = int(data.get("supplier_discounts", 0))
 	for id in inventory:
 		for field in inventory[id]: inventory[id][field] = int(inventory[id][field])
 	pending_product = data.pending_product
@@ -1195,6 +1323,10 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	var allowed_visits: Array[String] = ["No customers yet", "Out of stock", "Price too high", "Offer refused", "Customer left"]
 	for sale_price in range(50, 201, 10):
 		allowed_visits.append("Bought for %s%d" % [String.chr(8377), sale_price])
+	# Mixed baskets: 2-5 items, Rs100-1000 in steps of 10.
+	for units in range(2, 6):
+		for total in range(100, 1001, 10):
+			allowed_visits.append("Basket of %d items for %s%d" % [units, String.chr(8377), total])
 	if data["last_visit"] not in allowed_visits:
 		return false
 	var duration = data.get("marketing_seconds_left")
@@ -1220,7 +1352,10 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 		extra_sold += int(item.sold)
 		extra_stock += int(item.stock)
 		if item.stock + supply_by_product[id] != item.purchased - item.sold: return false
-	var bottle_cost := int(data.restocking_expenses) - extra_cost
+	# Expenses record what was paid; bulk discounts are saved separately so the
+	# full-price purchase accounting still balances.
+	if not EmployeeRelations.whole(data.get("supplier_discounts", 0), MAX_SAVED_VALUE): return false
+	var bottle_cost := int(data.restocking_expenses) + int(data.get("supplier_discounts", 0)) - extra_cost
 	if bottle_cost < 0 or bottle_cost % STOCK_COST != 0 or int(data["marketing_expenses"]) % MARKETING_COST != 0:
 		return false
 	if int(data["hiring_expenses"]) != int(relations.retired_hiring) + CASHIER_COSTS[int(data["cashier_level"]) - 1] * int(data["worker_hired"]) + HIRING_COST * (int(data["stock_worker_hired"]) + int(data.get("warehouse_worker_hired", false))):

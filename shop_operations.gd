@@ -595,6 +595,9 @@ func available_stock(product := "bottle") -> int:
 	for child in get_parent().get_children():
 		if child.has_method("resolve_bargain") and child.product_id == product and child.has_product and child.state != child.State.LEAVING and not child.is_queued_for_deletion():
 			reserved += child.basket_count
+		if child.has_method("resolve_bargain") and child.has_product and child.state != child.State.LEAVING and not child.is_queued_for_deletion():
+			for line in child.extra_lines:
+				if line.taken and line.product == product: reserved += int(line.count)
 	return maxi(0, shop.business.product_stock(product) - reserved)
 
 func update_rack() -> void:
@@ -643,13 +646,18 @@ func remove_customer(customer: Node3D) -> void:
 
 func show_basket(customer: Node3D) -> void:
 	basket_customer = customer
+	var products: Array[String] = customer.basket_products()
+	while checkout_items.size() < products.size():
+		var spare := make_bottle(counter, "CheckoutBottle%d" % checkout_items.size(), Vector3.ZERO)
+		spare.hide()
+		checkout_items.append(spare)
 	for index in range(checkout_items.size()):
 		var previous := checkout_items[index]
 		counter.remove_child(previous)
 		previous.queue_free()
-		checkout_items[index] = make_product(counter, "CheckoutBottle%d" % index, Vector3.ZERO, customer.product_id)
+		checkout_items[index] = make_product(counter, "CheckoutBottle%d" % index, Vector3.ZERO, products[index] if index < products.size() else customer.product_id)
 		checkout_items[index].position = Vector3(-1.0 + index * 0.27, 0.59, 0.1)
-		checkout_items[index].visible = index < customer.basket_count
+		checkout_items[index].visible = index < products.size()
 		checkout_items[index].get_node("Cap").material_override = _material(Color(0.92, 0.93, 0.9))
 	_update_checkout_display()
 
@@ -660,7 +668,7 @@ func _update_checkout_display() -> void:
 			status = "SCAN %.1fs" % maxf(0, basket_customer.auto_checkout_seconds)
 		elif basket_customer.state == basket_customer.State.NEGOTIATING: status = "PRICE DISCUSSION"
 		elif basket_customer.state == basket_customer.State.SCANNING and not player_at_counter(): status = "CASHIER NEEDED"
-		checkout_display.text = "%d/%d SCANNED\n%s%d\n%s" % [basket_customer.scanned_count, basket_customer.basket_count, String.chr(8377), basket_customer.scanned_count * basket_customer.agreed_unit_price, status]
+		checkout_display.text = "%d/%d SCANNED\n%s%d\n%s" % [basket_customer.scanned_count, basket_customer.total_items(), String.chr(8377), basket_customer.scanned_total(), status]
 		var paid: bool = basket_customer.state == basket_customer.State.PAYING
 		if screen_payment != paid:
 			screen_payment = paid
@@ -669,7 +677,7 @@ func _update_checkout_display() -> void:
 func mark_scanned(customer: Node3D, index: int) -> void:
 	if basket_customer == customer and index < checkout_items.size():
 		var item: Node3D = checkout_items[index]
-		var scanned_position := Vector3(0.7 + index * 0.22, 0.59, 0.1)
+		var scanned_position := Vector3(0.7 + (index % 3) * 0.22, 0.59, 0.1 - (index / 3) * 0.22)
 		var tween := create_tween()
 		tween.tween_property(item, "position", Vector3(0.58, 0.65, 0.08), 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		tween.tween_callback(_finish_scan_animation.bind(item))
@@ -685,7 +693,7 @@ func aimed_checkout_item(customer: Node3D) -> int:
 	var camera: Camera3D = player.camera
 	var best_alignment := 0.965
 	var result := -1
-	for index in range(mini(customer.basket_count, checkout_items.size())):
+	for index in range(mini(customer.total_items(), checkout_items.size())):
 		if index in customer.scanned_items: continue
 		var item: Node3D = checkout_items[index]
 		if not item.visible: continue
@@ -775,7 +783,7 @@ func interaction_hint() -> String:
 	var customer = checkout_customer()
 	if customer != null and player_at_counter():
 		if customer.state == customer.State.SCANNING:
-			return "Scan product %d/%d" % [customer.scanned_count + 1, customer.basket_count] if aimed_checkout_item(customer) >= 0 else "Aim at a product to scan"
+			return "Scan product %d/%d" % [customer.scanned_count + 1, customer.total_items()] if aimed_checkout_item(customer) >= 0 else "Aim at a product to scan"
 		if customer.state == customer.State.NEGOTIATING: return "Customer wants a discount"
 		if customer.state == customer.State.PAYING: return "Payment: %s" % customer.payment_method
 	var employee := employee_target()

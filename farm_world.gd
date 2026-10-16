@@ -64,6 +64,9 @@ func _ready() -> void:
 	var notice: Label3D = world.get_node("ShopOperations")._sign(self, "RoadmapSign", "COMING NEXT\nAPNA MART DEMO\nPLAYER SUGGESTIONS", Vector3(29, 1.8, 1.4))
 	notice.pixel_size = 0.005
 	_build_roadmap()
+	var worker := Node3D.new()
+	worker.set_script(preload("res://farm_worker.gd"))
+	add_child(worker)
 	business.changed.connect(refresh)
 	business.clock_changed.connect(refresh)
 	refresh()

@@ -74,5 +74,5 @@ static func valid(data) -> bool:
 		var value = data.get(field)
 		if not (value is int or value is float) or not is_finite(float(value)): return false
 		if value < 0 or value > (10 if field == "player_shelved" else MAX_VALUE) or value != int(value): return false
-	if int(data.revenue) % 10 != 0 or data.revenue < data.customers_served * 50 or data.revenue > data.customers_served * 600: return false
+	if int(data.revenue) % 10 != 0 or data.revenue < data.customers_served * 50 or data.revenue > data.customers_served * 1000: return false
 	return not data.completion_seen or (data.ordered and data.player_shelved >= 10 and data.customers_served >= 10 and data.worker_stocked and data.revenue >= 2000)

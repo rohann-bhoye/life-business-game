@@ -82,11 +82,12 @@ func _refresh() -> void:
 		payment_label.text = ""
 		return
 	customer_label.text = customer.customer_name.split(" - ")[0]
-	items_label.text = "%s: %d | Scanned: %d" % [operations.Catalog.NAMES[customer.product_id], customer.basket_count, customer.scanned_count]
-	total_label.text = "Total: %s%d" % [String.chr(8377), customer.scanned_count * customer.agreed_unit_price]
+	var label: String = operations.Catalog.NAMES[customer.product_id] if customer.total_items() == customer.basket_count else "Mixed basket"
+	items_label.text = "%s: %d | Scanned: %d" % [label, customer.total_items(), customer.scanned_count]
+	total_label.text = "Total: %s%d" % [String.chr(8377), customer.scanned_total()]
 	if customer.state == customer.State.SCANNING:
 		payment_label.text = "Use the counter scanner"
-		scan_button.text = "Close, aim at item %d / %d, press E" % [customer.scanned_count + 1, customer.basket_count]
+		scan_button.text = "Close, aim at item %d / %d, press E" % [customer.scanned_count + 1, customer.total_items()]
 	elif customer.state == customer.State.PAYING:
 		scan_button.hide()
 		payment_label.text = "Customer presents: %s" % customer.payment_method

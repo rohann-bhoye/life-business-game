@@ -64,6 +64,14 @@ static func apply(theme: Theme, light := true) -> void:
 	theme.set_stylebox("panel", "Panel", box(surface, 12, 1, border, 8 if light else 0))
 	theme.set_stylebox("panel", "PanelContainer", box(surface, 12, 1, border))
 	theme.set_stylebox("panel", "PopupMenu", box(surface, 8, 1, border, 6))
+	# Dropdown lists (e.g. the PC product list): readable dark text, teal hover row.
+	theme.set_stylebox("hover", "PopupMenu", box(BRAND_SOFT if light else Color("134e4a"), 6))
+	theme.set_color("font_color", "PopupMenu", text)
+	theme.set_color("font_hover_color", "PopupMenu", BRAND if light else Color("5eead4"))
+	theme.set_color("font_disabled_color", "PopupMenu", Color("94a3b8"))
+	theme.set_color("font_accelerator_color", "PopupMenu", MUTED)
+	theme.set_constant("v_separation", "PopupMenu", 6)
+	theme.set_constant("item_start_padding", "PopupMenu", 10)
 	for type in ["Button", "OptionButton"]:
 		theme.set_stylebox("normal", type, box(raised, 8, 1, border))
 		theme.set_stylebox("hover", type, box(BRAND_SOFT if light else Color("134e4a"), 8, 1, BRAND))

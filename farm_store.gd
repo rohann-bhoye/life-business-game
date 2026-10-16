@@ -20,6 +20,11 @@ var crop_seeds := {}
 var crop_bought := {}
 var crop_harvested := {}
 var plots: Array = []
+## Farm worker Kiran: one-time hire plus a fee for each harvest he brings in.
+const WORKER_COST := 1500
+const HARVEST_FEE := 50
+var worker_hired := false
+var worker_fees := 0
 
 func _init() -> void:
 	for index in range(24): plots.append(empty_plot())
@@ -35,7 +40,7 @@ static func plot_crop(plot: Dictionary) -> String:
 	return plot.get("crop", "tomato")
 
 func snapshot() -> Dictionary:
-	return {"level": level, "seeds": seeds, "bought": bought, "planted": planted, "harvested": harvested, "plots": plots.duplicate(true), "crop": crop, "crop_seeds": crop_seeds.duplicate(), "crop_bought": crop_bought.duplicate(), "crop_harvested": crop_harvested.duplicate()}
+	return {"level": level, "seeds": seeds, "bought": bought, "planted": planted, "harvested": harvested, "plots": plots.duplicate(true), "crop": crop, "crop_seeds": crop_seeds.duplicate(), "crop_bought": crop_bought.duplicate(), "crop_harvested": crop_harvested.duplicate(), "worker_hired": worker_hired, "worker_fees": worker_fees}
 
 func restore(data: Dictionary) -> void:
 	for field in ["level", "seeds", "bought", "planted", "harvested"]: set(field, int(data[field]))
@@ -44,6 +49,8 @@ func restore(data: Dictionary) -> void:
 		plot.watered_at = int(plot.watered_at)
 		plot.grow_minutes = int(plot.grow_minutes)
 	crop = data.get("crop", "tomato")
+	worker_hired = data.get("worker_hired", false)
+	worker_fees = int(data.get("worker_fees", 0))
 	# Older saves only had tomatoes: their totals belong to the tomato crop.
 	var legacy := {"crop_seeds": seeds, "crop_bought": bought, "crop_harvested": harvested}
 	for field in legacy:
@@ -56,6 +63,7 @@ func expenses() -> int:
 	var total := 0
 	for id in CROPS: total += int(crop_bought[id]) * SEED_COSTS[id]
 	for index in range(level - 1): total += UPGRADE_COSTS[index]
+	total += worker_fees
 	return total
 
 func ready(index: int, now: int) -> bool:
@@ -73,6 +81,8 @@ static func valid(data, now: int) -> bool:
 		if not whole(data.get(field), 0, 10000000): return false
 	if data.seeds + data.planted != data.bought or int(data.harvested) % 10 != 0: return false
 	if data.get("crop", "tomato") not in CROPS: return false
+	if not data.get("worker_hired", false) is bool or not whole(data.get("worker_fees", 0), 0, 1000000000): return false
+	if data.get("worker_hired", false) != (int(data.get("worker_fees", 0)) >= WORKER_COST) or (int(data.get("worker_fees", 0)) - (WORKER_COST if data.get("worker_hired", false) else 0)) % HARVEST_FEE != 0: return false
 	# Per-crop counters (optional for older saves) must add up to the totals.
 	for pair in [["crop_seeds", "seeds"], ["crop_bought", "bought"], ["crop_harvested", "harvested"]]:
 		if not data.has(pair[0]): continue

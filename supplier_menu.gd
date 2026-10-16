@@ -345,8 +345,10 @@ func _refresh() -> void:
 	var product: String = Catalog.IDS[product_input.selected]
 	var quantity := int(box_quantity.value)
 	get_node("ProductLabel").text = "Shelf: %d | Warehouse: %d | Box of 10" % [business.product_stock(product), business.logistics.stored_units(product)]
-	get_node("PriceLabel").text = "%d items | Total: %s%s" % [quantity * 10, String.chr(8377), shop._format_money(Catalog.COSTS[product] * quantity)]
-	order_button.text = "Order %d box%s - %s%s" % [quantity, "" if quantity == 1 else "es", String.chr(8377), shop._format_money(Catalog.COSTS[product] * quantity)]
+	var order_total: int = business.order_cost(product, quantity)
+	var bulk: bool = quantity >= business.BULK_BOXES
+	get_node("PriceLabel").text = ("%d items | Total: %s%s (10%% bulk discount)" if bulk else "%d items | Total: %s%s | 5+ boxes: 10%% off") % [quantity * 10, String.chr(8377), shop._format_money(order_total)]
+	order_button.text = "Order %d box%s - %s%s" % [quantity, "" if quantity == 1 else "es", String.chr(8377), shop._format_money(order_total)]
 	order_button.disabled = not business.can_order_stock(product, quantity)
 	order_button.tooltip_text = "Supply limit: 20 boxes" if business.supply_box_count() + quantity > business.MAX_SUPPLY_BOXES else ("Not enough money" if order_button.disabled else Catalog.NAMES[product])
 	auto_collect.set_pressed_no_signal(business.assistant_auto_collect)

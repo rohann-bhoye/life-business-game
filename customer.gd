@@ -1,6 +1,6 @@
 extends Node3D
 
-enum State { WAITING, ARRIVING, BUYING, LEAVING, NEGOTIATING, TAKING, TO_COUNTER, QUEUING, CHECKOUT, SCANNING, PAYING }
+enum State { WAITING, ARRIVING, BUYING, LEAVING, NEGOTIATING, TAKING, TO_COUNTER, QUEUING, CHECKOUT, SCANNING, PAYING, SHOPPING_MORE }
 
 @export var walk_speed := 1.5
 @export var spawn_delay := 3.0
@@ -26,6 +26,11 @@ var product_id := "bottle"
 var rack_id := -1
 var shopping_quantity := 1
 var basket_count := 0
+## Extra products in a mixed basket: {product, rack, count, taken}. The first
+## product stays in product_id/rack_id/basket_count.
+var extra_lines: Array = []
+var line_index := -1
+const MIXED_CHANCE := 0.5
 var scanned_count := 0
 var scanned_items: Array[int] = []
 var agreed_unit_price := 100
@@ -51,7 +56,8 @@ func _ready() -> void:
 	operations = get_tree().current_scene.get_node_or_null("ShopOperations")
 	spending_budget = randi_range(10, 20) * 10
 	personality = randi_range(0, 2)
-	customer_name = ["Ravi - Bargain hunter", "Meena - Regular", "Aman - In a hurry"][personality]
+	var first_names: Array = [["Ravi", "Sunita", "Prakash", "Lata", "Mohan"], ["Meena", "Arjun", "Kavita", "Rahul", "Pooja"], ["Aman", "Neha", "Vikram", "Divya", "Sanjay"]][personality]
+	customer_name = "%s - %s" % [first_names.pick_random(), ["Bargain hunter", "Regular", "In a hurry"][personality]]
 	wants_discount = randf() < [0.75, 0.35, 0.0][personality]
 	shopping_quantity = randi_range(1, 3)
 	payment_method = ["Cash", "Card", "UPI"][randi_range(0, 2)]
@@ -61,8 +67,8 @@ func _ready() -> void:
 	patience_label.name = "PatienceLabel"
 	patience_label.position = Vector3(0, 1.9, 0)
 	patience_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	patience_label.font_size = 28
-	patience_label.pixel_size = 0.006
+	patience_label.font_size = 24
+	patience_label.pixel_size = 0.0045
 	patience_label.outline_size = 6
 	patience_label.hide()
 	add_child(patience_label)
@@ -89,6 +95,7 @@ func _physics_process(delta: float) -> void:
 						if operations.available_stock(id) > 0: choices.append(id)
 					if not choices.is_empty(): product_id = choices.pick_random()
 					if is_instance_valid(operations.furnishing): rack_id = operations.furnishing.choose_rack(product_id)
+					_plan_extra_products(choices)
 					var points: Array[Vector3] = operations.customer_entry_route(product_id, rack_id)
 					_set_route(points)
 		State.ARRIVING:
@@ -112,8 +119,16 @@ func _physics_process(delta: float) -> void:
 					basket_count = mini(shopping_quantity, available)
 					held_bottle = operations.make_product(self, "HeldBottle", Vector3(0.32, 0.9, -0.2), product_id)
 					operations.update_rack()
-					_set_route(shop_area.business.racks.route(global_position, Vector3(-4.6, 0.1, 1.65)))
-					state = State.TO_COUNTER
+					_next_stop()
+		State.SHOPPING_MORE:
+			if _walk_route(delta):
+				var line: Dictionary = extra_lines[line_index]
+				var available: int = operations.furnishing.available(line.rack, line.product) if is_instance_valid(operations.furnishing) else operations.available_stock(line.product)
+				if available > 0:
+					line.count = mini(line.count, available)
+					line.taken = true
+					operations.update_rack()
+				_next_stop()
 		State.TO_COUNTER:
 			if _walk_route(delta):
 				operations.enqueue(self)
@@ -170,6 +185,68 @@ func _physics_process(delta: float) -> void:
 			if (_walk_route(delta) if physical_shop() else _walk_to(exit_point.global_position, delta)):
 				queue_free()
 
+## Half of customers also want one or two other products they can afford.
+func _plan_extra_products(choices: Array) -> void:
+	extra_lines.clear()
+	line_index = -1
+	# Real games (started from the menu) enable this; fixed test scenes stay single-product.
+	if not get_tree().current_scene.get_meta("mixed_baskets", false) or randf() >= MIXED_CHANCE: return
+	var others: Array = choices.filter(func(id): return id != product_id and shop_area.business.product_price(id) <= spending_budget)
+	if others.is_empty(): return
+	others.shuffle()
+	for id in others.slice(0, randi_range(1, mini(2, others.size()))):
+		extra_lines.append({"product": id, "rack": -1, "count": 1, "taken": false})
+	# Bargaining stays a single-product conversation.
+	wants_discount = false
+
+## Walk to the next rack on the shopping list, or to the counter when done.
+func _next_stop() -> void:
+	line_index += 1
+	while line_index < extra_lines.size():
+		var line: Dictionary = extra_lines[line_index]
+		var rack: int = operations.furnishing.choose_rack(line.product) if is_instance_valid(operations.furnishing) else -1
+		var record: Dictionary = shop_area.business.racks.find(rack)
+		if not record.is_empty() and operations.furnishing.available(rack, line.product) > 0:
+			var points: Array[Vector3] = shop_area.business.racks.route(global_position, shop_area.business.RackStore.approach(record))
+			if not points.is_empty():
+				line.rack = rack
+				_set_route(points)
+				state = State.SHOPPING_MORE
+				return
+		line_index += 1
+	_set_route(shop_area.business.racks.route(global_position, Vector3(-4.6, 0.1, 1.65)))
+	state = State.TO_COUNTER
+
+## Extra products actually in the basket, priced at retail.
+func taken_lines() -> Array:
+	var result: Array = []
+	for line in extra_lines:
+		if line.taken: result.append({"product": line.product, "count": line.count, "rack": line.rack, "price": shop_area.business.product_price(line.product)})
+	return result
+
+func total_items() -> int:
+	var total := basket_count
+	for line in extra_lines:
+		if line.taken: total += int(line.count)
+	return total
+
+## Product id of every item in the basket, in scanning order.
+func basket_products() -> Array[String]:
+	var result: Array[String] = []
+	for index in range(basket_count): result.append(product_id)
+	for line in extra_lines:
+		if line.taken:
+			for index in range(int(line.count)): result.append(line.product)
+	return result
+
+## Running total of the items scanned so far (first product at the agreed price).
+func scanned_total() -> int:
+	var products := basket_products()
+	var total := 0
+	for index in scanned_items:
+		if index < products.size(): total += agreed_unit_price if index < basket_count else shop_area.business.product_price(products[index])
+	return total
+
 func physical_shop() -> bool:
 	return is_instance_valid(operations) and operations.enabled
 
@@ -187,6 +264,8 @@ func _update_queue_patience(delta: float) -> bool:
 	var remaining := maxf(0, queue_patience_limit() - queue_wait_seconds)
 	patience_label.text = "%s\nWaiting: %ds" % [customer_name.get_slice(" - ", 0), ceili(remaining)]
 	patience_label.modulate = Color(1, 0.7, 0.25) if queue_is_impatient() else Color(0.8, 1, 0.85)
+	# Neighbours in the queue stand 0.85 m apart: stagger their labels so they never overlap.
+	patience_label.position.y = 1.9 + (0.32 if operations.queue.find(self) % 2 == 1 else 0.0)
 	patience_label.show()
 	if remaining > 0: return false
 	review_outcome = "timeout"
@@ -235,13 +314,17 @@ func leave_shop() -> void:
 func complete_checkout() -> void:
 	if not has_product:
 		return
-	if physical_shop() and (operations.checkout_customer() != self or state != State.PAYING or scanned_count != basket_count):
+	if physical_shop() and (operations.checkout_customer() != self or state != State.PAYING or scanned_count != total_items()):
 		return
 	if not shop_area.business.shop_is_open():
 		leave_shop()
 		return
 	state = State.LEAVING
-	deal_sold = shop_area.business.sell_basket(basket_count, spending_budget, agreed_unit_price, product_id, rack_id)
+	var lines := taken_lines()
+	if lines.is_empty(): deal_sold = shop_area.business.sell_basket(basket_count, spending_budget, agreed_unit_price, product_id, rack_id)
+	else:
+		lines.push_front({"product": product_id, "count": basket_count, "rack": rack_id, "price": agreed_unit_price})
+		deal_sold = shop_area.business.sell_mixed_basket(lines, spending_budget)
 	review_outcome = "sold" if deal_sold else "stock"
 	if deal_sold: operations.play_sound("payment")
 	deal_result = "Receipt: %s | %s%d" % [payment_method, String.chr(8377), payment_total()] if deal_sold else "Customer left without buying."
@@ -249,24 +332,26 @@ func complete_checkout() -> void:
 	get_tree().current_scene.get_node("Ui").show_feedback(deal_result, not deal_sold)
 
 func payment_total() -> int:
-	return agreed_unit_price * basket_count
+	var total := agreed_unit_price * basket_count
+	for line in taken_lines(): total += line.price * line.count
+	return total
 
 func change_due() -> int:
 	return maxi(0, cash_tendered - payment_total()) if payment_method == "Cash" else 0
 
 func scan_next() -> bool:
-	for index in range(basket_count):
+	for index in range(total_items()):
 		if index not in scanned_items: return scan_item(index)
 	return false
 
 func scan_item(index: int) -> bool:
 	if state != State.SCANNING or operations.checkout_customer() != self or not shop_area.business.shop_is_open(): return false
-	if index < 0 or index >= basket_count or index in scanned_items or scanned_count >= basket_count: return false
+	if index < 0 or index >= total_items() or index in scanned_items or scanned_count >= total_items(): return false
 	scanned_items.append(index)
 	scanned_count += 1
 	operations.play_sound("scan")
 	operations.mark_scanned(self, index)
-	if scanned_count == basket_count:
+	if scanned_count == total_items():
 		if wants_discount and quoted_price > 50: _begin_bargaining()
 		else: prepare_payment(quoted_price)
 	return true

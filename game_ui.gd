@@ -20,7 +20,7 @@ const TAB_CONTROLS := [
 	["WorkerLabel", "WorkerStatusLabel", "HireWorkerButton", "WageLabel"],
 	["MarketingLabel", "MarketingButton", "MissedSalesLabel", "LastVisitLabel", "ReputationLabel"],
 	["DemoStatusLabel", "DemoGoal0", "DemoGoal1", "DemoGoal2", "DemoGoal3", "DemoGoal4", "DemoResultsLabel", "DemoContinueButton"],
-	["FarmSummary", "BuySeedsButton", "FarmUpgradeButton", "FarmCropButton", "SeedQuantityInput", "BuyProduceTableButton"]
+	["FarmSummary", "BuySeedsButton", "FarmUpgradeButton", "FarmCropButton", "SeedQuantityInput", "BuyProduceTableButton", "HireFarmerButton"]
 ]
 
 var tabs: TabBar
@@ -89,7 +89,7 @@ func _ready() -> void:
 	seed_quantity.value = 1
 	shop_menu.add_child(seed_quantity)
 	seed_quantity.value_changed.connect(func(_value): _refresh_farm())
-	for item in [["BuySeedsButton", "Buy tomato seed - Rs100"], ["FarmUpgradeButton", "Expand farm"], ["BuyProduceTableButton", "Order produce table - Rs1000"]]:
+	for item in [["BuySeedsButton", "Buy tomato seed - Rs100"], ["FarmUpgradeButton", "Expand farm"], ["BuyProduceTableButton", "Order produce table - Rs1000"], ["HireFarmerButton", "Hire farmer Kiran - Rs1500"]]:
 		var button := Button.new()
 		button.name = item[0]
 		button.text = item[1]
@@ -97,6 +97,9 @@ func _ready() -> void:
 	shop_menu.get_node("BuySeedsButton").pressed.connect(func():
 		var success: bool = shop.business.buy_seeds(int(shop_menu.get_node("SeedQuantityInput").value))
 		show_feedback("%s seeds purchased." % shop.business.farm.CROP_NAMES[shop.business.farm.crop] if success else "Not enough money or save failed.", not success))
+	shop_menu.get_node("HireFarmerButton").pressed.connect(func():
+		var success: bool = shop.business.hire_farm_worker()
+		show_feedback("Kiran hired. He plants, waters and harvests by day; harvests go to warehouse storage." if success else "Not enough money or save failed.", not success))
 	shop_menu.get_node("FarmUpgradeButton").pressed.connect(func():
 		var success: bool = shop.business.upgrade_farm()
 		show_feedback("Farm expanded." if success else "Farm needs the next shop level, money, or a successful save.", not success))
@@ -405,7 +408,8 @@ func _layout() -> void:
 	_place(shop_menu.get_node("SeedQuantityLabel"), 16, 260, content_width * 0.5, 32)
 	_place(shop_menu.get_node("FarmCropButton"), 16, 260, content_width * 0.5 - 6, 32)
 	_place(shop_menu.get_node("SeedQuantityInput"), 16 + content_width * 0.5, 260, content_width * 0.5, 32)
-	_place(shop_menu.get_node("BuySeedsButton"), 16, 304, content_width, 36)
+	_place(shop_menu.get_node("BuySeedsButton"), 16, 304, content_width * 0.5 - 4, 36)
+	_place(shop_menu.get_node("HireFarmerButton"), 16 + content_width * 0.5 + 4, 304, content_width * 0.5 - 4, 36)
 	_place(shop_menu.get_node("FarmUpgradeButton"), 16, 348, content_width, 36)
 	_place(shop_menu.get_node("BuyProduceTableButton"), 16, 392, content_width, 36)
 	shop.last_visit_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -547,7 +551,8 @@ func _layout_tablet() -> void:
 	_place(shop_menu.get_node("SeedQuantityLabel"), 24, 386, width * 0.5, 34)
 	_place(shop_menu.get_node("FarmCropButton"), 24, 386, width * 0.5 - 8, 34)
 	_place(shop_menu.get_node("SeedQuantityInput"), 24 + width * 0.5, 386, width * 0.5, 34)
-	_place(shop_menu.get_node("BuySeedsButton"), 24, 434, width, 38)
+	_place(shop_menu.get_node("BuySeedsButton"), 24, 434, width * 0.48, 38)
+	_place(shop_menu.get_node("HireFarmerButton"), 24 + width * 0.52, 434, width * 0.48, 38)
 	_place(shop_menu.get_node("FarmUpgradeButton"), 24, 478, width * 0.48, 42)
 	_place(shop_menu.get_node("BuyProduceTableButton"), 24 + width * 0.52, 478, width * 0.48, 42)
 	_place(shop.save_status_label, 24, 560, width, 24)
@@ -715,6 +720,10 @@ func _refresh_farm() -> void:
 	var seed_cost: int = int(shop_menu.get_node("SeedQuantityInput").value) * farm.SEED_COSTS[farm.crop]
 	shop_menu.get_node("BuySeedsButton").disabled = shop.business.money < seed_cost
 	shop_menu.get_node("BuySeedsButton").text = "Buy %s seeds - Rs%d" % [crop_name.to_lower(), seed_cost]
+	var hire: Button = shop_menu.get_node("HireFarmerButton")
+	hire.text = "Kiran works the farm" if farm.worker_hired else "Hire farmer - Rs%d" % farm.WORKER_COST
+	hire.disabled = farm.worker_hired or shop.business.money < farm.WORKER_COST
+	hire.tooltip_text = "Rs%d per harvest; harvests go to warehouse storage" % farm.HARVEST_FEE
 	var button: Button = shop_menu.get_node("FarmUpgradeButton")
 	button.text = "Maximum farm size" if farm.level == 3 else "Expand to %d beds - Rs%d" % [farm.PLOTS[farm.level], farm.UPGRADE_COSTS[farm.level - 1]]
 	button.disabled = farm.level == 3 or shop.business.shop_level <= farm.level or shop.business.money < farm.UPGRADE_COSTS[mini(farm.level - 1, 1)]

@@ -14,6 +14,32 @@ Latest feature: playable tomato farming, a Farm tablet tab/seed stall, three far
 expansions, tomato warehouse/shelf/checkout integration, a road-end Coming Next
 board and a local suggestion form. See Farming section below for controls and limits.
 
+## Mixed Baskets, Bulk Discount, Queue Labels, Farm Worker (2026-10-17)
+
+- Mixed baskets (customer.gd): with scene meta "mixed_baskets" (set by
+  game_session.launch_game; fixed test scenes stay single-product), 50% of customers
+  add 1-2 other affordable products (extra_lines {product, rack, count, taken}),
+  walk to those racks (State.SHOPPING_MORE = 11, appended to the enum), and bring up
+  to 5 items. total_items()/basket_products()/taken_lines()/scanned_total() drive
+  checkout (extra counter item slots are created as needed), monitor, hint and
+  checkout menu. Extras sell at retail; bargaining only for single-product baskets.
+  Backend sell_mixed_basket(lines, budget) is all-or-nothing; save validation accepts
+  "Basket of N items for RsX"; demo revenue cap per customer raised to 1000.
+  rack_furnishing.available()/shop_operations.available_stock() reserve taken extras.
+- Bulk supplier discount: order_cost(id, boxes) gives 10% off for 5+ boxes; paid cost
+  goes to restocking_expenses and the discount to saved supplier_discounts, which
+  validation adds back to rebuild full-price purchase accounting. PC Orders shows it.
+- Queue labels: patience labels smaller and staggered by queue position; customers
+  get random first names from 5 per personality.
+- Farm worker Kiran (farm_worker.gd, spawned by farm_world): hire Rs1500 (Farm tab
+  HireFarmerButton), Rs50 per harvest; both recorded in farm.worker_fees (part of
+  farm.expenses()). Backend farm_worker_next_bed()/farm_worker_work(): 06:00-20:00,
+  harvest first, then water, then plant (selected crop or any crop with seeds);
+  harvests go into warehouse storage (Sunil restocks with Auto collect).
+  _commit_farm now also rolls back logistics.
+- Tests: mixed_basket_test, farm_worker_test (also bulk discount). Previews:
+  tools/farm_worker_preview.gd.
+
 ## More Farm Crops (2026-10-17)
 
 - farm_store.gd: CROPS tomato/carrot/cabbage/corn/apple with SEED_COSTS 100/80/120/
