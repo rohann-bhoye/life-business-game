@@ -42,6 +42,10 @@ func refresh() -> void:
 		if business.farm.ready(index, business.farm_time()): ready_beds += 1
 	if ready_beds > 0:
 		next["farm_ready"] = _entry("Crops ready to harvest", "%d farm %s ready. Carry produce to storage or shop shelves." % [ready_beds, "bed" if ready_beds == 1 else "beds"])
+	if business.rival_open() and business.price_index() > 1.05:
+		next["rival"] = _entry("Customers prefer %s" % business.RIVAL_NAME, "Your prices are %d%% higher. Lower prices or raise your reputation." % roundi((business.price_index() - 1.0) * 100.0), "", true)
+	if business.loan_left() > 0 and business.loan_missed_payments > 0:
+		next["loan"] = _entry("Loan payment missed", "APNA Bank: %s left. Keep money for the morning instalment." % (String.chr(8377) + str(business.loan_left())), "", true)
 	var operations = ui.get_tree().current_scene.get_node_or_null("ShopOperations")
 	if is_instance_valid(operations) and operations.enabled:
 		for customer in operations.queue:

@@ -14,6 +14,7 @@ var saved_input: Array = []
 var clock: Label
 var desktop_theme: Theme
 var store: Panel
+var bank: Panel
 const KenneyTheme := preload("res://kenney_theme.gd")
 const UiStyle := preload("res://ui_style.gd")
 @onready var world = get_tree().current_scene
@@ -111,8 +112,8 @@ func _configure() -> void:
 			source.tabs.current_tab = 1 if index == 2 else 0
 			if index == 2: source.role_input.select(2); source.role_input.item_selected.emit(2))
 	clock = Label.new()
-	clock.position = Vector2(720, 508)
-	clock.size = Vector2(224, 24)
+	clock.position = Vector2(812, 508)
+	clock.size = Vector2(136, 24)
 	clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	clock.add_theme_color_override("font_color", Color("e2e8f0"))
 	desktop.add_child(clock)
@@ -204,9 +205,33 @@ func _build_store(desktop: Control) -> void:
 	store_button.add_theme_font_size_override("font_size", 15)
 	desktop.add_child(store_button)
 	store_button.pressed.connect(open_store)
+	# APNA Bank page (bank_page.gd): business loan.
+	bank = Panel.new()
+	bank.set_script(preload("res://bank_page.gd"))
+	bank.position = Vector2(24, 12)
+	screen_viewport.add_child(bank)
+	bank.setup(ui.shop.business, ui.shop._format_money)
+	bank.hide()
+	bank.back_requested.connect(func(): bank.hide())
+	var bank_button := Button.new()
+	bank_button.name = "BankTaskbarButton"
+	bank_button.text = "Bank"
+	bank_button.theme_type_variation = "InfoButton"
+	bank_button.position = Vector2(652, 504)
+	bank_button.size = Vector2(150, 32)
+	bank_button.add_theme_font_size_override("font_size", 15)
+	desktop.add_child(bank_button)
+	bank_button.pressed.connect(open_bank)
+
+func open_bank() -> void:
+	if not is_instance_valid(bank): return
+	if is_instance_valid(store): store.hide()
+	bank.refresh()
+	bank.show()
 
 func open_store() -> void:
 	if not is_instance_valid(store): return
+	if is_instance_valid(bank): bank.hide()
 	store.refresh()
 	store.show()
 
@@ -336,6 +361,7 @@ func close() -> void:
 		if landscape != null: landscape.set_camera(previous_camera)
 	screen_menu.hide()
 	if is_instance_valid(store): store.hide()
+	if is_instance_valid(bank): bank.hide()
 	screen_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 func screen_point(pixel: Vector2) -> Vector2:

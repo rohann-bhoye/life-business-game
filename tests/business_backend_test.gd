@@ -375,7 +375,7 @@ func _run_checks() -> void:
 	assert(shop.money == money_before_sleep - 300 and shop.stock == stock_before_sleep)
 	assert(shop.business.operating_expenses == 100 and shop.business.wage_expenses == 200)
 	assert(shop.business.unpaid_bills() == 0 and shop.pay_bills_button.disabled)
-	assert(current_scene.get_node("Ui/ClockLabel").text == "Day %d | 08:00" % shop.business.day)
+	assert(current_scene.get_node("Ui/ClockLabel").text.begins_with("Day %d | 08:00 | " % shop.business.day))
 	assert(shop.business.save_status == "Save: Saved")
 	assert(camera.global_position.y < 3.1)
 	assert(camera.global_position.distance_to(house_player.camera_pivot.global_position) < 0.01)

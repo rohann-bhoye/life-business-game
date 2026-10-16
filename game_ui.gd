@@ -419,7 +419,8 @@ func _layout() -> void:
 			child.size.x = house_menu.size.x - 40.0
 	house.close_house_button.size.x = 80.0
 	_place(hud_money, 16, 12, maxf(120, viewport_size.x - 240), 28)
-	_place($ClockLabel, viewport_size.x - 176, 12, 160, 28)
+	_place($ClockLabel, viewport_size.x - 256, 12, 240, 28)
+	$ClockLabel.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_place(first_day_panel, viewport_size.x - 276, 50, 260, 156)
 	_place(first_day_panel.get_node("Title"), 12, 8, 236, 20)
 	_place(first_day_label, 12, 30, 236, 64)

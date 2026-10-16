@@ -51,7 +51,7 @@ func plant_crop(index: int, crop := "") -> bool:
 	farm.seeds -= 1
 	farm.crop_seeds[crop] -= 1
 	farm.planted += 1
-	farm.plots[index] = {"planted": true, "watered_at": -1, "grow_minutes": FarmStore.GROW_MINUTES[farm.level - 1], "crop": crop}
+	farm.plots[index] = {"planted": true, "watered_at": farm_time() if is_raining() else -1, "grow_minutes": FarmStore.GROW_MINUTES[farm.level - 1], "crop": crop}
 	return _commit_farm(old)
 
 func water_crop(index: int) -> bool:
@@ -138,7 +138,7 @@ func farm_worker_work(index: int) -> bool:
 		farm.seeds -= 1
 		farm.crop_seeds[crop] -= 1
 		farm.planted += 1
-		farm.plots[index] = {"planted": true, "watered_at": -1, "grow_minutes": FarmStore.GROW_MINUTES[farm.level - 1], "crop": crop}
+		farm.plots[index] = {"planted": true, "watered_at": farm_time() if is_raining() else -1, "grow_minutes": FarmStore.GROW_MINUTES[farm.level - 1], "crop": crop}
 	else: return false
 	return _commit_farm(old)
 
@@ -619,7 +619,7 @@ func upgrade_shop() -> bool:
 	return true
 
 func customer_spawn_interval(marketing := false) -> float:
-	return CUSTOMER_INTERVALS[shop_level - 1] * (0.85 if marketing else 1.0) * reputation_traffic_factor()
+	return CUSTOMER_INTERVALS[shop_level - 1] * (0.85 if marketing else 1.0) * reputation_traffic_factor() * (RAIN_TRAFFIC_FACTOR if is_raining() else 1.0) * rival_traffic_factor()
 
 ## Good reputation brings customers more often: 100 -> 25% shorter waits,
 ## 0 -> 25% longer, 50 (the starting value) -> unchanged.
@@ -666,12 +666,120 @@ func _can_bill(target_day: int) -> bool:
 	if warehouse_worker_hired: wages += target_day - warehouse_worker_hired_day
 	return (target_day - billing_start_day) * DAILY_SHOP_COST <= MAX_SAVED_VALUE and wages * DAILY_WORKER_WAGE <= MAX_SAVED_VALUE
 
+# --- Weather: each day is sunny or rainy (about 1 day in 4), decided by the day
+# number so it needs no save data. Day 1 is always sunny. ---
+const RAIN_CHANCE_PERCENT := 25
+const RAIN_TRAFFIC_FACTOR := 1.25
+
+static func weather_for_day(day_number: int) -> String:
+	if day_number <= 1: return "sunny"
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(day_number * 2654435761 + 12345)
+	return "rain" if rng.randi_range(0, 99) < RAIN_CHANCE_PERCENT else "sunny"
+
+func is_raining() -> bool:
+	return weather_for_day(day) == "rain"
+
+## Rain waters every planted bed that still needs water.
+func _rain_waters_farm() -> void:
+	if not is_raining(): return
+	for index in range(FarmStore.PLOTS[farm.level - 1]):
+		if farm.plots[index].planted and farm.plots[index].watered_at < 0: farm.plots[index].watered_at = farm_time()
+
+# --- Rival shop: Sharma General Store opens on day 3 and sells at the catalog's
+# standard prices with a fixed reputation. Customers compare: higher prices or a
+# worse reputation than Sharma's mean fewer visits; cheaper or better means more. ---
+const RIVAL_NAME := "Sharma General Store"
+const RIVAL_OPEN_DAY := 3
+const RIVAL_REPUTATION := 55
+
+func rival_open() -> bool:
+	return day >= RIVAL_OPEN_DAY
+
+static func rival_price(id: String) -> int:
+	return 100 if id == "bottle" else int(Catalog.PRICES[id])
+
+## Your average price compared with Sharma's for products you have on the shelves
+## (1.0 = same, 1.1 = 10% more expensive).
+func price_index() -> float:
+	var total := 0.0
+	var count := 0
+	for id in Catalog.IDS:
+		if product_stock(id) <= 0: continue
+		total += float(product_price(id)) / rival_price(id)
+		count += 1
+	return total / count if count > 0 else 1.0
+
+func rival_traffic_factor() -> float:
+	if not rival_open(): return 1.0
+	return clampf(1.0 + (price_index() - 1.0) + (RIVAL_REPUTATION - customer_reviews.reputation) / 200.0, 0.85, 1.4)
+
+# --- APNA Bank business loan: Rs20,000 repaid over 10 days with 10% interest. ---
+const LOAN_AMOUNT := 20000
+const LOAN_DAYS := 10
+const LOAN_INTEREST_PERCENT := 10
+var loan_received := 0
+var loan_principal_repaid := 0
+var loan_interest_paid := 0
+var loan_missed_payments := 0
+
+func loan_left() -> int:
+	return loan_received - loan_principal_repaid
+
+func loan_daily_payment() -> int:
+	var principal := mini(LOAN_AMOUNT / LOAN_DAYS, loan_left())
+	return principal + principal * LOAN_INTEREST_PERCENT / 100
+
+## Instalment for a fresh loan (shown on the bank page before borrowing).
+func loan_daily_payment_for_new() -> int:
+	return LOAN_AMOUNT / LOAN_DAYS * (100 + LOAN_INTEREST_PERCENT) / 100
+
+func loan_payoff_amount() -> int:
+	return loan_left() + loan_left() * LOAN_INTEREST_PERCENT / 100
+
+func take_loan() -> bool:
+	if loan_left() > 0 or loan_received + LOAN_AMOUNT > MAX_SAVED_VALUE: return false
+	money += LOAN_AMOUNT
+	loan_received += LOAN_AMOUNT
+	_commit()
+	return true
+
+func _repay_principal(principal: int) -> void:
+	var interest := principal * LOAN_INTEREST_PERCENT / 100
+	money -= principal + interest
+	loan_principal_repaid += principal
+	loan_interest_paid += interest
+
+## Clears the whole loan now (remaining principal plus its 10% interest).
+func repay_loan() -> bool:
+	if loan_left() <= 0 or money < loan_payoff_amount(): return false
+	_repay_principal(loan_left())
+	_commit()
+	return true
+
+## One instalment per new day; a day without enough money is a missed payment.
+func _pay_loan_installments(days: int) -> void:
+	for index in range(maxi(0, days)):
+		if loan_left() <= 0: return
+		if money >= loan_daily_payment(): _repay_principal(mini(LOAN_AMOUNT / LOAN_DAYS, loan_left()))
+		else: loan_missed_payments += 1
+
+static func _valid_loan(data: Dictionary) -> bool:
+	for field in ["loan_received", "loan_principal_repaid", "loan_interest_paid", "loan_missed_payments"]:
+		if not EmployeeRelations.whole(data.get(field, 0), MAX_SAVED_VALUE): return false
+	var received := int(data.get("loan_received", 0))
+	var repaid := int(data.get("loan_principal_repaid", 0))
+	if received % LOAN_AMOUNT != 0 or repaid > received or received - repaid > LOAN_AMOUNT: return false
+	return int(data.get("loan_interest_paid", 0)) == repaid * LOAN_INTEREST_PERCENT / 100
+
 func _bill_new_day() -> void:
 	var elapsed_days := day - last_billed_day
 	operating_due += elapsed_days * DAILY_SHOP_COST
 	wages_due += elapsed_days * DAILY_WORKER_WAGE * staff_count()
 	last_billed_day = day
 	_settle_bills()
+	_pay_loan_installments(elapsed_days)
+	_rain_waters_farm()
 
 func advance_clock(minutes: float) -> void:
 	if not is_finite(minutes) or minutes <= 0.0:
@@ -882,7 +990,7 @@ func finish_marketing() -> void:
 	_commit()
 
 func total_expenses() -> int:
-	return restocking_expenses + marketing_expenses + hiring_expenses + operating_expenses + wage_expenses + upgrade_expenses + overtime_expenses + furnishing_expenses + farm.expenses()
+	return restocking_expenses + marketing_expenses + hiring_expenses + operating_expenses + wage_expenses + upgrade_expenses + overtime_expenses + furnishing_expenses + farm.expenses() + loan_interest_paid
 
 func place_rack(product: String, position: Vector2, turn: int, id := -1, from_delivery := false) -> bool:
 	if product not in Catalog.IDS or not position.is_finite() or turn < 0 or turn > 3: return false
@@ -985,6 +1093,7 @@ func snapshot() -> Dictionary:
 	if day_report.start.is_empty(): day_report.begin(self)
 	data["day_report"] = day_report.snapshot()
 	data["supplier_discounts"] = supplier_discounts
+	for field in ["loan_received", "loan_principal_repaid", "loan_interest_paid", "loan_missed_payments"]: data[field] = get(field)
 	data["incoming_boxes"] = incoming_boxes.duplicate(true)
 	data["queued_boxes"] = queued_boxes.duplicate(true)
 	data["demo_progress"] = demo.snapshot()
@@ -1032,6 +1141,7 @@ func load_progress(path: String) -> void:
 	farm.restore(data.get("farm", FarmStore.new().snapshot()))
 	day_report.restore(data.get("day_report", {}))
 	supplier_discounts = int(data.get("supplier_discounts", 0))
+	for field in ["loan_received", "loan_principal_repaid", "loan_interest_paid", "loan_missed_payments"]: set(field, int(data.get(field, 0)))
 	for id in inventory:
 		for field in inventory[id]: inventory[id][field] = int(inventory[id][field])
 	pending_product = data.pending_product
@@ -1386,7 +1496,10 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	if extra_sold > sold or extra_stock > data.stock: return false
 	if revenue % 10 != 0 or revenue < sold * 50 or revenue > sold * 200:
 		return false
-	var expenses := int(data["restocking_expenses"]) + int(data["marketing_expenses"]) + int(data["hiring_expenses"]) + int(data["operating_expenses"]) + int(data["wage_expenses"]) + int(data["upgrade_expenses"]) + int(data.overtime_expenses) + int(furnishing) + farm_state.expenses()
+	var expenses := int(data["restocking_expenses"]) + int(data["marketing_expenses"]) + int(data["hiring_expenses"]) + int(data["operating_expenses"]) + int(data["wage_expenses"]) + int(data["upgrade_expenses"]) + int(data.overtime_expenses) + int(furnishing) + farm_state.expenses() + int(data.get("loan_interest_paid", 0))
+	# Loans: money received minus principal paid back.
+	if not _valid_loan(data): return false
+	expenses -= int(data.get("loan_received", 0)) - int(data.get("loan_principal_repaid", 0))
 	if int(data["money"]) != INITIAL_MONEY + revenue - expenses - int(data["property_expenses"]):
 		return false
 	var purchased_stock := bottle_cost / STOCK_COST * STOCK_AMOUNT + extra_purchased

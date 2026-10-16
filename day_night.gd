@@ -75,6 +75,15 @@ func _refresh() -> void:
 	sky_material.ground_bottom_color = Color(0.045, 0.065, 0.075).lerp(Color(0.2, 0.28, 0.24), daylight)
 	sky_material.sun_angle_max = lerpf(2.0, 1.0, daylight)
 	sky_material.sun_curve = 0.08
+	if business.is_raining():
+		# Overcast rainy day: weaker sun, greyer sky, thicker haze.
+		sun.light_energy *= 0.45
+		environment.ambient_light_energy *= 0.85
+		environment.background_energy_multiplier *= 0.65
+		var grey := Color(0.45, 0.5, 0.55) * maxf(0.2, daylight)
+		sky_material.sky_top_color = sky_material.sky_top_color.lerp(grey, 0.7)
+		sky_material.sky_horizon_color = horizon.lerp(grey, 0.6)
+		environment.fog_density *= 2.5
 	streetlights_on = not low_quality and (business.minutes_of_day < 390.0 or business.minutes_of_day >= 1110.0)
 	for light in street_lights:
 		light.visible = streetlights_on

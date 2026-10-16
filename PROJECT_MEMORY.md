@@ -14,6 +14,35 @@ Latest feature: playable tomato farming, a Farm tablet tab/seed stall, three far
 expansions, tomato warehouse/shelf/checkout integration, a road-end Coming Next
 board and a local suggestion form. See Farming section below for controls and limits.
 
+## Music, Save Slots, Bank Loan, Weather, Rival Shop (2026-10-18)
+
+- Music/ambience: tools/make_audio.gd composes original WAVs in assets/audio/generated
+  (music_lobby, music_day: tanpura drone + Raag Bhupali plucks, day track with soft
+  tabla; ambience_street: breeze, birds, traffic, horn; rain). .import loop_mode=2.
+  world_audio.gd (added by neighbourhood): day music 06-20, calm track at night,
+  ambience quieter indoors, rain sound and CPUParticles3D rain that follow the camera
+  (350 drops on Low, 900 otherwise). Lobby plays music_lobby (LobbyMusic).
+- Save slots (main_menu.gd): SlotRow with Slot1..3; slot_path(base, n) = base for 1,
+  "<name>_<n>.json" otherwise; last slot remembered in <settings dir>/lobby.cfg;
+  returning from a slot-n game recovers base_save_path and slot. Compact lobby
+  tightens spacing/buttons and hides the tagline. Test: save_slots_test.
+- Bank loan (APNA BANK page, bank_page.gd, PC taskbar "Bank"): Rs20,000, 10 daily
+  instalments of Rs2,200 (10% interest) paid in _bill_new_day after bills; missed
+  instalments counted (loan_missed_payments, notification). repay_loan() pays the
+  rest + 10%. Saved loan_received/loan_principal_repaid/loan_interest_paid/
+  loan_missed_payments; interest is in total_expenses; validation adds
+  received - repaid back to the money equation and checks interest = 10% of repaid.
+- Weather: weather_for_day(day) = seeded RNG (hash(day*2654435761+12345)), 25% rain,
+  day 1 sunny, first rain day 4. Rain: customer interval x1.25, beds planted or
+  waiting are watered (_rain_waters_farm at day change, planting in rain), darker
+  sky/fog in day_night, clock shows "| Rain"/"| Sunny" (ClockLabel now 240 px).
+- Rival: "Sharma General Store" from day 3 (store front on the south house at x 25,
+  Neighbourhood/RivalStore). rival_traffic_factor = clamp(1 + (price_index-1) +
+  (55 - reputation)/200, 0.85, 1.4); price_index compares your prices with catalog
+  defaults for stocked products. Notification when your prices are >5% higher.
+- Test: economy_world_test (loan, weather, rival, audio/bank wiring). Previews:
+  tools/bank_preview.gd, tools/weather_preview.gd.
+
 ## Lobby Page and Credits (2026-10-18)
 
 - main_menu.gd is now a game lobby: left-to-right dark gradient over the shop

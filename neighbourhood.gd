@@ -27,6 +27,9 @@ func _ready() -> void:
 	var street_life := Node3D.new()
 	street_life.name = "StreetLife"
 	street_life.set_script(preload("res://street_life.gd"))
+	var world_audio := Node.new()
+	world_audio.set_script(preload("res://world_audio.gd"))
+	get_parent().add_child.call_deferred(world_audio)
 	add_child(street_life)
 	for x in [-31.5, 31.5]:
 		_collider("BoundaryX%s" % x, self, Vector3(0.3, 5, 64), Vector3(x, 2.5, 0))
@@ -298,6 +301,7 @@ func _build_background() -> void:
 		for side in [-1, 1]:
 			_box("SouthShopWindow%d_%d" % [index, side], self, Vector3(2, 1.6, 0.06), Vector3(x + side * 2.1, 1.7, depth - 2.54), Color(0.36, 0.65, 0.72))
 	_dress_buildings()
+	_build_rival_store()
 
 # Show Kenney City Kit Suburban houses in place of the block buildings. The
 # original box colliders stay; only their visible meshes are hidden.
@@ -317,3 +321,30 @@ func _dress_buildings() -> void:
 			var part := get_node_or_null(String(pattern % spot[4]).validate_node_name()) as Node3D
 			if part != null: part.visible = false
 		Kenney.fit(self, spot[0], "res://assets/buildings/kenney/building-type-%s.glb" % HOUSE_MODELS[number], spot[2], Vector3(building.position.x, 0.1, building.position.z), spot[1])
+
+# Sharma General Store, the rival shop: a shop front on the south-side house at
+# x 25, shown from the day it opens (business.rival_open()).
+func _build_rival_store() -> void:
+	var business = get_parent().get_node("Shop/ShopArea").business
+	var store := Node3D.new()
+	store.name = "RivalStore"
+	store.position = Vector3(25, 0.1, 15.25)
+	add_child(store)
+	_box("RivalSignBoard", store, Vector3(4.2, 0.7, 0.14), Vector3(0, 3.0, 0), Color(0.55, 0.12, 0.1))
+	for index in range(9):
+		_box("RivalAwning%d" % index, store, Vector3(0.48, 0.08, 0.9), Vector3(-2.0 + index * 0.5, 2.45, -0.4), Color(0.95, 0.75, 0.2) if index % 2 == 0 else Color(0.97, 0.96, 0.9))
+	_box("RivalOpenBoard", store, Vector3(1.0, 0.45, 0.06), Vector3(1.6, 1.4, -0.08), Color(0.12, 0.35, 0.18))
+	for entry in [["SHARMA GENERAL STORE", Vector3(0, 3.0, -0.09), 48, Color(1, 0.93, 0.8)], ["OPEN 8-8", Vector3(1.6, 1.4, -0.12), 30, Color(0.85, 1, 0.85)]]:
+		var label := Label3D.new()
+		label.text = entry[0]
+		label.position = entry[1]
+		label.rotation.y = PI
+		label.font_size = entry[2]
+		label.pixel_size = 0.006
+		label.modulate = entry[3]
+		label.outline_size = 0
+		store.add_child(label)
+	var update := func(): store.visible = business.rival_open()
+	business.clock_changed.connect(update)
+	business.changed.connect(update)
+	update.call()

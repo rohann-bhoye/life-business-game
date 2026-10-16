@@ -46,6 +46,12 @@ func _ready() -> void:
 	if not ResourceLoader.has_cached(GAME_SCENE): ResourceLoader.load_threaded_request(GAME_SCENE, "", true)
 	get_tree().root.content_scale_size = Vector2i.ZERO
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	var music := AudioStreamPlayer.new()
+	music.name = "LobbyMusic"
+	music.stream = load("res://assets/audio/generated/music_lobby.wav")
+	music.volume_db = -14.0
+	add_child(music)
+	if DisplayServer.get_name() != "headless": music.play()
 	theme = make_theme()
 	var settings = Settings.new()
 	settings.load_file(settings_path)
@@ -92,6 +98,7 @@ func _ready() -> void:
 	var tagline := _label(content, "Run your shop. Build your life.", 17)
 	tagline.name = "Tagline"
 	tagline.add_theme_color_override("font_color", Color("4ade80"))
+	_build_slots()
 	save_label = _label(content, "", 15)
 	save_label.name = "SaveCard"
 	save_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -193,6 +200,11 @@ func _layout() -> void:
 	var title: Label = content.get_node("GameTitle")
 	var font_size := 30 if compact else 44
 	if title.get_theme_font_size("font_size") != font_size: title.add_theme_font_size_override("font_size", font_size)
+	# Small windows: tighter spacing, shorter buttons, no tagline, so everything fits.
+	content.add_theme_constant_override("separation", 6 if compact else 10)
+	content.get_node("Tagline").visible = not compact
+	for child in content.get_children():
+		if child is Button: child.custom_minimum_size.y = 36 if compact else 44
 	content.size = Vector2(minf(360, viewport_size.x - 48), content.get_combined_minimum_size().y)
 	content.position = Vector2(24 if compact else 64, maxf(24, (viewport_size.y - content.get_combined_minimum_size().y) / 2))
 	# Glass panel behind the menu column (skipped on very small screens).
@@ -215,6 +227,58 @@ func _layout() -> void:
 		child.size.x = confirmation.size.x - 40
 	confirmation.get_node("Message").size.y = 68
 
+# --- Save slots: slot 1 is the original save file, slots 2 and 3 add "_2"/"_3". ---
+const SLOTS := 3
+var base_save_path := ""
+var slot := 1
+var slot_buttons: Array[Button] = []
+
+static func slot_path(base: String, number: int) -> String:
+	return base if number <= 1 else "%s_%d.%s" % [base.get_basename(), number, base.get_extension()]
+
+func _lobby_config_path() -> String:
+	return settings_path.get_base_dir().path_join("lobby.cfg")
+
+func _build_slots() -> void:
+	# Coming back from a game passes that slot's path: recover the base and slot.
+	base_save_path = save_path
+	for number in range(2, SLOTS + 1):
+		var suffix := "_%d.%s" % [number, save_path.get_extension()]
+		if save_path.ends_with(suffix):
+			base_save_path = save_path.trim_suffix(suffix) + "." + save_path.get_extension()
+			slot = number
+	if slot == 1:
+		var config := ConfigFile.new()
+		if config.load(_lobby_config_path()) == OK: slot = clampi(int(config.get_value("lobby", "slot", 1)), 1, SLOTS)
+	var row := HBoxContainer.new()
+	row.name = "SlotRow"
+	row.add_theme_constant_override("separation", 8)
+	content.add_child(row)
+	for number in range(1, SLOTS + 1):
+		var button := Button.new()
+		button.name = "Slot%d" % number
+		button.text = "SLOT %d" % number
+		button.custom_minimum_size.y = 36
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.add_theme_font_size_override("font_size", 14)
+		button.pressed.connect(select_slot.bind(number))
+		row.add_child(button)
+		slot_buttons.append(button)
+	select_slot(slot, false)
+
+func select_slot(number: int, remember := true) -> void:
+	if launching: return
+	slot = clampi(number, 1, SLOTS)
+	save_path = slot_path(base_save_path, slot)
+	for index in range(slot_buttons.size()):
+		slot_buttons[index].theme_type_variation = "PrimaryButton" if index + 1 == slot else ""
+	if remember:
+		var config := ConfigFile.new()
+		config.load(_lobby_config_path())
+		config.set_value("lobby", "slot", slot)
+		config.save(_lobby_config_path())
+	if is_instance_valid(save_label): _refresh_save()
+
 func _refresh_save() -> void:
 	var summary := Session.save_summary(save_path)
 	continue_button.disabled = not summary.valid
@@ -222,10 +286,10 @@ func _refresh_save() -> void:
 	new_button.theme_type_variation = "InfoButton" if summary.valid else "PrimaryButton"
 	if summary.valid:
 		var state = summary.state
-		save_label.text = "Last save: Day %d  |  %02d:%02d\nMoney %s%s  |  Stock %d" % [state.day, int(state.minutes_of_day) / 60, int(state.minutes_of_day) % 60, String.chr(8377), str(state.money), state.stock]
+		save_label.text = "Slot %d  |  Day %d  |  %02d:%02d\nMoney %s%s  |  Stock %d" % [slot, state.day, int(state.minutes_of_day) / 60, int(state.minutes_of_day) % 60, String.chr(8377), str(state.money), state.stock]
 		continue_button.tooltip_text = state.save_status
 	else:
-		save_label.text = "No saved game" if not FileAccess.file_exists(save_path) else "Save unavailable; New Game will archive it."
+		save_label.text = ("Slot %d is empty\nStart a New Game here" % slot) if not FileAccess.file_exists(save_path) else ("Slot %d: save unavailable\nNew Game will archive it." % slot)
 	_layout()
 
 func _continue() -> void:

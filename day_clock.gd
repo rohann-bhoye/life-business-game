@@ -16,4 +16,4 @@ func _process(delta: float) -> void:
 
 func _update_clock() -> void:
 	var minute := floori(business.minutes_of_day)
-	clock_label.text = "Day %d | %02d:%02d" % [business.day, minute / 60, minute % 60]
+	clock_label.text = "Day %d | %02d:%02d | %s" % [business.day, minute / 60, minute % 60, "Rain" if business.is_raining() else "Sunny"]
