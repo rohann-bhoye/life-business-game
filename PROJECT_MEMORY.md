@@ -24,6 +24,14 @@ board and a local suggestion form. See Farming section below for controls and li
   hidden below 900x560). Bottom credits "Made by Bucketstudy team" (footer/Credits)
   and version "Development Demo | v0.6". Node names used by tests are unchanged.
 - tools/lobby_preview.gd captures 1152x648 and 640x480. main_menu_test passes.
+- Pause menu and Settings now use UiStyle.glass_box (dark glass) with white labels,
+  Kenney-font titles, coloured buttons (Resume green, others blue InfoButton) and a
+  panel fitted to its contents. KenneyTheme: CheckButton/CheckBox have no button
+  background, Kenney check icons for CheckButton, CheckBox keeps the fallback font;
+  InfoButton (blue) is a shared variation. Compact tablet tabs use the fallback font
+  (Kenney Future is too wide for 360 px). Checkout scan/pay buttons use the fallback
+  font. Full suite 43/43 after these fixes (checkout/staff rerun individually).
+  tools/pause_preview.gd captures the pause menu and settings.
 
 ## Kenney UI Theme and PC Wholesale Store (2026-10-17)
 

@@ -64,6 +64,8 @@ static func apply(theme: Theme) -> void:
 	_button_states(theme, "Button", "grey", "blue")
 	theme.set_type_variation("PrimaryButton", "Button")
 	_button_states(theme, "PrimaryButton", "green", "blue")
+	theme.set_type_variation("InfoButton", "Button")
+	_button_states(theme, "InfoButton", "blue", "green")
 	theme.set_type_variation("DangerButton", "Button")
 	_button_states(theme, "DangerButton", "red", "red")
 	_button_states(theme, "OptionButton", "grey", "blue")
@@ -87,6 +89,20 @@ static func apply(theme: Theme) -> void:
 		var tab: StyleBoxTexture = theme.get_stylebox(state, "TabBar")
 		tab.content_margin_left = 8
 		tab.content_margin_right = 8
+	# On/off switches and checkboxes sit directly on the panel (no button background);
+	# checkboxes keep the compact standard font because their labels are long.
+	for state in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
+		theme.set_stylebox(state, "CheckBox", StyleBoxEmpty.new())
+	theme.set_font("font", "CheckBox", ThemeDB.fallback_font)
+	for state in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
+		theme.set_stylebox(state, "CheckButton", StyleBoxEmpty.new())
+	theme.set_font("font", "CheckButton", heading_font())
+	for pair in [["checked", "check_on"], ["unchecked", "check_off"]]:
+		var image: Image = (load(ROOT + pair[1] + ".png") as Texture2D).get_image()
+		image.resize(26, 26, Image.INTERPOLATE_LANCZOS)
+		var icon := ImageTexture.create_from_image(image)
+		theme.set_icon(pair[0], "CheckButton", icon)
+		theme.set_icon(pair[0] + "_disabled", "CheckButton", icon)
 	theme.set_type_variation("HeadingLabel", "Label")
 	theme.set_font("font", "HeadingLabel", heading_font())
 	theme.set_color("font_color", "HeadingLabel", GREEN)

@@ -17,6 +17,8 @@ var footer: HBoxContainer
 
 func _ready() -> void:
 	hide()
+	# Dark glass panel (lobby style) so the white labels are readable everywhere.
+	add_theme_stylebox_override("panel", preload("res://ui_style.gd").glass_box(0.92))
 	scroll = ScrollContainer.new()
 	scroll.follow_focus = true
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -25,7 +27,8 @@ func _ready() -> void:
 	form.add_theme_constant_override("separation", 10)
 	form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(form)
-	var title := _label("Settings", 24)
+	var title := _label("SETTINGS", 26)
+	title.add_theme_font_override("font", preload("res://kenney_theme.gd").heading_font())
 	title.name = "Title"
 	volume = _slider("Volume", 0, 100, 1)
 	sensitivity = _slider("Look sensitivity", 1, 10, 0.5)
@@ -38,12 +41,15 @@ func _ready() -> void:
 	form.add_child(graphics)
 	fullscreen = CheckButton.new()
 	fullscreen.text = "Fullscreen"
+	fullscreen.add_theme_color_override("font_color", Color(0.95, 0.97, 0.98))
 	form.add_child(fullscreen)
 	invert = CheckButton.new()
 	invert.text = "Invert vertical look"
+	invert.add_theme_color_override("font_color", Color(0.95, 0.97, 0.98))
 	form.add_child(invert)
 	status = Label.new()
 	status.add_theme_font_size_override("font_size", 14)
+	status.add_theme_color_override("font_color", Color("86efac"))
 	add_child(status)
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	footer = HBoxContainer.new()
@@ -52,13 +58,14 @@ func _ready() -> void:
 	var apply := Button.new()
 	apply.text = "Apply"
 	apply.icon = MenuSkin.texture("checkmark", 16)
-	apply.custom_minimum_size.y = 36
+	apply.custom_minimum_size.y = 40
+	apply.theme_type_variation = "PrimaryButton"
 	apply.pressed.connect(_apply)
 	apply.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	footer.add_child(apply)
 	var back := Button.new()
 	back.text = "Back"
-	back.custom_minimum_size.y = 36
+	back.custom_minimum_size.y = 40
 	back.pressed.connect(close_menu)
 	back.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	footer.add_child(back)
@@ -69,6 +76,7 @@ func _label(text: String, size: int) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_color_override("font_color", Color(0.95, 0.97, 0.98))
 	form.add_child(label)
 	return label
 
@@ -93,10 +101,10 @@ func _layout() -> void:
 	scroll.position = Vector2(20, 20)
 	scroll.size = Vector2(width - 40, height - 128)
 	form.custom_minimum_size.x = width - 56
-	status.position = Vector2(20, height - 88)
+	status.position = Vector2(20, height - 92)
 	status.size = Vector2(width - 40, 24)
-	footer.position = Vector2(20, height - 56)
-	footer.size = Vector2(width - 40, 36)
+	footer.position = Vector2(20, height - 60)
+	footer.size = Vector2(width - 40, 40)
 
 func open_menu(path: String) -> void:
 	settings_path = path

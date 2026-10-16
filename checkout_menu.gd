@@ -24,6 +24,9 @@ func _ready() -> void:
 	payment_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	scan_button = _button("ScanButton", _scan)
 	pay_button = _button("PaymentButton", _pay)
+	# Payment text includes amounts and change, so use the compact standard font.
+	pay_button.add_theme_font_override("font", ThemeDB.fallback_font)
+	scan_button.add_theme_font_override("font", ThemeDB.fallback_font)
 	for method in ["Cash", "Card", "UPI"]:
 		var button := _button(method + "Button", _choose_payment.bind(method))
 		button.text = method

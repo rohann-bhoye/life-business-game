@@ -461,6 +461,9 @@ func _tablet_theme(compact: bool) -> Theme:
 	theme.set_font_size("font_size", "TabBar", 14 if compact else 20)
 	MenuSkin.apply(theme, true)
 	theme.set_constant("tab_separation", "TabBar", 6 if compact else 10)
+	# Kenney Future is wide: narrow (portrait) screens keep the compact standard font.
+	if compact: theme.set_font("font", "TabBar", ThemeDB.fallback_font)
+	theme.set_font_size("font_size", "TabBar", 14 if compact else 15)
 	for state in ["tab_unselected", "tab_hovered", "tab_selected", "disabled"]:
 		var style := theme.get_stylebox(state, "TabBar")
 		style.content_margin_left = 8 if compact else 16

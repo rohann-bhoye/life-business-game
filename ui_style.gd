@@ -107,3 +107,14 @@ static func apply(theme: Theme, light := true) -> void:
 	theme.set_stylebox("separator", "HSeparator", divider)
 	theme.set_stylebox("background", "ProgressBar", box(DISABLED_BG if light else Color("1e293b"), 999))
 	theme.set_stylebox("fill", "ProgressBar", box(BRAND, 999))
+
+## Dark translucent "glass" panel used by the lobby, pause and settings menus.
+static func glass_box(alpha := 0.82) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.06, 0.09, 0.14, alpha)
+	style.set_corner_radius_all(16)
+	style.set_border_width_all(1)
+	style.border_color = Color(1, 1, 1, 0.12)
+	style.shadow_size = 12
+	style.shadow_color = Color(0, 0, 0, 0.35)
+	return style

@@ -33,24 +33,14 @@ static func make_theme() -> Theme:
 	result.default_font_size = 18
 	MenuSkin.apply(result)
 	result.set_color("font_color", "Label", Color(0.95, 0.97, 0.98))
-	result.set_type_variation("InfoButton", "Button")
-	result.set_stylebox("normal", "InfoButton", KenneyTheme.button_box("blue"))
-	result.set_stylebox("hover", "InfoButton", KenneyTheme.button_box("green"))
-	for state in ["font_color", "font_hover_color", "font_focus_color"]: result.set_color(state, "InfoButton", Color.WHITE)
 	for type in ["CheckButton"]:
 		result.set_color("font_color", type, Color(0.95, 0.97, 0.98))
 	result.set_stylebox("panel", "Panel", glass_box())
 	return result
 
 static func glass_box(alpha := 0.82) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.06, 0.09, 0.14, alpha)
-	style.set_corner_radius_all(16)
-	style.set_border_width_all(1)
-	style.border_color = Color(1, 1, 1, 0.12)
-	style.shadow_size = 12
-	style.shadow_color = Color(0, 0, 0, 0.35)
-	return style
+	return preload("res://ui_style.gd").glass_box(alpha)
+
 
 func _ready() -> void:
 	if not ResourceLoader.has_cached(GAME_SCENE): ResourceLoader.load_threaded_request(GAME_SCENE, "", true)
