@@ -4,6 +4,7 @@ var last_minute := -1
 var streetlights_on := false
 var street_lights: Array[SpotLight3D] = []
 var lamp_materials: Array[StandardMaterial3D] = []
+var light_pools: Array[MeshInstance3D] = []
 var moon: DirectionalLight3D
 var interior_light: OmniLight3D
 var environment: Environment
@@ -34,9 +35,11 @@ func _ready() -> void:
 	interior_light.shadow_enabled = false
 	get_tree().current_scene.get_node("House").add_child(interior_light)
 	for lamp in get_tree().current_scene.get_node("Neighbourhood").get_children():
-		if lamp.has_node("Light") and lamp.has_node("Lens"):
-			street_lights.append(lamp.get_node("Light"))
-			lamp_materials.append(lamp.get_node("Lens").material_override)
+		if not lamp.has_node("Lens"): continue
+		lamp_materials.append(lamp.get_node("Lens").material_override)
+		if lamp.has_node("Light"): street_lights.append(lamp.get_node("Light"))
+		# Town expansion lamps have no real light, only a glowing pool on the ground.
+		if lamp.has_node("Pool"): light_pools.append(lamp.get_node("Pool"))
 	business.clock_changed.connect(_on_clock_changed)
 	business.changed.connect(_refresh)
 	_refresh()
@@ -85,6 +88,8 @@ func _refresh() -> void:
 		sky_material.sky_horizon_color = horizon.lerp(grey, 0.6)
 		environment.fog_density *= 2.5
 	streetlights_on = not low_quality and (business.minutes_of_day < 390.0 or business.minutes_of_day >= 1110.0)
+	for pool in light_pools:
+		pool.visible = streetlights_on
 	for light in street_lights:
 		light.visible = streetlights_on
 	for material in lamp_materials:

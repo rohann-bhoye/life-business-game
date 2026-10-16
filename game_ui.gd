@@ -31,10 +31,7 @@ var controls_panel: Panel
 var first_day_panel: Panel
 var first_day_label: Label
 var first_day_step: Label
-var day_report_panel: Panel
-var day_report_title: Label
-var day_report_body: Label
-var day_report_seconds := 0.0
+var day_report_screen: Control
 const UiStyle := preload("res://ui_style.gd")
 var feedback_seconds := 0.0
 var employee_refresh_seconds := 0.0
@@ -68,7 +65,7 @@ func _ready() -> void:
 	interaction_label = _label("InteractionLabel", self)
 	feedback_label = _label("FeedbackLabel", self)
 	_build_first_day_guide(theme)
-	_build_day_report()
+	_build_day_report(theme)
 	_build_controls_hint()
 	_label("FarmSummary", shop_menu)
 	_label("SeedQuantityLabel", shop_menu).text = "Seed packets"
@@ -425,10 +422,6 @@ func _layout() -> void:
 	_place(first_day_panel.get_node("Title"), 12, 8, 236, 20)
 	_place(first_day_label, 12, 30, 236, 64)
 	_place(first_day_step, 12, 98, 236, 52)
-	var report_width := minf(400.0, viewport_size.x - 32.0)
-	_place(day_report_panel, (viewport_size.x - report_width) / 2.0, 64, report_width, 214)
-	_place(day_report_title, 18, 12, report_width - 36, 28)
-	_place(day_report_body, 18, 46, report_width - 36, 160)
 	_place(interaction_label, 16, viewport_size.y - 46, maxf(120, viewport_size.x - 250), 24)
 	_place(feedback_label, 16, viewport_size.y - 80, viewport_size.x - 32, 28)
 	_place(controls_panel, viewport_size.x - 218, viewport_size.y - 132, 202, 116)
@@ -631,32 +624,15 @@ func _build_first_day_guide(theme: Theme) -> void:
 	first_day_step.modulate = Color(1, 0.85, 0.45)
 	_update_first_day_guide()
 
-# End-of-day summary card shown after sleeping; it never blocks movement.
-func _build_day_report() -> void:
-	day_report_panel = Panel.new()
-	day_report_panel.name = "DayReport"
-	day_report_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	day_report_panel.add_theme_stylebox_override("panel", UiStyle.card(14))
-	day_report_panel.hide()
-	add_child(day_report_panel)
-	day_report_title = _label("Title", day_report_panel)
-	day_report_title.add_theme_font_size_override("font_size", 20)
-	day_report_title.add_theme_color_override("font_color", UiStyle.BRAND)
-	day_report_body = _label("Body", day_report_panel)
-	day_report_body.add_theme_font_size_override("font_size", 15)
-	day_report_body.add_theme_color_override("font_color", UiStyle.TEXT)
-	day_report_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	for label in [day_report_title, day_report_body]:
-		label.add_theme_constant_override("outline_size", 0)
-		label.add_theme_color_override("font_shadow_color", Color.TRANSPARENT)
+# Full-screen end-of-day report after sleeping; the next day starts on Space/Enter.
+func _build_day_report(theme: Theme) -> void:
+	day_report_screen = Control.new()
+	day_report_screen.set_script(preload("res://day_report_screen.gd"))
+	day_report_screen.theme = theme
+	add_child(day_report_screen)
 
 func show_day_report() -> void:
-	var report = shop.business.day_report
-	if report.last.is_empty(): return
-	day_report_title.text = "Day %d summary" % report.last.day
-	day_report_body.text = "\n".join(report.lines())
-	day_report_seconds = 15.0
-	day_report_panel.visible = not player._menu_is_open()
+	day_report_screen.open(shop.business, shop._format_money)
 
 func _update_first_day_guide() -> void:
 	if not is_instance_valid(first_day_panel): return
@@ -746,8 +722,6 @@ func _update_save_footer() -> void:
 func _process(delta: float) -> void:
 	_present_demo_completion()
 	feedback_seconds = maxf(0, feedback_seconds - delta)
-	day_report_seconds = maxf(0, day_report_seconds - delta)
-	day_report_panel.visible = day_report_seconds > 0 and not player._menu_is_open()
 	feedback_label.visible = feedback_seconds > 0 and not shop_menu.visible and not bargain_menu.visible and not supplier_menu.visible and not checkout_menu.visible
 	_update_save_footer()
 	employee_refresh_seconds -= delta

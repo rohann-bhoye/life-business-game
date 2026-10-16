@@ -21,18 +21,18 @@ func _run() -> void:
 	var before: Dictionary = business.snapshot()
 	var street = current_scene.get_node("Neighbourhood/StreetLife")
 	street.set_physics_process(false)
-	assert(street.walkers.size() == 6)
+	assert(street.walkers.size() == 12)
 	var start: Vector3 = street.walkers[0].position
 	street._physics_process(1)
 	assert(is_equal_approx(street.walkers[0].position.x - start.x, street.WALK_SPEED))
 	assert(street.walkers[0].position.z == start.z)
-	street.walkers[0].position.x = 28.9
+	street.walkers[0].position.x = 69.9
 	street.directions[0] = 1
 	street._physics_process(1)
-	assert(street.walkers[0].position.x == 29 and street.directions[0] == -1)
+	assert(street.walkers[0].position.x == 70 and street.directions[0] == -1)
 	for frame in range(100): street._physics_process(1)
 	for person in street.walkers:
-		assert(absf(person.position.x) <= 29)
+		assert(absf(person.position.x) <= 70)
 		assert(is_equal_approx(person.position.z, 3.9) or is_equal_approx(person.position.z, 10.9))
 		assert(person.get_node("CharacterVisual").body.mesh != null)
 	assert(business.snapshot() == before, "Ambient pedestrians must not change the shop economy")
@@ -70,5 +70,5 @@ func _run() -> void:
 		await process_frame
 		await RenderingServer.frame_post_draw
 		assert(root.get_texture().get_image().save_png(OS.get_environment("TEMP").path_join("street_assets_products.png")) == OK)
-	print("PASS: licensed fitted product models, preserved scan caps, six walking/reversing passers-by, six solid buildings and no ambient economy changes")
+	print("PASS: licensed fitted product models, preserved scan caps, twelve walking/reversing passers-by, six solid buildings and no ambient economy changes")
 	quit()

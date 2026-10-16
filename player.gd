@@ -57,6 +57,8 @@ func _menu_is_open() -> bool:
 	if is_instance_valid(roadmap) and roadmap.visible: return true
 	var pause := get_tree().current_scene.get_node_or_null("Ui/PauseMenu")
 	if is_instance_valid(pause) and pause.is_open(): return true
+	var report := get_tree().current_scene.get_node_or_null("Ui/DayReportScreen")
+	if is_instance_valid(report) and report.visible: return true
 	var dialog := get_tree().current_scene.get_node_or_null("Ui/StaffDialog")
 	if is_instance_valid(dialog) and dialog.visible: return true
 	return shop_menu.visible or house_menu.visible or (is_instance_valid(bargain_menu) and bargain_menu.visible) or (is_instance_valid(supplier_menu) and supplier_menu.visible) or (is_instance_valid(checkout_menu) and checkout_menu.visible)

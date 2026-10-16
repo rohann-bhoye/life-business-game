@@ -5,6 +5,9 @@ extends RefCounted
 # day that just ended, shown when the player wakes up. Both are saved.
 const Catalog = preload("res://product_catalog.gd")
 const NUMBERS := ["day", "items_sold", "revenue", "expenses", "missed", "reputation", "reviews"]
+# Expense breakdown for the end-of-day screen; together they add up to total_expenses().
+const COSTS := ["stock", "staff", "bills", "marketing", "upgrades", "farm", "loan"]
+const COST_NAMES := {"stock": "Stock purchases", "staff": "Staff wages and hiring", "bills": "Shop rent and bills", "marketing": "Marketing", "upgrades": "Upgrades and furniture", "farm": "Farm", "loan": "Loan interest"}
 
 var start := {}
 var last := {}
@@ -16,7 +19,8 @@ static func counters(business) -> Dictionary:
 		sold[id] = int(business.inventory.get(id, {}).get("sold", 0))
 		extras += sold[id]
 	sold["bottle"] = maxi(0, int(business.items_sold) - extras)
-	return {"day": int(business.day), "items_sold": int(business.items_sold), "revenue": int(business.sales_revenue), "expenses": int(business.total_expenses()), "missed": int(business.missed_sales), "reputation": int(business.customer_reviews.reputation), "reviews": int(business.customer_reviews.review_count), "sold": sold}
+	var costs := {"stock": business.restocking_expenses, "staff": business.hiring_expenses + business.wage_expenses + business.overtime_expenses, "bills": business.operating_expenses, "marketing": business.marketing_expenses, "upgrades": business.upgrade_expenses + business.furnishing_expenses, "farm": business.farm.expenses(), "loan": business.loan_interest_paid}
+	return {"day": int(business.day), "items_sold": int(business.items_sold), "revenue": int(business.sales_revenue), "expenses": int(business.total_expenses()), "missed": int(business.missed_sales), "reputation": int(business.customer_reviews.reputation), "reviews": int(business.customer_reviews.review_count), "sold": sold, "costs": costs}
 
 func begin(business) -> void:
 	start = counters(business)
@@ -35,21 +39,13 @@ func close(business) -> Dictionary:
 	var revenue: int = now.revenue - int(start.revenue)
 	var expenses: int = now.expenses - int(start.expenses)
 	last = {"day": int(start.day), "items_sold": now.items_sold - int(start.items_sold), "revenue": revenue, "expenses": expenses, "profit": revenue - expenses, "missed": now.missed - int(start.missed), "reputation": now.reputation, "reputation_change": now.reputation - int(start.reputation), "reviews": now.reviews - int(start.reviews), "best": best, "best_count": best_count}
+	# Saves from before the breakdown have no start costs; they show only the total.
+	if start.has("costs"):
+		var costs := {}
+		for key in COSTS: costs[key] = int(now.costs[key]) - int(start.costs.get(key, 0))
+		last["costs"] = costs
 	start = now
 	return last
-
-## Short readable lines for the HUD card.
-func lines() -> PackedStringArray:
-	var result: PackedStringArray = []
-	if last.is_empty(): return result
-	var rupee := String.chr(8377)
-	result.append("Items sold: %d" % last.items_sold)
-	result.append("Revenue: %s%d   Expenses: %s%d" % [rupee, last.revenue, rupee, last.expenses])
-	result.append("Profit: %s%s%d" % ["-" if last.profit < 0 else "", rupee, absi(last.profit)])
-	result.append("Best seller: %s" % ("%s (%d)" % [Catalog.NAMES[last.best], last.best_count] if last.best != "" else "none"))
-	result.append("Missed sales: %d" % last.missed)
-	result.append("Reputation: %d/100 (%s%d, %d reviews)" % [last.reputation, "+" if last.reputation_change >= 0 else "", last.reputation_change, last.reviews])
-	return result
 
 func snapshot() -> Dictionary:
 	return {"start": start.duplicate(true), "last": last.duplicate(true)}
@@ -74,10 +70,10 @@ static func valid(data) -> bool:
 		if not item is Dictionary: return false
 		for key in item:
 			var value = item[key]
-			if key == "sold":
+			if key == "sold" or key == "costs":
 				if not value is Dictionary: return false
 				for id in value:
-					if id not in Catalog.IDS or not (value[id] is int or value[id] is float) or not is_finite(float(value[id])): return false
+					if id not in (Catalog.IDS if key == "sold" else COSTS) or not (value[id] is int or value[id] is float) or not is_finite(float(value[id])): return false
 			elif key == "best":
 				if not value is String or (value != "" and value not in Catalog.IDS): return false
 			elif not (value is int or value is float) or not is_finite(float(value)): return false

@@ -46,7 +46,7 @@ func _run() -> void:
 	var road = current_scene.get_node("Road")
 	assert(road.position.y - road.mesh.size.y / 2 > 0.1)
 	assert(current_scene.get_node("Shop/ShopSign").position.z > current_scene.get_node("Shop/SignBoard").position.z + 0.06)
-	assert(current_scene.get_node("Ground/CollisionShape3D").shape.size == Vector3(64, 0.2, 64))
+	assert(current_scene.get_node("Ground/CollisionShape3D").shape.size == Vector3(150, 0.2, 120))
 	assert(current_scene.get_node("Shop/ShopSign").rotation.is_zero_approx())
 	assert(current_scene.get_node("DirectionalLight3D").shadow_enabled == (preload("res://game_settings.gd").new().detected_quality() > 0))
 	assert(current_scene.get_node("WorldEnvironment").environment.sky != null)
@@ -71,7 +71,7 @@ func _run() -> void:
 	query = PhysicsRayQueryParameters3D.create(Vector3(15, 2, 7), Vector3(15, -1, 7))
 	var ground: Dictionary = space.intersect_ray(query)
 	assert(not ground.is_empty() and is_equal_approx(ground["position"].y, 0.1))
-	query = PhysicsRayQueryParameters3D.create(Vector3(30, 1, 7), Vector3(33, 1, 7))
+	query = PhysicsRayQueryParameters3D.create(Vector3(72, 1, 7), Vector3(76, 1, 7))
 	assert(not space.intersect_ray(query).is_empty())
 	player.global_position = Vector3(-3, 1.1, 3.6)
 	player.rotation.y = 0

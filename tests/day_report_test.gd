@@ -39,8 +39,10 @@ func _run() -> void:
 	assert(report.day == 1 and report.items_sold == 6, str(report))
 	assert(report.revenue == 5 * 80 + 100 and report.expenses == 400 and report.profit == 100, str(report))
 	assert(report.best == "snack" and report.best_count == 5)
+	var cost_total := 0
+	for key in report.costs: cost_total += int(report.costs[key])
+	assert(report.costs.stock == 400 and cost_total == report.expenses, str(report.costs))
 	assert(report.reputation_change == 4 and report.reviews == 2)
-	assert(state.day_report.lines().size() == 6)
 	assert(state.day_report.start.day == 2 and state.day_report.start.items_sold == 6)
 
 	# Saved and restored exactly; invalid data is rejected.
@@ -51,13 +53,16 @@ func _run() -> void:
 	var invalid: Dictionary = state.snapshot()
 	invalid.day_report.last.best = "gold"
 	assert(not state._is_valid_snapshot(invalid))
+	invalid = state.snapshot()
+	invalid.day_report.last.costs["gold"] = 5
+	assert(not state._is_valid_snapshot(invalid))
 
 	# A day that ends at midnight without sleeping is still closed.
 	assert(state.sell_basket(1, 1000))
 	state.advance_clock(1440.0 - state.minutes_of_day + 30.0)
 	assert(state.day == 3 and state.day_report.last.day == 2 and state.day_report.last.items_sold == 1)
 
-	# In the game: sleeping shows the summary card without locking movement.
+	# In the game: sleeping shows the full report; the next day starts on Space/Enter.
 	var fixture = load("res://main.tscn.tscn").instantiate()
 	fixture.get_node("Shop/ShopArea").save_path = _path()
 	var packed := PackedScene.new()
@@ -78,14 +83,22 @@ func _run() -> void:
 	for frame in range(3): await physics_frame
 	var bed = current_scene.get_node("House/Bed/SleepArea")
 	assert(bed.try_sleep())
-	assert(ui.day_report_panel.visible and not player._menu_is_open())
-	assert(ui.day_report_title.text == "Day 1 summary" and ui.day_report_body.text.contains("Items sold: 2"))
-	ui._process(16.0)
-	assert(not ui.day_report_panel.visible)
+	var screen = ui.day_report_screen
+	assert(screen.visible and player._menu_is_open() and paused, "Report must hold the next day")
+	assert(screen.title.text == "END OF DAY 1" and screen.result.text.begins_with("PROFIT"))
+	assert(screen.start_button.text == "START DAY 2" and screen.tomorrow.text.begins_with("Tomorrow: Day 2"))
+	var labels: Array = screen.income.get_children().map(func(label): return label.text)
+	assert(labels.has("Items sold") and labels.has("2"), str(labels))
+	await process_frame
+	var space := InputEventKey.new()
+	space.keycode = KEY_SPACE
+	space.pressed = true
+	screen._input(space)
+	assert(not screen.visible and not paused and not player._menu_is_open())
 
 	business.save_path = ""
 	for path in paths:
 		for suffix in ["", ".bak", ".tmp"]:
 			if FileAccess.file_exists(path + suffix): DirAccess.remove_absolute(path + suffix)
-	print("PASS: daily report on sleep and at midnight, saved/validated, HUD summary card, reputation changes customer arrival rate")
+	print("PASS: daily report on sleep and at midnight, cost breakdown, saved/validated, full-screen report held until Space, reputation changes customer arrival rate")
 	quit()

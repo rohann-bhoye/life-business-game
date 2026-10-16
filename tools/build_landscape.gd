@@ -6,10 +6,14 @@ const SCENE_PATH := "res://neighbourhood_landscape.tscn"
 func _initialize() -> void:
 	call_deferred("_build")
 
+# Flat town (x +-74, z -56..60, matching the enlarged Ground) with hills beyond it.
+const HILLS := [Vector3(-108, 20, -100), Vector3(110, 24, -96), Vector3(-108, 18, 108), Vector3(104, 22, 110), Vector3(0, 16, -116)]
+
 func _height(x: float, z: float) -> float:
-	var edge := smoothstep(38.0, 60.0, maxf(absf(x), absf(z)))
-	var hills := 0.0
-	for hill in [Vector3(-75, 18, -82), Vector3(83, 22, -55), Vector3(-78, 15, 87), Vector3(72, 20, 97)]:
+	var edge := clampf(maxf((absf(x) - 74.0) / 26.0, (absf(z - 2.0) - 58.0) / 26.0), 0.0, 1.0)
+	edge = edge * edge * (3.0 - 2.0 * edge)
+	var hills := 2.0
+	for hill in HILLS:
 		var distance := Vector2(x - hill.x, z - hill.z).length_squared()
 		hills += hill.y * exp(-distance / 1600.0)
 	return 0.08 + edge * hills

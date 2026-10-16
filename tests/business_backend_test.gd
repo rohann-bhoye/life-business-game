@@ -371,6 +371,8 @@ func _run_checks() -> void:
 	var day_before_sleep: int = shop.business.day
 	sleep_area._unhandled_input(interaction)
 	assert(shop.business.day == day_before_sleep + 1 and shop.business.minutes_of_day == 480.0)
+	assert(paused and current_scene.get_node("Ui").day_report_screen.visible)
+	current_scene.get_node("Ui").day_report_screen.close()
 	assert(not sleep_area.try_sleep())
 	assert(shop.money == money_before_sleep - 300 and shop.stock == stock_before_sleep)
 	assert(shop.business.operating_expenses == 100 and shop.business.wage_expenses == 200)

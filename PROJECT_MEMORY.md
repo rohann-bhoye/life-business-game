@@ -14,6 +14,35 @@ Latest feature: playable tomato farming, a Farm tablet tab/seed stall, three far
 expansions, tomato warehouse/shelf/checkout integration, a road-end Coming Next
 board and a local suggestion form. See Farming section below for controls and limits.
 
+## End-of-Day Report Screen (2026-10-18)
+
+- Sleeping opens `day_report_screen.gd` (Ui/DayReportScreen): full-screen dim, big
+  PROFIT/LOSS banner, Income (revenue, items sold, best seller, missed sales) and
+  Expenses breakdown (stock, staff, rent/bills, marketing, upgrades, farm, loan
+  interest, total), money now, reputation, loan left, tomorrow's weather forecast,
+  a tip, and START DAY N. The tree is paused until Space/Enter or the button.
+- `day_report.gd` counters now carry `costs` per category (`COSTS`, `COST_NAMES`);
+  saves from before have no start costs, so that first report shows only the total.
+- The old 15-second HUD summary card was removed. Preview: `tools/day_report_preview.gd`.
+
+## Bigger Town and Sharma Shop Life (2026-10-18)
+
+- Map grew from the 64 m block to x +-74, z -56..60. `main.tscn.tscn` Ground box is
+  150x120; boundary walls are in `neighbourhood.gd` (x +-74, z -55/59). Terrain was
+  regenerated with `tools/build_landscape.gd -- --rebuild` (flat town, hills beyond).
+- `town_expansion.gd` (built by `neighbourhood.gd`): main road extended both ways,
+  market street at x 50 with 8 Indian shops (Chai Point, Gupta Medical, Mithai House,
+  Mobile Repair, Pani Puri, Tailor, Hardware, Bakery), crossing, streetlights, 16
+  Kenney houses with colliders and garden paths, chai stall with chaiwala and two
+  customers, bus stop with a waiting passenger, parked autos/scooters, 15 trees.
+- `rival_shop.gd`: Sharma General Store gets a path and forecourt to the pavement,
+  a produce display, Mr. Sharma (name tag) at the door from day 3, and two shoppers
+  who walk from the street, go inside for 6 s and walk away (only while shops open).
+- `street_life.gd`: 12 passers-by walking the whole road (bounce at x +-70).
+- Pure scenery: no save/economy change. Tests: `town_life_test`, updated
+  `terrain_landscape_test` and `street_assets_test`. Preview: `tools/map_overview.gd`
+  (top/angle/west/market/road/rival PNGs in %TEMP%).
+
 ## Music, Save Slots, Bank Loan, Weather, Rival Shop (2026-10-18)
 
 - Music/ambience: tools/make_audio.gd composes original WAVs in assets/audio/generated

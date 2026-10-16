@@ -31,8 +31,11 @@ func _ready() -> void:
 	world_audio.set_script(preload("res://world_audio.gd"))
 	get_parent().add_child.call_deferred(world_audio)
 	add_child(street_life)
-	for x in [-31.5, 31.5]:
-		_collider("BoundaryX%s" % x, self, Vector3(0.3, 5, 64), Vector3(x, 2.5, 0))
+	# Town edge (the town was enlarged to x +-74, z -55..59).
+	for x in [-74.0, 74.0]:
+		_collider("BoundaryX%s" % x, self, Vector3(0.3, 5, 116), Vector3(x, 2.5, 2))
+	for z in [-55.0, 59.0]:
+		_collider("BoundaryZ%s" % z, self, Vector3(148, 5, 0.3), Vector3(0, 2.5, z))
 
 func set_quality(quality: int) -> void:
 	var show_scenery := quality > 0
@@ -46,8 +49,6 @@ func set_quality(quality: int) -> void:
 	if street_life != null:
 		street_life.visible = show_scenery
 		street_life.set_physics_process(show_scenery)
-	for z in [-31.5, 31.5]:
-		_collider("BoundaryZ%s" % z, self, Vector3(64, 5, 0.3), Vector3(0, 2.5, z))
 
 func _material(color: Color) -> StandardMaterial3D:
 	if not materials.has(color):
@@ -248,7 +249,9 @@ func _tree(offset: Vector3) -> void:
 	_collider("TrunkBody", tree, Vector3(0.35, 2.1, 0.35), Vector3(0, 1.05, 0))
 	_collider("CanopyBody", tree, Vector3(1.6, 2.2, 1.6), Vector3(0, 3.0, 0))
 
-func _streetlight(offset: Vector3, facing := 0.0) -> void:
+## real_light false (town expansion) keeps the glowing lens and adds a soft light pool
+## on the ground instead of a SpotLight3D, so low-end GPUs keep few real lights.
+func _streetlight(offset: Vector3, facing := 0.0, real_light := true) -> void:
 	var lamp := Node3D.new()
 	lamp.name = "Streetlight%d" % get_child_count()
 	lamp.position = offset
@@ -264,6 +267,18 @@ func _streetlight(offset: Vector3, facing := 0.0) -> void:
 	glow.emission_enabled = true
 	glow.emission = Color(0.4, 0.35, 0.2)
 	lens.material_override = glow
+	if not real_light:
+		var pool := MeshInstance3D.new()
+		pool.name = "Pool"
+		var plane := PlaneMesh.new()
+		plane.size = Vector2(6, 6)
+		pool.mesh = plane
+		pool.position = Vector3(0, 0.03, 0.65)
+		pool.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		pool.material_override = _light_pool_material()
+		pool.visible = false
+		lamp.add_child(pool)
+		return
 	var light := SpotLight3D.new()
 	light.name = "Light"
 	light.position = Vector3(0, 3.0, 0.65)
@@ -275,6 +290,25 @@ func _streetlight(offset: Vector3, facing := 0.0) -> void:
 	light.shadow_enabled = false
 	light.visible = false
 	lamp.add_child(light)
+
+var light_pool_material: StandardMaterial3D
+
+func _light_pool_material() -> StandardMaterial3D:
+	if light_pool_material != null: return light_pool_material
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color(1, 0.85, 0.55, 0.55))
+	gradient.set_color(1, Color(1, 0.85, 0.55, 0.0))
+	var texture := GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.fill = GradientTexture2D.FILL_RADIAL
+	texture.fill_from = Vector2(0.5, 0.5)
+	texture.fill_to = Vector2(1.0, 0.5)
+	light_pool_material = StandardMaterial3D.new()
+	light_pool_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	light_pool_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	light_pool_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	light_pool_material.albedo_texture = texture
+	return light_pool_material
 
 func _build_background() -> void:
 	var colors := [Color(0.62, 0.68, 0.7), Color(0.71, 0.56, 0.5), Color(0.74, 0.77, 0.68), Color(0.5, 0.64, 0.63)]
@@ -302,6 +336,14 @@ func _build_background() -> void:
 			_box("SouthShopWindow%d_%d" % [index, side], self, Vector3(2, 1.6, 0.06), Vector3(x + side * 2.1, 1.7, depth - 2.54), Color(0.36, 0.65, 0.72))
 	_dress_buildings()
 	_build_rival_store()
+	var expansion := Node3D.new()
+	expansion.set_script(preload("res://town_expansion.gd"))
+	add_child(expansion)
+	expansion.build(self)
+	var rival_life := Node3D.new()
+	rival_life.set_script(preload("res://rival_shop.gd"))
+	add_child(rival_life)
+	rival_life.build(self, get_parent().get_node("Shop/ShopArea").business)
 
 # Show Kenney City Kit Suburban houses in place of the block buildings. The
 # original box colliders stay; only their visible meshes are hidden.

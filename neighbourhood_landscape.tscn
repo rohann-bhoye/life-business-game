@@ -3,7 +3,7 @@
 [ext_resource type="Terrain3DMaterial" path="res://assets/terrain/neighbourhood/material.tres" id="1_k1pt4"]
 [ext_resource type="Terrain3DAssets" path="res://assets/terrain/neighbourhood/assets.tres" id="2_gngt8"]
 
-[node name="Landscape" type="Terrain3D" unique_id=1335067802]
+[node name="Landscape" type="Terrain3D" unique_id=1281178864]
 data_directory = "res://assets/terrain/neighbourhood"
 material = ExtResource("1_k1pt4")
 assets = ExtResource("2_gngt8")

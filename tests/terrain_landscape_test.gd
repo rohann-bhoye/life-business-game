@@ -44,10 +44,10 @@ func _run() -> void:
 	assert(terrain.collision_mode == 0 and terrain.material.world_background == 0)
 	assert(terrain.assets.get_texture_count() == 1)
 	assert(terrain.assets.get_texture(0).albedo_texture != null and terrain.assets.get_texture(0).normal_texture != null)
-	for position in [Vector3.ZERO, Vector3(-6.8, 0, 3.5), Vector3(4, 0, -4), Vector3(31, 0, 31), Vector3(-31, 0, -31)]:
+	for position in [Vector3.ZERO, Vector3(-6.8, 0, 3.5), Vector3(4, 0, -4), Vector3(31, 0, 31), Vector3(-31, 0, -31), Vector3(60, 0, -40), Vector3(-60, 0, 45), Vector3(50, 0, -50)]:
 		assert(is_equal_approx(terrain.data.get_height(position), 0.08), "Terrain raised an existing gameplay area")
-	assert(terrain.data.get_height(Vector3(83, 0, -55)) > 20)
-	assert(terrain.data.get_height(Vector3(-75, 0, -82)) > 17)
+	assert(terrain.data.get_height(Vector3(110, 0, -96)) > 20)
+	assert(terrain.data.get_height(Vector3(-108, 0, 108)) > 17)
 	var business = current_scene.get_node("Shop/ShopArea").business
 	var before: Dictionary = business.snapshot()
 	await physics_frame
@@ -56,7 +56,7 @@ func _run() -> void:
 	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(15, 2, 7), Vector3(15, -1, 7)))
 	assert(not hit.is_empty() and is_equal_approx(hit.position.y, 0.1))
 	assert(hit.collider == current_scene.get_node("Ground"))
-	assert(not space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(30, 1, 7), Vector3(33, 1, 7))).is_empty())
+	assert(not space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(72, 1, 7), Vector3(76, 1, 7))).is_empty())
 	var camera := Camera3D.new()
 	current_scene.add_child(camera)
 	camera.current = true

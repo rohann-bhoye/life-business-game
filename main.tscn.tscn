@@ -18,10 +18,10 @@
 [ext_resource type="Script" path="res://warehouse.gd" id="16_warehouse"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_wp5od"]
-size = Vector3(64, 0.2, 64)
+size = Vector3(150, 0.2, 120)
 
 [sub_resource type="BoxShape3D" id="NeighbourhoodGroundShape"]
-size = Vector3(64, 0.2, 64)
+size = Vector3(150, 0.2, 120)
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_wp5od"]
 
