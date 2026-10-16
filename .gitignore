@@ -11,3 +11,6 @@ Thumbs.db
 
 # Export output
 /build/
+
+# Terrain3D temporary DLL copies made by the editor
+addons/terrain_3d/bin/~*

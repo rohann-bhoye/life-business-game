@@ -14,6 +14,17 @@ Latest feature: playable tomato farming, a Farm tablet tab/seed stall, three far
 expansions, tomato warehouse/shelf/checkout integration, a road-end Coming Next
 board and a local suggestion form. See Farming section below for controls and limits.
 
+## Lobby Page and Credits (2026-10-18)
+
+- main_menu.gd is now a game lobby: left-to-right dark gradient over the shop
+  background, dark glass LobbyPanel behind the menu column, "LIFE BUSINESS GAME" logo
+  in Kenney Future, green tagline, SaveCard label, Kenney buttons Continue (green
+  PrimaryButton), New Game (blue InfoButton; green when there is no save), Settings
+  (grey), Quit (red DangerButton). Right-side "WHAT'S NEW" card (WHATS_NEW list,
+  hidden below 900x560). Bottom credits "Made by Bucketstudy team" (footer/Credits)
+  and version "Development Demo | v0.6". Node names used by tests are unchanged.
+- tools/lobby_preview.gd captures 1152x648 and 640x480. main_menu_test passes.
+
 ## Kenney UI Theme and PC Wholesale Store (2026-10-17)
 
 - kenney_theme.gd: Kenney UI Pack (assets/ui/kenney_pack, owner's local CC0 download)
