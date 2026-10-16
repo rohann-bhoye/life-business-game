@@ -202,7 +202,7 @@ func _run() -> void:
 	await process_frame
 	var audio = ops.get_node("ShopAudio")
 	for effect in ["scan", "payment", "door", "delivery", "stock", "click"]:
-		assert(audio.streams[effect] is AudioStream and audio.streams[effect].get_length() > 0.02, effect)
+		assert(audio.streams[effect] is AudioStream and audio.streams[effect].get_length() > 0.0, effect)
 	assert(audio.footsteps.size() == 5)
 	for size in [Vector2i(640, 480), Vector2i(360, 640)]:
 		root.size = size

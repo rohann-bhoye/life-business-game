@@ -694,6 +694,16 @@ func buy_house() -> bool:
 	_commit()
 	return true
 
+## The player's family home is owned from the start of every game, at no cost.
+func grant_home() -> bool:
+	if house_owned: return true
+	house_owned = true
+	if not save_progress():
+		house_owned = false
+		return false
+	changed.emit()
+	return true
+
 func finish_marketing() -> void:
 	marketing_seconds_left = 0.0
 	_commit()
@@ -1146,7 +1156,8 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	for field in ["wage_expenses", "wages_due"]:
 		if int(data[field]) % DAILY_WORKER_WAGE != 0:
 			return false
-	if int(data["property_expenses"]) != (HOUSE_COST if data["house_owned"] else 0):
+	# A home is either bought (older saves) or the family home given at start (free).
+	if int(data["property_expenses"]) not in ([0, HOUSE_COST] if data["house_owned"] else [0]):
 		return false
 	if data["last_visit"].length() > 64:
 		return false

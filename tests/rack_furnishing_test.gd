@@ -125,12 +125,12 @@ func _run() -> void:
 	assert(business.assign_shelf_slot(3, 2, "bottle"))
 	assert(business.order_stock("soap") and business.receive_delivery() and business.pick_up_box())
 	world.get_node("Player").global_position = Store.approach(business.racks.find(3))
-	before = business.snapshot()
+	# Racks are mixed: rack 3's empty row (assigned to bottles) still takes soap.
 	assert(ops.try_interact())
-	assert(business.snapshot() == before)
+	assert(business.racks.find(3).slots[2].product == "soap" and business.carried_stock == 9)
 	world.get_node("Player").global_position = Store.approach(business.racks.find(2))
 	assert(ops.try_interact())
-	assert(business.racks.find(2).amount == 1 and business.carried_stock == 9)
+	assert(business.racks.find(2).amount == 1 and business.carried_stock == 8)
 	assert(business.drop_box())
 	var customer = world.get_node("Customer")
 	customer.product_id = "bottle"

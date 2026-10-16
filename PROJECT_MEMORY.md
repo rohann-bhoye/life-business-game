@@ -14,12 +14,13 @@ Latest feature: playable tomato farming, a Farm tablet tab/seed stall, three far
 expansions, tomato warehouse/shelf/checkout integration, a road-end Coming Next
 board and a local suggestion form. See Farming section below for controls and limits.
 
-## >>> RESUME HERE (end of session 2026-10-16) <<<
+## Current status (2026-10-17)
 
-Status: work in progress, NOT committed. Everything listed below (visual upgrade,
-mixed racks, modern UI, 5 new products, sounds, jump, Sunil storage restock, rack
-packing) is on disk only; last commit is 26ca8b3 (First Day guide). Owner wants ONE
-commit when the work is verified, and to be asked before any push to GitHub.
+COMMITTED as one commit after the full suite passed 38/38 (400 s, headless, only the
+editor open). Covers: visual upgrade, mixed racks, modern UI, 5 new products, sounds,
+jump, Sunil storage restock, rack packing and the new family home + spawn. Owner wants
+ONE commit per finished piece of work and to be asked before any push to GitHub.
+The "to do" list below is history except items 4-5 (export templates, next features).
 
 Added at the end of the session:
 - Jump: Space (player.gd jump_velocity 6.5, ~1 m); Kenney "jump" one-shot in
@@ -35,11 +36,25 @@ Added at the end of the session:
   rack_furnishing.pack(id) remaps models after the id shift.
 - New test tests/storage_restock_test.gd: PASS (jump, storage restock, pack/unpack, reload).
 
+Added 2026-10-17 (owner request): new family home, owned from the start.
+- home_decor.gd now builds the whole house: 6.4 x 5.5 m (house-local x +-3.2,
+  z 1.9..-3.6; fits inside the garden fences), 3 m walls with colliders, gable roof
+  (30 deg slabs, gable prisms, ridge), framed windows, door posts/lintel, porch,
+  bedroom partition, raised wood floor (1.5 cm above the ground plane). Kenney
+  furniture: double bed, wardrobe, side table+lamp, sofa facing TV cabinet, rug,
+  coffee table, bookcase, kitchen fridge/stove/sink, dining table + 2 chairs, plants,
+  porch lamp. Old house.tscn walls/roof/windows are hidden with colliders disabled;
+  Bed (+SleepArea), InteriorArea, HouseSign and InteriorLight are re-fitted.
+- Ownership: backend grant_home() (free). house_area._start_at_home() grants it and
+  spawns the player at home_decor.SPAWN (beside the bed, facing the door) on every
+  scene start (New Game and Continue). Save validation now accepts an owned home
+  with property_expenses 0 (granted) or HOUSE_COST (bought in older saves).
+  buy_house() still exists for backend/legacy use; the in-game buy button is disabled.
+
 To do next session, in order:
-1. tests/mixed_shelves_test.gd still FAILS at ~line 108: it encodes the OLD rule that
-   an empty row assigned to one product refuses another. Update its expectations to
-   the mixed-rack rule (lines 21-25 and the legacy purchase_stock line were already
-   updated). Then rerun it.
+1. DONE (2026-10-17): mixed_shelves_test updated to the mixed-rack rule ("no shelf
+   space" now means every row is physically full; it fills rows with purchase_stock
+   and frees one by selling bottles). It passes.
 2. Run the FULL suite (38 tests incl. storage_restock_test). checkout_test line 132
    has failed only under heavy CPU load (owner's game + suite at once) and passed on
    a clean rerun; rerun failures individually before changing code.

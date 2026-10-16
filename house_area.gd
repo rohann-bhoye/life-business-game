@@ -19,8 +19,28 @@ func _ready() -> void:
 	shop_area.business.changed.connect(_update_house_state)
 	_update_house_state()
 	var decor := Node3D.new()
-	decor.set_script(preload("res://home_decor.gd"))
+	decor.set_script(HomeDecor)
 	get_parent().add_child.call_deferred(decor)
+	call_deferred("_start_at_home")
+
+const HomeDecor := preload("res://home_decor.gd")
+
+# The family home is owned from day one, and every New Game / Continue starts
+# with the player inside it, beside the bed.
+func _start_at_home() -> void:
+	# Only real sessions started from the main menu (New Game / Continue).
+	if not get_tree().current_scene.has_meta("session_save_path"): return
+	shop_area.business.grant_home()
+	spawn_player()
+
+func spawn_player() -> void:
+	var player := get_tree().current_scene.get_node_or_null("Player") as CharacterBody3D
+	if player == null: return
+	var house := get_parent() as Node3D
+	player.global_position = house.to_global(HomeDecor.SPAWN)
+	player.rotation.y = house.global_rotation.y + PI
+	player.velocity = Vector3.ZERO
+	player.indoors = true
 
 func _unhandled_input(event: InputEvent) -> void:
 	if player_inside and event is InputEventKey:

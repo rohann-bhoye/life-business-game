@@ -352,7 +352,7 @@ func _run_checks() -> void:
 	var camera_ray := PhysicsRayQueryParameters3D.create(house_player.camera_pivot.global_position, camera.global_position)
 	camera_ray.exclude = [house_player.get_rid()]
 	assert(current_scene.get_world_3d().direct_space_state.intersect_ray(camera_ray).is_empty())
-	house_player.global_position = Vector3(4, 1.1, -4)
+	house_player.global_position = Vector3(3.0, 1.1, -4.7)
 	house_player.rotation.y = 0.0
 	house_player.camera_pivot.rotation.x = deg_to_rad(-55)
 	await physics_frame
@@ -380,7 +380,8 @@ func _run_checks() -> void:
 	assert(camera.global_position.y < 3.1)
 	assert(camera.global_position.distance_to(house_player.camera_pivot.global_position) < 0.01)
 	assert(house_player.camera_distance == outdoor_zoom)
-	house_player.global_position = Vector3(4, 1.1, -6.8)
+	house_player.global_position = Vector3(4, 1.1, -9.0)
+	house_player.rotation.y = 0.0
 	house_player.camera_pivot.rotation.x = deg_to_rad(-12)
 	await create_timer(0.3).timeout
 	await physics_frame

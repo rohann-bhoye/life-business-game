@@ -101,7 +101,10 @@ func _run() -> void:
 	assert(operations.try_interact() and business.snapshot() == before)
 	assert(current_scene.get_node("Ui").feedback_label.text.contains("Rack full"))
 	assert(business.drop_box() and business.hire_stock_worker())
-	for row in range(3): assert(business.assign_shelf_slot(2, row, "bottle"))
+	# Racks are mixed, so "no shelf space" now means every row is physically full:
+	# fill the six empty rows on racks 1 and 2 with bottles.
+	for box in range(6): assert(business.purchase_stock())
+	assert(not business.purchase_stock())
 	assert(business.pick_up_box(true))
 	var worker = operations.stock_worker
 	for frame in range(30): worker._physics_process(0.1)
@@ -109,7 +112,9 @@ func _run() -> void:
 	var feed = current_scene.get_node("Ui/NotificationFeed")
 	feed.refresh()
 	assert(feed.entries.has("shelf_space"))
-	assert(business.assign_shelf_slot(1, 0, "soap"))
+	# Selling the ten bottles on rack 1's lower row empties it, so Sunil can use it.
+	for quantity in [3, 3, 3, 1]: assert(business.sell_basket(quantity, 1000, -1, "bottle", 1))
+	assert(business.racks.find(1).slots[0].count == 0)
 	for frame in range(500): worker._physics_process(0.1)
 	assert(business.worker_carried_stock == 0 and business.racks.find(1).slots[0].count == 8)
 	feed.refresh()

@@ -76,6 +76,11 @@ func _run() -> void:
 	assert(player.mouse_sensitivity == 0.006 and player.invert_y and player.camera.fov == 68)
 	assert(not current_scene.get_node("DirectionalLight3D").shadow_enabled, "Default Low preset must disable sun shadows")
 	assert(current_scene.get_meta("session_settings_path") == settings_path)
+	# New Game starts at home: the family home is owned free and the player is beside the bed.
+	await process_frame
+	var house: Node3D = current_scene.get_node("House")
+	assert(shop.business.house_owned and shop.business.property_expenses == 0, "New game must own the family home")
+	assert(house.to_local(player.global_position).distance_to(preload("res://home_decor.gd").SPAWN) < 0.4, "New game must spawn at home")
 	assert(shop.business.order_stock("soap", 2))
 	var money: int = shop.money
 	# Escape pauses the actual game, not just the mouse.

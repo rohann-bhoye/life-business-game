@@ -134,7 +134,7 @@ func _run() -> void:
 
 	# Early E is consumed with HUD feedback; it never opens a menu or changes time.
 	player.indoors = true
-	player.global_position = Vector3(4, 1.1, -4)
+	player.global_position = Vector3(3.0, 1.1, -4.7)
 	await physics_frame
 	await physics_frame
 	await physics_frame
