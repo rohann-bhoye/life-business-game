@@ -140,8 +140,9 @@ func _run() -> void:
 		menu.tabs.current_tab = 1
 		terminal._sync()
 		var pixels: Image = terminal.screen_viewport.get_texture().get_image()
-		assert(pixels.get_pixel(30, 30).get_luminance() > 0.5)
-		assert(pixels.get_pixel(950, 520).get_luminance() < 0.3)
+		var scale := pixels.get_width() / 960
+		assert(pixels.get_pixel(40 * scale, 465 * scale).get_luminance() > 0.5)
+		assert(pixels.get_pixel(950 * scale, 520 * scale).get_luminance() < 0.3)
 	var event := InputEventKey.new()
 	event.keycode = KEY_ESCAPE
 	event.pressed = true

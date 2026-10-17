@@ -47,7 +47,10 @@ func _on_spawn_timer_timeout() -> void:
 	if not shop_area.business.shop_is_open():
 		$SpawnTimer.start()
 		return
-	if (customers.size() >= 3 if physical_shop else is_instance_valid(active_customer)):
+	# Up to 3 shoppers at a time; people already walking away down the street don't
+	# count, but the street never holds more than 8 customers in all.
+	var shopping := customers.filter(func(customer): return is_instance_valid(customer) and customer.state != customer.State.LEAVING).size()
+	if (shopping >= 3 or customers.size() >= 8 if physical_shop else is_instance_valid(active_customer)):
 		return
 
 	var customer = CUSTOMER_SCENE.instantiate()

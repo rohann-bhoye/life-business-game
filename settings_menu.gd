@@ -5,6 +5,7 @@ const Settings := preload("res://game_settings.gd")
 const MenuSkin := preload("res://menu_skin.gd")
 var settings_path := "user://settings.cfg"
 var volume: HSlider
+var music: HSlider
 var sensitivity: HSlider
 var fov: HSlider
 var graphics: OptionButton
@@ -30,7 +31,8 @@ func _ready() -> void:
 	var title := _label("SETTINGS", 26)
 	title.add_theme_font_override("font", preload("res://kenney_theme.gd").heading_font())
 	title.name = "Title"
-	volume = _slider("Volume", 0, 100, 1)
+	volume = _slider("Master volume", 0, 100, 1)
+	music = _slider("Music volume", 0, 100, 1)
 	sensitivity = _slider("Look sensitivity", 1, 10, 0.5)
 	fov = _slider("Camera FOV", 50, 90, 1)
 	_label("Graphics", 16)
@@ -111,6 +113,7 @@ func open_menu(path: String) -> void:
 	var settings = Settings.new()
 	settings.load_file(path)
 	volume.value = settings.volume * 100
+	music.value = settings.music_volume * 100
 	sensitivity.value = settings.sensitivity * 1000
 	fov.value = settings.fov
 	graphics.select(settings.graphics + 1)
@@ -126,6 +129,7 @@ func open_menu(path: String) -> void:
 func _apply() -> void:
 	var settings = Settings.new()
 	settings.volume = volume.value / 100
+	settings.music_volume = music.value / 100
 	settings.sensitivity = sensitivity.value / 1000
 	settings.fov = fov.value
 	settings.graphics = graphics.selected - 1

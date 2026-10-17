@@ -83,11 +83,16 @@ func build_room(builder: Node3D) -> void:
 	rack = first.node
 	rack_bottles = first.items
 	rack_label = first.label
-	counter = builder._box("CheckoutCounter", self, Vector3(2.8, 1, 0.7), Vector3(-2.5, 0.6, 0.4), Color(0.18, 0.4, 0.35), true)
+	# Waist height for the 1.45 m characters (top at 0.88 m): the 1 m box sinks
+	# 0.3 m into the floor so everything on the counter keeps its local layout.
+	counter = builder._box("CheckoutCounter", self, Vector3(2.8, 1, 0.7), Vector3(-2.5, 0.3, 0.4), Color(0.18, 0.4, 0.35), true)
 	builder._box("CounterTop", counter, Vector3(2.9, 0.08, 0.8), Vector3(0, 0.54, 0), Color(0.2, 0.24, 0.26))
-	checkout_pc = builder._box("CheckoutPC", counter, Vector3(0.64, 0.4, 0.08), Vector3(0, 0.98, -0.21), Color(0.08, 0.12, 0.14))
+	# The monitor stands at the cashier's side, turned toward the cashier, so it
+	# never hides the customer's face at the middle of the counter.
+	checkout_pc = builder._box("CheckoutPC", counter, Vector3(0.64, 0.4, 0.08), Vector3(1.0, 0.98, -0.2), Color(0.08, 0.12, 0.14))
+	checkout_pc.rotation.y = 0.6
 	builder._box("Screen", checkout_pc, Vector3(0.58, 0.34, 0.015), Vector3(0, 0, -0.05), Color(0.07, 0.25, 0.28))
-	builder._box("MonitorStand", counter, Vector3(0.08, 0.2, 0.08), Vector3(0, 0.68, -0.21), Color(0.12, 0.17, 0.18))
+	builder._box("MonitorStand", counter, Vector3(0.08, 0.2, 0.08), Vector3(1.0, 0.68, -0.2), Color(0.12, 0.17, 0.18))
 	checkout_display = _sign(checkout_pc, "TotalDisplay", "CHECKOUT", Vector3(0, 0, -0.063))
 	checkout_display.rotation.y = PI
 	checkout_display.font_size = 24
@@ -101,7 +106,7 @@ func build_room(builder: Node3D) -> void:
 	scanner_light.light_energy = 0.0
 	scanner_light.omni_range = 0.8
 	scanner.add_child(scanner_light)
-	builder._box("CardTerminal", counter, Vector3(0.19, 0.08, 0.25), Vector3(1.1, 0.63, -0.17), Color(0.1, 0.17, 0.19))
+	builder._box("CardTerminal", counter, Vector3(0.19, 0.08, 0.25), Vector3(1.05, 0.63, 0.2), Color(0.1, 0.17, 0.19))
 	_sign(counter, "CheckoutSign", "CHECKOUT", Vector3(0, 0.25, 0.38))
 	var desk = builder._box("ComputerDesk", self, Vector3(1.3, 0.85, 0.65), Vector3(-1.1, 0.525, -1.6), Color(0.39, 0.44, 0.43), true)
 	desk.mesh = null
@@ -656,7 +661,8 @@ func show_basket(customer: Node3D) -> void:
 		counter.remove_child(previous)
 		previous.queue_free()
 		checkout_items[index] = make_product(counter, "CheckoutBottle%d" % index, Vector3.ZERO, products[index] if index < products.size() else customer.product_id)
-		checkout_items[index].position = Vector3(-1.0 + index * 0.27, 0.59, 0.1)
+		# Two rows of five keep big family baskets on the free end of the counter.
+		checkout_items[index].position = Vector3(-1.12 + (index % 5) * 0.24, 0.59, 0.16 - (index / 5 % 2) * 0.24)
 		checkout_items[index].visible = index < products.size()
 		checkout_items[index].get_node("Cap").material_override = _material(Color(0.92, 0.93, 0.9))
 	_update_checkout_display()
@@ -788,7 +794,7 @@ func interaction_hint() -> String:
 		if customer.state == customer.State.PAYING: return "Payment: %s" % customer.payment_method
 	var employee := employee_target()
 	if not employee.is_empty(): return "%s | %s" % [shop.business.staff.name_for(employee), "Cashier" if employee == "cashier" else "Stock assistant"]
-	if player.shop_indoors and _near(pc.global_position, 1.0): return "Management PC"
+	if player.shop_indoors and _near(pc.global_position, 1.0): return "Shop PC"
 	if player.shop_indoors and player_at_counter(): return "Checkout PC"
 	return ""
 

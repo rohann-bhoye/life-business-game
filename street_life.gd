@@ -10,7 +10,7 @@ func _ready() -> void:
 	for index in range(12):
 		var person := Node3D.new()
 		person.name = "Passerby%d" % index
-		person.position = Vector3(-66 + index * 12, 0.12, 3.9 if index % 2 == 0 else 10.9)
+		person.position = Vector3(-27 + index * 4.9, 0.12, 3.9 if index % 2 == 0 else 10.9)
 		var visual := Node3D.new()
 		visual.name = "CharacterVisual"
 		visual.set_script(CharacterVisual)
@@ -26,6 +26,6 @@ func _physics_process(delta: float) -> void:
 	for index in range(walkers.size()):
 		var person := walkers[index]
 		person.position.x += directions[index] * WALK_SPEED * delta
-		if absf(person.position.x) >= 70:
-			person.position.x = clampf(person.position.x, -70, 70)
+		if absf(person.position.x) >= 29:
+			person.position.x = clampf(person.position.x, -29, 29)
 			directions[index] *= -1

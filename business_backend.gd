@@ -353,6 +353,9 @@ func set_assistant_auto_collect(enabled: bool) -> void:
 	_commit()
 
 const INITIAL_MONEY := 50000
+# New games from the lobby start small, like a beginner opening a kirana shop. Saves
+# record their starting money; older saves (no field) started with INITIAL_MONEY.
+const BEGINNER_MONEY := 10000
 const INITIAL_STOCK := 10
 const STOCK_COST := 500
 const STOCK_AMOUNT := 10
@@ -376,6 +379,7 @@ const MAX_SAVED_VALUE := 1000000000
 const INTEGER_FIELDS := ["money", "stock", "items_sold", "sales_revenue", "restocking_expenses", "marketing_expenses", "hiring_expenses", "property_expenses", "selling_price", "missed_sales", "shop_level", "upgrade_expenses"]
 
 var money := INITIAL_MONEY
+var starting_money := INITIAL_MONEY
 var stock := INITIAL_STOCK
 var items_sold := 0
 var sales_revenue := 0
@@ -687,8 +691,9 @@ func _rain_waters_farm() -> void:
 		if farm.plots[index].planted and farm.plots[index].watered_at < 0: farm.plots[index].watered_at = farm_time()
 
 # --- Rival shop: Sharma General Store opens on day 3 and sells at the catalog's
-# standard prices with a fixed reputation. Customers compare: higher prices or a
-# worse reputation than Sharma's mean fewer visits; cheaper or better means more. ---
+# standard prices, plus a daily sale on one product, with a fixed reputation.
+# Customers compare: higher prices or a worse reputation than Sharma's mean fewer
+# visits; cheaper or better means more. ---
 const RIVAL_NAME := "Sharma General Store"
 const RIVAL_OPEN_DAY := 3
 const RIVAL_REPUTATION := 55
@@ -699,6 +704,25 @@ func rival_open() -> bool:
 static func rival_price(id: String) -> int:
 	return 100 if id == "bottle" else int(Catalog.PRICES[id])
 
+## Price war: most days Sharma cuts Rs10 or Rs20 off one product (deterministic per
+## day, like the weather, so nothing extra is saved). {} means no sale that day.
+static func rival_sale_for_day(day_number: int) -> Dictionary:
+	if day_number < RIVAL_OPEN_DAY: return {}
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(day_number * 40503 + 777)
+	if rng.randi_range(0, 99) < 30: return {}
+	var id: String = Catalog.IDS[rng.randi_range(0, Catalog.IDS.size() - 1)]
+	var cut: int = mini([10, 20][rng.randi_range(0, 1)], rival_price(id) - 50)
+	return {} if cut <= 0 else {"id": id, "cut": cut, "price": rival_price(id) - cut}
+
+func rival_sale() -> Dictionary:
+	return rival_sale_for_day(day)
+
+## Sharma's price today, including the daily sale.
+func rival_price_today(id: String) -> int:
+	var sale := rival_sale()
+	return int(sale.price) if sale.get("id", "") == id else rival_price(id)
+
 ## Your average price compared with Sharma's for products you have on the shelves
 ## (1.0 = same, 1.1 = 10% more expensive).
 func price_index() -> float:
@@ -706,7 +730,7 @@ func price_index() -> float:
 	var count := 0
 	for id in Catalog.IDS:
 		if product_stock(id) <= 0: continue
-		total += float(product_price(id)) / rival_price(id)
+		total += float(product_price(id)) / rival_price_today(id)
 		count += 1
 	return total / count if count > 0 else 1.0
 
@@ -1094,6 +1118,7 @@ func snapshot() -> Dictionary:
 	data["day_report"] = day_report.snapshot()
 	data["supplier_discounts"] = supplier_discounts
 	for field in ["loan_received", "loan_principal_repaid", "loan_interest_paid", "loan_missed_payments"]: data[field] = get(field)
+	data["starting_money"] = starting_money
 	data["incoming_boxes"] = incoming_boxes.duplicate(true)
 	data["queued_boxes"] = queued_boxes.duplicate(true)
 	data["demo_progress"] = demo.snapshot()
@@ -1142,6 +1167,7 @@ func load_progress(path: String) -> void:
 	day_report.restore(data.get("day_report", {}))
 	supplier_discounts = int(data.get("supplier_discounts", 0))
 	for field in ["loan_received", "loan_principal_repaid", "loan_interest_paid", "loan_missed_payments"]: set(field, int(data.get(field, 0)))
+	starting_money = int(data.get("starting_money", INITIAL_MONEY))
 	for id in inventory:
 		for field in inventory[id]: inventory[id][field] = int(inventory[id][field])
 	pending_product = data.pending_product
@@ -1500,7 +1526,9 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	# Loans: money received minus principal paid back.
 	if not _valid_loan(data): return false
 	expenses -= int(data.get("loan_received", 0)) - int(data.get("loan_principal_repaid", 0))
-	if int(data["money"]) != INITIAL_MONEY + revenue - expenses - int(data["property_expenses"]):
+	var start_money := int(data.get("starting_money", INITIAL_MONEY))
+	if start_money not in [INITIAL_MONEY, BEGINNER_MONEY]: return false
+	if int(data["money"]) != start_money + revenue - expenses - int(data["property_expenses"]):
 		return false
 	var purchased_stock := bottle_cost / STOCK_COST * STOCK_AMOUNT + extra_purchased
 	return int(data["stock"]) + stored_supply == INITIAL_STOCK + purchased_stock - sold

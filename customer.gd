@@ -31,6 +31,22 @@ var basket_count := 0
 var extra_lines: Array = []
 var line_index := -1
 const MIXED_CHANCE := 0.5
+## Real games ("town_customers" scene meta): each customer is a kind of shopper
+## with their own basket size and budget, walks in along the shop-side pavement
+## from the edge of town and walks away down the street after shopping.
+## budget is per item in tens of rupees; items is the main product's count.
+const SHOPPER_TYPES := {
+	"quick": {"weight": 35, "items": [1, 1], "extras": [0, 0], "budget": [8, 15], "say": ["Just one thing, please.", "Quick shopping today!"]},
+	"regular": {"weight": 40, "items": [1, 3], "extras": [0, 1], "budget": [10, 20], "say": ["Need a few things.", "Namaste!"]},
+	"family": {"weight": 20, "items": [2, 4], "extras": [1, 2], "budget": [14, 25], "say": ["Big shopping for the family!", "Monthly ration time!"]},
+	"bulk": {"weight": 5, "items": [5, 7], "extras": [0, 0], "budget": [12, 20], "say": ["I need a lot for my tea stall!"]},
+}
+const PAVEMENT_Z := 3.9
+const STREET_END_X := 32.0
+var shopper_type := ""
+var pavement_lane := PAVEMENT_Z
+## +1 / -1: the end of the street the customer walked in from (0 = not walking in).
+var arrival_side := 0.0
 var scanned_count := 0
 var scanned_items: Array[int] = []
 var agreed_unit_price := 100
@@ -47,6 +63,8 @@ var review_outcome := ""
 var review_recorded := false
 var queue_wait_seconds := 0.0
 var patience_label: Label3D
+var speech_label: Label3D
+var speech_seconds := 0.0
 
 @onready var shop_area: Area3D = get_node(shop_area_path)
 @onready var purchase_point: Marker3D = get_node(purchase_point_path)
@@ -61,6 +79,7 @@ func _ready() -> void:
 	wants_discount = randf() < [0.75, 0.35, 0.0][personality]
 	shopping_quantity = randi_range(1, 3)
 	payment_method = ["Cash", "Card", "UPI"][randi_range(0, 2)]
+	if town_customers(): _pick_shopper_type()
 	visible = false
 	wait_remaining = spawn_delay
 	patience_label = Label3D.new()
@@ -72,8 +91,44 @@ func _ready() -> void:
 	patience_label.outline_size = 6
 	patience_label.hide()
 	add_child(patience_label)
+	speech_label = Label3D.new()
+	speech_label.name = "SpeechLabel"
+	speech_label.position = Vector3(0, 2.3, 0)
+	speech_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	speech_label.font_size = 26
+	speech_label.pixel_size = 0.0045
+	speech_label.outline_size = 8
+	speech_label.modulate = Color(1, 0.9, 0.55)
+	speech_label.hide()
+	add_child(speech_label)
+
+func town_customers() -> bool:
+	return is_inside_tree() and get_tree().current_scene != null and get_tree().current_scene.get_meta("town_customers", false)
+
+func _pick_shopper_type() -> void:
+	var roll := randi_range(1, 100)
+	for kind in SHOPPER_TYPES:
+		roll -= int(SHOPPER_TYPES[kind].weight)
+		if roll <= 0 or kind == "bulk":
+			shopper_type = kind
+			break
+	var kind: Dictionary = SHOPPER_TYPES[shopper_type]
+	shopping_quantity = randi_range(kind.items[0], kind.items[1])
+	spending_budget = randi_range(kind.budget[0], kind.budget[1]) * 10
+	# People doing big shopping don't haggle over every rupee.
+	if shopper_type in ["family", "bulk"]: wants_discount = false
+	pavement_lane = PAVEMENT_Z + randf_range(-0.3, 0.3)
+
+## A short remark above the customer's head (e.g. comparing with Sharma's price).
+func say(text: String, seconds := 4.0) -> void:
+	speech_label.text = text
+	speech_label.show()
+	speech_seconds = seconds
 
 func _physics_process(delta: float) -> void:
+	if speech_seconds > 0.0:
+		speech_seconds -= delta
+		if speech_seconds <= 0.0: speech_label.hide()
 	if state in [State.QUEUING, State.BUYING, State.SCANNING, State.NEGOTIATING, State.PAYING, State.CHECKOUT]:
 		service_wait_seconds += delta
 	if not shop_area.business.shop_is_open():
@@ -90,13 +145,23 @@ func _physics_process(delta: float) -> void:
 				visible = true
 				state = State.ARRIVING
 				if physical_shop():
+					var town := town_customers()
+					if town and shopper_type.is_empty(): _pick_shopper_type()
 					var choices: Array[String] = []
 					for id in operations.Catalog.IDS:
 						if operations.available_stock(id) > 0: choices.append(id)
-					if not choices.is_empty(): product_id = choices.pick_random()
+					# Shoppers go for something they can afford when there is a choice.
+					var affordable := choices.filter(func(id): return shop_area.business.product_price(id) <= spending_budget)
+					if town and not affordable.is_empty(): product_id = affordable.pick_random()
+					elif not choices.is_empty(): product_id = choices.pick_random()
 					if is_instance_valid(operations.furnishing): rack_id = operations.furnishing.choose_rack(product_id)
 					_plan_extra_products(choices)
 					var points: Array[Vector3] = operations.customer_entry_route(product_id, rack_id)
+					if town:
+						# Start at one end of the street and walk along the pavement to the door.
+						arrival_side = 1.0 if randf() < 0.5 else -1.0
+						global_position = Vector3(arrival_side * randf_range(22.0, 28.0), 0.1, pavement_lane)
+						points.push_front(Vector3(points[0].x, 0.1, pavement_lane))
 					_set_route(points)
 		State.ARRIVING:
 			if physical_shop():
@@ -109,6 +174,7 @@ func _physics_process(delta: float) -> void:
 		State.TAKING:
 			wait_remaining -= delta
 			if wait_remaining <= 0:
+				if not shopper_type.is_empty() and not has_product: say(SHOPPER_TYPES[shopper_type].say.pick_random(), 3.0)
 				var available: int = operations.furnishing.available(rack_id, product_id) if rack_id >= 0 and is_instance_valid(operations.furnishing) else operations.available_stock(product_id)
 				if available <= 0:
 					review_outcome = "stock"
@@ -147,6 +213,9 @@ func _physics_process(delta: float) -> void:
 						state = State.QUEUING
 					else:
 						quoted_price = shop_area.business.product_price(product_id)
+						var sharma: int = shop_area.business.rival_price_today(product_id)
+						if shop_area.business.rival_open() and quoted_price > sharma:
+							say("Sharma sells this for %s%d!" % [String.chr(8377), sharma])
 						agreed_unit_price = quoted_price
 						state = State.SCANNING
 						auto_checkout_seconds = shop_area.business.cashier_scan_seconds()
@@ -190,12 +259,18 @@ func _plan_extra_products(choices: Array) -> void:
 	extra_lines.clear()
 	line_index = -1
 	# Real games (started from the menu) enable this; fixed test scenes stay single-product.
-	if not get_tree().current_scene.get_meta("mixed_baskets", false) or randf() >= MIXED_CHANCE: return
+	if not get_tree().current_scene.get_meta("mixed_baskets", false): return
+	var wanted := randi_range(1, 2) if randf() < MIXED_CHANCE else 0
+	if not shopper_type.is_empty():
+		var kind: Dictionary = SHOPPER_TYPES[shopper_type]
+		wanted = randi_range(kind.extras[0], kind.extras[1])
+	if wanted == 0: return
 	var others: Array = choices.filter(func(id): return id != product_id and shop_area.business.product_price(id) <= spending_budget)
 	if others.is_empty(): return
 	others.shuffle()
-	for id in others.slice(0, randi_range(1, mini(2, others.size()))):
-		extra_lines.append({"product": id, "rack": -1, "count": 1, "taken": false})
+	for id in others.slice(0, mini(wanted, others.size())):
+		# Family shoppers take one or two of each extra product.
+		extra_lines.append({"product": id, "rack": -1, "count": randi_range(1, 2) if shopper_type == "family" else 1, "taken": false})
 	# Bargaining stays a single-product conversation.
 	wants_discount = false
 
@@ -304,12 +379,21 @@ func leave_shop() -> void:
 		held_bottle.show()
 	operations.clear_basket(self)
 	operations.remove_customer(self)
-	if global_position.z > 2.6:
-		_set_route([exit_point.global_position])
-	else:
-		var points: Array[Vector3] = shop_area.business.racks.route(global_position, Vector3(-4.6, 0.1, 1.65))
+	var points: Array[Vector3] = []
+	if global_position.z <= 2.6:
+		points = shop_area.business.racks.route(global_position, Vector3(-4.6, 0.1, 1.65))
 		points.append_array(operations.customer_exit_route())
-		_set_route(points)
+	if town_customers():
+		# Out of the door, onto the pavement and on down the street (most keep going
+		# the way they came from, some turn back), out of town.
+		if not points.is_empty(): points.pop_back()
+		var start_x: float = points[-1].x if not points.is_empty() else global_position.x
+		var came := arrival_side if arrival_side != 0.0 else (1.0 if randf() < 0.5 else -1.0)
+		var side := -came if randf() < 0.7 else came
+		points.append(Vector3(start_x, 0.1, pavement_lane))
+		points.append(Vector3(side * STREET_END_X, 0.1, pavement_lane))
+	elif points.is_empty(): points = [exit_point.global_position]
+	_set_route(points)
 
 func complete_checkout() -> void:
 	if not has_product:

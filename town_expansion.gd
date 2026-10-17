@@ -1,13 +1,15 @@
 extends Node3D
 
-# Fills the enlarged town (x +-74, z -56..60) around the original 64 m block:
-# the main road continues both ways, a market street with Indian shops crosses it
-# in the east, a chai stall with people, a bus stop, more houses, trees,
-# streetlights and parked autos/scooters. Built once by neighbourhood.gd; uses its
-# box/tree/streetlight helpers so scenery batching and quality settings apply.
+# Land around the original 64 m town (flat out to x +-74, z -56..60). The open town
+# still ends at the old edge (town_boundary.gd); out here the main road continues
+# both ways with streetlights and trees, so traffic drives in and out of town. The
+# next phase (FutureTown, hidden for now) has a market street with Indian shops, a
+# chai stall, more houses and parked autos/scooters. The bus stop sits inside the
+# open town. Built once by neighbourhood.gd; uses its box/tree/streetlight helpers.
 const Kenney = preload("res://kenney_assets.gd")
 const HOUSE := "res://assets/buildings/kenney/building-type-%s.glb"
 const MARKET_X := 50.0
+const BUS_STOP_X := -24.0
 const SHOPS := [
 	["CHAI POINT", Color(0.85, 0.45, 0.12)], ["GUPTA MEDICAL", Color(0.1, 0.55, 0.45)],
 	["MITHAI HOUSE", Color(0.85, 0.2, 0.35)], ["MOBILE REPAIR", Color(0.2, 0.35, 0.75)],
@@ -15,11 +17,18 @@ const SHOPS := [
 	["HARDWARE", Color(0.35, 0.4, 0.45)], ["BAKERY", Color(0.75, 0.5, 0.25)],
 ]
 var town: Node3D
+# Houses, the market street with its shops, the chai stall and parked vehicles open
+# in a later phase: they are built under FutureTown, which is hidden and disabled
+# (no collisions) until unlock_future_town(). Roads, lamps and trees stay visible.
+var future: Node3D
 var people: Array[Node3D] = []
 
 func build(neighbourhood: Node3D) -> void:
 	name = "TownExpansion"
 	town = neighbourhood
+	future = Node3D.new()
+	future.name = "FutureTown"
+	town.add_child(future)
 	_roads()
 	_houses()
 	_market()
@@ -27,9 +36,15 @@ func build(neighbourhood: Node3D) -> void:
 	_bus_stop()
 	_vehicles()
 	_greenery()
+	future.visible = false
+	future.process_mode = Node.PROCESS_MODE_DISABLED
 
-func _box(node_name: String, size: Vector3, position: Vector3, colour: Color, solid := false) -> MeshInstance3D:
-	return town._box(node_name, town, size, position, colour, solid)
+func unlock_future_town() -> void:
+	future.visible = true
+	future.process_mode = Node.PROCESS_MODE_INHERIT
+
+func _box(node_name: String, size: Vector3, position: Vector3, colour: Color, solid := false, parent: Node3D = null) -> MeshInstance3D:
+	return town._box(node_name, town if parent == null else parent, size, position, colour, solid)
 
 func _roads() -> void:
 	var road_material: Material = town.get_parent().get_node("Road").material_override
@@ -42,16 +57,16 @@ func _roads() -> void:
 		for z in [4.35, 9.65]: _box("RoadEdgeExt%d_%s" % [side, z], Vector3(43, 0.008, 0.05), Vector3(side * 53.5, 0.124, z), Color(0.83, 0.86, 0.83))
 		for step in range(10):
 			var x: float = side * (34.0 + step * 4.0)
-			if absf(x - MARKET_X) > 4.0: _box("LaneMark%s" % x, Vector3(1.8, 0.008, 0.09), Vector3(x, 0.124, 7), Color(0.88, 0.86, 0.68))
-	# Market street crossing the main road in the east.
+			_box("LaneMark%s" % x, Vector3(1.8, 0.008, 0.09), Vector3(x, 0.124, 7), Color(0.88, 0.86, 0.68))
+	# Market street crossing the main road in the east (future phase).
 	for part in [[-21.3, 51.3], [33.8, 48.3]]:
-		var road := _box("MarketStreet%s" % part[0], Vector3(5.5, 0.012, part[1]), Vector3(MARKET_X, 0.112, part[0]), Color(0.16, 0.18, 0.19))
+		var road := _box("MarketStreet%s" % part[0], Vector3(5.5, 0.012, part[1]), Vector3(MARKET_X, 0.112, part[0]), Color(0.16, 0.18, 0.19), false, future)
 		if road_material != null: road.material_override = road_material
 	for side in [-1, 1]:
-		_box("MarketPavementN%d" % side, Vector3(1.6, 0.014, 50.0), Vector3(MARKET_X + side * 3.55, 0.107, -22.4), paving)
-		_box("MarketPavementS%d" % side, Vector3(1.6, 0.014, 46.0), Vector3(MARKET_X + side * 3.55, 0.107, 34.4), paving)
+		_box("MarketPavementN%d" % side, Vector3(1.6, 0.014, 50.0), Vector3(MARKET_X + side * 3.55, 0.107, -22.4), paving, false, future)
+		_box("MarketPavementS%d" % side, Vector3(1.6, 0.014, 46.0), Vector3(MARKET_X + side * 3.55, 0.107, 34.4), paving, false, future)
 	for stripe in range(7):
-		_box("MarketCrossing%d" % stripe, Vector3(2.0, 0.008, 0.28), Vector3(MARKET_X - 5.5, 0.124, 4.8 + stripe * 0.7), Color(0.85, 0.87, 0.83))
+		_box("MarketCrossing%d" % stripe, Vector3(2.0, 0.008, 0.28), Vector3(MARKET_X - 5.5, 0.124, 4.8 + stripe * 0.7), Color(0.85, 0.87, 0.83), false, future)
 	for x in [-70.0, -58.0, -46.0, 38.0, 62.0, 70.0]:
 		town._streetlight(Vector3(x, 0.1, 3.3), 0.0, false)
 		town._streetlight(Vector3(x + 1.0, 0.1, 10.7), PI, false)
@@ -68,13 +83,13 @@ func _houses() -> void:
 	]
 	for index in range(spots.size()):
 		var spot: Array = spots[index]
-		Kenney.fit(town, "TownHouse%d" % index, HOUSE % types[index % types.size()], Vector3(6.6, 6.5, 5.6), Vector3(spot[0], 0.1, spot[1]), spot[2])
-		town._collider("TownHouseBody%d" % index, town, Vector3(5.8, 4.0, 4.8), Vector3(spot[0], 2.1, spot[1]))
+		Kenney.fit(future, "TownHouse%d" % index, HOUSE % types[index % types.size()], Vector3(6.6, 6.5, 5.6), Vector3(spot[0], 0.1, spot[1]), spot[2])
+		town._collider("TownHouseBody%d" % index, future, Vector3(5.8, 4.0, 4.8), Vector3(spot[0], 2.1, spot[1]))
 		# Short garden path from the pavement to each front door.
 		var front: float = spot[1] + (2.9 if spot[2] == 0.0 else -2.9)
 		var pavement: float = 2.6 if spot[2] == 0.0 else 11.4
 		if absf(front - pavement) < 14.0:
-			_box("TownHousePath%d" % index, Vector3(1.4, 0.016, absf(front - pavement)), Vector3(spot[0], 0.108, (front + pavement) / 2.0), Color(0.72, 0.73, 0.7))
+			_box("TownHousePath%d" % index, Vector3(1.4, 0.016, absf(front - pavement)), Vector3(spot[0], 0.108, (front + pavement) / 2.0), Color(0.72, 0.73, 0.7), false, future)
 
 ## A small Indian shop: coloured facade, half-open shutter, sign and awning.
 func _shop(index: int, position: Vector3, facing: float) -> void:
@@ -83,7 +98,7 @@ func _shop(index: int, position: Vector3, facing: float) -> void:
 	shop.name = "MarketShop%d" % index
 	shop.position = position
 	shop.rotation.y = facing
-	town.add_child(shop)
+	future.add_child(shop)
 	var wall := Color(0.93, 0.88, 0.78) if index % 2 == 0 else Color(0.88, 0.9, 0.84)
 	town._box("Body", shop, Vector3(5.0, 3.4, 5.0), Vector3(0, 1.7, -2.5), wall, true)
 	town._box("Roof", shop, Vector3(5.3, 0.18, 5.3), Vector3(0, 3.45, -2.5), Color(0.4, 0.38, 0.36))
@@ -110,7 +125,7 @@ func _market() -> void:
 		_shop(index, Vector3(MARKET_X - 4.6, 0.1, z_slots[index]), PI / 2)
 		_shop(index + 4, Vector3(MARKET_X + 4.6, 0.1, z_slots[index]), -PI / 2)
 
-func _person(node_name: String, model: String, position: Vector3, yaw: float) -> Node3D:
+func _person(node_name: String, model: String, position: Vector3, yaw: float, parent: Node3D = null) -> Node3D:
 	var person := Node3D.new()
 	person.name = node_name
 	person.position = position
@@ -120,30 +135,31 @@ func _person(node_name: String, model: String, position: Vector3, yaw: float) ->
 	visual.set_script(preload("res://character_visual.gd"))
 	visual.model = model
 	person.add_child(visual)
-	town.add_child(person)
+	(town if parent == null else parent).add_child(person)
 	people.append(person)
 	return person
 
 func _chai_stall() -> void:
 	var base := Vector3(MARKET_X - 6.5, 0.1, -3.0)
-	_box("ChaiCart", Vector3(1.8, 0.9, 0.9), base + Vector3(0, 0.55, 0), Color(0.72, 0.32, 0.12), true)
-	_box("ChaiCartRoof", Vector3(2.2, 0.08, 1.3), base + Vector3(0, 2.1, 0), Color(0.95, 0.75, 0.2))
-	for x in [-0.95, 0.95]: _box("ChaiPole%s" % x, Vector3(0.06, 1.2, 0.06), base + Vector3(x, 1.5, 0.5), Color(0.3, 0.25, 0.2))
-	_box("Kettle", Vector3(0.3, 0.3, 0.3), base + Vector3(-0.4, 1.15, 0), Color(0.75, 0.75, 0.72))
+	_box("ChaiCart", Vector3(1.8, 0.9, 0.9), base + Vector3(0, 0.55, 0), Color(0.72, 0.32, 0.12), true, future)
+	_box("ChaiCartRoof", Vector3(2.2, 0.08, 1.3), base + Vector3(0, 2.1, 0), Color(0.95, 0.75, 0.2), false, future)
+	for x in [-0.95, 0.95]: _box("ChaiPole%s" % x, Vector3(0.06, 1.2, 0.06), base + Vector3(x, 1.5, 0.5), Color(0.3, 0.25, 0.2), false, future)
+	_box("Kettle", Vector3(0.3, 0.3, 0.3), base + Vector3(-0.4, 1.15, 0), Color(0.75, 0.75, 0.72), false, future)
 	var sign := Label3D.new()
 	sign.text = "CHAI 10"
 	sign.position = base + Vector3(0, 1.85, 0.66)
 	sign.font_size = 40
 	sign.pixel_size = 0.005
-	town.add_child(sign)
+	future.add_child(sign)
 	for stool in [Vector3(-1.2, 0, 1.4), Vector3(0.9, 0, 1.6)]:
-		_box("ChaiStool%s" % stool.x, Vector3(0.4, 0.45, 0.4), base + stool + Vector3(0, 0.25, 0), Color(0.45, 0.3, 0.2))
-	_person("ChaiWala", "male-c", base + Vector3(0.2, 0, -0.9), 0.0)
-	_person("ChaiCustomer1", "female-d", base + Vector3(-1.0, 0, 1.25), PI)
-	_person("ChaiCustomer2", "male-f", base + Vector3(1.1, 0, 1.3), PI + 0.4)
+		_box("ChaiStool%s" % stool.x, Vector3(0.4, 0.45, 0.4), base + stool + Vector3(0, 0.25, 0), Color(0.45, 0.3, 0.2), false, future)
+	_person("ChaiWala", "male-c", base + Vector3(0.2, 0, -0.9), 0.0, future)
+	_person("ChaiCustomer1", "female-d", base + Vector3(-1.0, 0, 1.25), PI, future)
+	_person("ChaiCustomer2", "male-f", base + Vector3(1.1, 0, 1.3), PI + 0.4, future)
 
+## Bus stop on the south pavement inside the open town (the bus halts here).
 func _bus_stop() -> void:
-	var base := Vector3(-45.0, 0.1, 11.6)
+	var base := Vector3(BUS_STOP_X, 0.1, 11.6)
 	_box("BusStopRoof", Vector3(3.6, 0.1, 1.4), base + Vector3(0, 2.4, 0.2), Color(0.2, 0.45, 0.65))
 	_box("BusStopBack", Vector3(3.6, 1.8, 0.06), base + Vector3(0, 1.4, 0.85), Color(0.6, 0.78, 0.85))
 	for x in [-1.7, 1.7]: _box("BusStopPost%s" % x, Vector3(0.08, 2.4, 0.08), base + Vector3(x, 1.2, 0.8), Color(0.25, 0.27, 0.3))
@@ -163,7 +179,7 @@ func _auto(index: int, position: Vector3, yaw: float) -> void:
 	auto.name = "Auto%d" % index
 	auto.position = position
 	auto.rotation.y = yaw
-	town.add_child(auto)
+	future.add_child(auto)
 	town._box("Body", auto, Vector3(1.3, 0.75, 2.4), Vector3(0, 0.65, 0), Color(0.95, 0.78, 0.1), true)
 	town._box("Lower", auto, Vector3(1.32, 0.25, 2.42), Vector3(0, 0.38, 0), Color(0.1, 0.5, 0.25))
 	town._box("Canopy", auto, Vector3(1.35, 0.12, 1.9), Vector3(0, 1.55, 0.15), Color(0.08, 0.08, 0.09))
@@ -176,7 +192,7 @@ func _scooter(index: int, position: Vector3, yaw: float) -> void:
 	scooter.name = "Scooter%d" % index
 	scooter.position = position
 	scooter.rotation.y = yaw
-	town.add_child(scooter)
+	future.add_child(scooter)
 	var colour: Color = [Color(0.8, 0.15, 0.15), Color(0.15, 0.35, 0.8), Color(0.9, 0.9, 0.9)][index % 3]
 	town._box("Body", scooter, Vector3(0.35, 0.45, 1.3), Vector3(0, 0.5, 0), colour)
 	town._box("Seat", scooter, Vector3(0.3, 0.1, 0.6), Vector3(0, 0.78, -0.2), Color(0.1, 0.1, 0.1))
@@ -184,8 +200,8 @@ func _scooter(index: int, position: Vector3, yaw: float) -> void:
 	for z in [-0.5, 0.5]: town._box("Wheel%s" % z, scooter, Vector3(0.12, 0.36, 0.36), Vector3(0, 0.2, z), Color(0.05, 0.05, 0.05))
 
 func _vehicles() -> void:
-	for entry in [[0, Vector3(40.0, 0.1, 5.2), PI / 2], [1, Vector3(-52.0, 0.1, 8.8), -PI / 2], [2, Vector3(66.0, 0.1, 8.8), -PI / 2], [3, Vector3(MARKET_X + 1.6, 0.1, -40.0), 0.0]]:
-		_auto(entry[0], entry[1], entry[2])
+	# Moving traffic on the main road is in traffic.gd; only the market keeps a parked auto.
+	_auto(0, Vector3(MARKET_X + 1.6, 0.1, -40.0), 0.0)
 	for index in range(6):
 		_scooter(index, Vector3(MARKET_X + (-2.1 if index % 2 == 0 else 2.1), 0.1, -8.0 - index * 4.5), PI / 2 if index % 2 == 0 else -PI / 2)
 

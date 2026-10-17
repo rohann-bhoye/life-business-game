@@ -1,6 +1,7 @@
 extends RefCounted
 
 var volume := 0.8
+var music_volume := 0.6
 var fullscreen := false
 var sensitivity := 0.003
 var invert_y := false
@@ -10,7 +11,7 @@ var graphics := -1
 func load_file(path := "user://settings.cfg") -> void:
 	var config := ConfigFile.new()
 	if config.load(path) != OK: return
-	for field in ["volume", "fullscreen", "sensitivity", "invert_y", "fov", "graphics"]:
+	for field in ["volume", "music_volume", "fullscreen", "sensitivity", "invert_y", "fov", "graphics"]:
 		var value = config.get_value("game", field, get(field))
 		if field in ["fullscreen", "invert_y"]:
 			if value is bool: set(field, value)
@@ -19,18 +20,32 @@ func load_file(path := "user://settings.cfg") -> void:
 			match field:
 				"graphics": graphics = clampi(int(value), -1, 2)
 				"volume": volume = clampf(value, 0, 1)
+				"music_volume": music_volume = clampf(value, 0, 1)
 				"sensitivity": sensitivity = clampf(value, 0.001, 0.01)
 				"fov": fov = clampf(value, 50, 90)
 
 func save_file(path := "user://settings.cfg") -> bool:
 	var config := ConfigFile.new()
-	for field in ["volume", "fullscreen", "sensitivity", "invert_y", "fov", "graphics"]:
+	for field in ["volume", "music_volume", "fullscreen", "sensitivity", "invert_y", "fov", "graphics"]:
 		config.set_value("game", field, get(field))
 	return config.save(path) == OK
+
+## The "Music" audio bus (created on first use) carries background music only.
+static func music_bus() -> int:
+	var index := AudioServer.get_bus_index("Music")
+	if index == -1:
+		AudioServer.add_bus()
+		index = AudioServer.bus_count - 1
+		AudioServer.set_bus_name(index, "Music")
+		AudioServer.set_bus_send(index, "Master")
+	return index
 
 func apply_global() -> void:
 	AudioServer.set_bus_mute(0, volume <= 0)
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(0.001, volume)))
+	var music := music_bus()
+	AudioServer.set_bus_mute(music, music_volume <= 0)
+	AudioServer.set_bus_volume_db(music, linear_to_db(maxf(0.001, music_volume)))
 	if DisplayServer.get_name() != "headless":
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
 

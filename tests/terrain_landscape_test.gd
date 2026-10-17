@@ -56,7 +56,7 @@ func _run() -> void:
 	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(15, 2, 7), Vector3(15, -1, 7)))
 	assert(not hit.is_empty() and is_equal_approx(hit.position.y, 0.1))
 	assert(hit.collider == current_scene.get_node("Ground"))
-	assert(not space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(72, 1, 7), Vector3(76, 1, 7))).is_empty())
+	assert(not space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(30, 1, 7), Vector3(33, 1, 7))).is_empty())
 	var camera := Camera3D.new()
 	current_scene.add_child(camera)
 	camera.current = true

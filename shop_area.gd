@@ -232,7 +232,7 @@ func _update_shop_labels():
 		buy_stock_button.disabled = false
 	hire_worker_button.disabled = business.worker_hired or money < WORKER_HIRING_COST
 	if get_tree().current_scene.get_node("ShopOperations").enabled:
-		hire_worker_button.text = "Staff - Management PC"
+		hire_worker_button.text = "Staff - Shop PC"
 		hire_worker_button.disabled = false
 	worker_label.text = "Worker: Hired" if business.worker_hired else "Worker: Not hired"
 	save_status_label.text = business.save_status
@@ -243,11 +243,11 @@ func _update_shop_labels():
 	pay_bills_button.disabled = not business.can_pay_bills()
 	buy_stock_button.tooltip_text = "Not enough money. Requires %s500." % String.chr(8377) if buy_stock_button.disabled else "Buy 10 stock"
 	if get_tree().current_scene.get_node("ShopOperations").enabled:
-		buy_stock_button.tooltip_text = "Order products at the management PC"
+		buy_stock_button.tooltip_text = "Order products on the shop PC (Wholesale app)"
 	marketing_button.tooltip_text = "Marketing already active" if marketing_active else ("Not enough money. Requires %s200." % String.chr(8377) if marketing_button.disabled else "Start marketing")
 	hire_worker_button.tooltip_text = "Worker already hired" if business.worker_hired else ("Not enough money. Requires %s1,000." % String.chr(8377) if hire_worker_button.disabled else "Hire worker")
 	if get_tree().current_scene.get_node("ShopOperations").enabled:
-		hire_worker_button.tooltip_text = "Hire cashier and stock assistant at the management PC"
+		hire_worker_button.tooltip_text = "Hire staff on the shop PC (Staff app)"
 	pay_bills_button.tooltip_text = "No unpaid bills" if business.unpaid_bills() == 0 else ("Not enough money to pay bills" if pay_bills_button.disabled else "Pay outstanding bills")
 	if not business.worker_hired:
 		worker_status_label.text = "Status: Vacant"

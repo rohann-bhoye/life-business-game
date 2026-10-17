@@ -26,13 +26,13 @@ func _run() -> void:
 	street._physics_process(1)
 	assert(is_equal_approx(street.walkers[0].position.x - start.x, street.WALK_SPEED))
 	assert(street.walkers[0].position.z == start.z)
-	street.walkers[0].position.x = 69.9
+	street.walkers[0].position.x = 28.9
 	street.directions[0] = 1
 	street._physics_process(1)
-	assert(street.walkers[0].position.x == 70 and street.directions[0] == -1)
+	assert(street.walkers[0].position.x == 29 and street.directions[0] == -1)
 	for frame in range(100): street._physics_process(1)
 	for person in street.walkers:
-		assert(absf(person.position.x) <= 70)
+		assert(absf(person.position.x) <= 29)
 		assert(is_equal_approx(person.position.z, 3.9) or is_equal_approx(person.position.z, 10.9))
 		assert(person.get_node("CharacterVisual").body.mesh != null)
 	assert(business.snapshot() == before, "Ambient pedestrians must not change the shop economy")

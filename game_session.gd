@@ -18,6 +18,9 @@ static func new_game(path: String) -> String:
 		if DirAccess.copy_absolute(path + suffix, target) != OK: return "Could not archive existing progress."
 	var state = Backend.new()
 	state.save_path = path
+	# A new shop starts with beginner money (the bank loan helps if it runs short).
+	state.starting_money = Backend.BEGINNER_MONEY
+	state.money = Backend.BEGINNER_MONEY
 	return "" if state.save_progress() else "Could not create a new save."
 
 static func launch_game(tree: SceneTree, path: String, settings_path: String) -> Error:
@@ -26,6 +29,8 @@ static func launch_game(tree: SceneTree, path: String, settings_path: String) ->
 	scene.set_meta("session_save_path", path)
 	scene.set_meta("session_settings_path", settings_path)
 	scene.set_meta("mixed_baskets", true)
+	# Customers walk in along the pavement, shop by type and walk off down the street.
+	scene.set_meta("town_customers", true)
 	return _launch(tree, scene)
 
 static func launch_menu(tree: SceneTree, path: String, settings_path: String) -> Error:

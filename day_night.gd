@@ -40,9 +40,38 @@ func _ready() -> void:
 		if lamp.has_node("Light"): street_lights.append(lamp.get_node("Light"))
 		# Town expansion lamps have no real light, only a glowing pool on the ground.
 		if lamp.has_node("Pool"): light_pools.append(lamp.get_node("Pool"))
+	_build_stars()
 	business.clock_changed.connect(_on_clock_changed)
 	business.changed.connect(_refresh)
 	_refresh()
+
+var stars: MultiMeshInstance3D
+var star_material: StandardMaterial3D
+
+## Night stars: small billboards on a dome far beyond the town (one draw call).
+func _build_stars() -> void:
+	star_material = StandardMaterial3D.new()
+	star_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	star_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	star_material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	star_material.disable_fog = true
+	var quad := QuadMesh.new()
+	quad.material = star_material
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = quad
+	multimesh.instance_count = 360
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 42
+	for index in range(multimesh.instance_count):
+		var direction := Vector3(rng.randf_range(-1, 1), rng.randf_range(0.12, 1), rng.randf_range(-1, 1)).normalized()
+		var size := rng.randf_range(0.7, 1.9)
+		multimesh.set_instance_transform(index, Transform3D(Basis.from_scale(Vector3.ONE * size), direction * 300.0))
+	stars = MultiMeshInstance3D.new()
+	stars.name = "Stars"
+	stars.multimesh = multimesh
+	stars.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(stars)
 
 func _on_clock_changed() -> void:
 	if floori(business.minutes_of_day) != last_minute:
@@ -65,13 +94,13 @@ func _refresh() -> void:
 	moon.light_energy = 0.16 * (1.0 - daylight)
 	environment.ambient_light_energy = lerpf(0.14, 0.4, daylight)
 	environment.ambient_light_color = Color(0.5, 0.64, 0.82).lerp(Color(0.84, 0.9, 1), daylight)
-	environment.background_energy_multiplier = lerpf(0.18, 0.9, daylight)
+	environment.background_energy_multiplier = lerpf(0.4, 0.9, daylight)
 	environment.fog_enabled = not low_quality
 	environment.fog_light_color = Color(0.18, 0.23, 0.31).lerp(Color(0.52, 0.69, 0.85), daylight)
 	environment.fog_light_energy = lerpf(0.35, 0.7, daylight)
 	environment.fog_density = lerpf(0.003, 0.0006, daylight)
-	sky_material.sky_top_color = Color(0.025, 0.045, 0.085).lerp(Color(0.3, 0.52, 0.75), daylight)
-	var horizon := Color(0.08, 0.12, 0.18).lerp(Color(0.77, 0.86, 0.9), daylight)
+	sky_material.sky_top_color = Color(0.03, 0.06, 0.16).lerp(Color(0.3, 0.52, 0.75), daylight)
+	var horizon := Color(0.1, 0.15, 0.27).lerp(Color(0.77, 0.86, 0.9), daylight)
 	horizon = horizon.lerp(Color(0.88, 0.43, 0.26), twilight * 0.65)
 	sky_material.sky_horizon_color = horizon
 	sky_material.ground_horizon_color = horizon
@@ -94,5 +123,7 @@ func _refresh() -> void:
 		light.visible = streetlights_on
 	for material in lamp_materials:
 		material.emission_enabled = streetlights_on
-		material.emission_energy_multiplier = 1.8 if streetlights_on else 0.0
+		material.emission_energy_multiplier = 3.0 if streetlights_on else 0.0
 	interior_light.visible = streetlights_on and business.house_owned
+	star_material.albedo_color = Color(1, 1, 1, (1.0 - daylight) * (0.25 if business.is_raining() else 0.9))
+	stars.visible = daylight < 0.9

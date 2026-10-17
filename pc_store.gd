@@ -35,9 +35,12 @@ func setup(business_ref, money_formatter: Callable) -> void:
 	format_money = money_formatter
 	name = "WholesaleStore"
 	size = SIZE
-	theme = Theme.new()
-	theme.default_font_size = 15
-	KenneyTheme.apply(theme)
+	# Fill the theme before assigning it: every change to an assigned theme re-themes
+	# the whole page on the next frame (that made loading the game take ~20 s longer).
+	var page_theme := Theme.new()
+	page_theme.default_font_size = 15
+	KenneyTheme.apply(page_theme)
+	theme = page_theme
 	add_theme_stylebox_override("panel", _flat(Color("f3f4f6"), 12))
 	_build_header()
 	_build_sidebar()

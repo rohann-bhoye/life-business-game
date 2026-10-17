@@ -141,7 +141,9 @@ func open(business_ref, money_format := Callable()) -> bool:
 	if business.loan_left() > 0: status_label.text += "\nBank loan left: %s (%s per day)" % [_money(business.loan_left()), _money(business.loan_daily_payment())]
 	var next_day: int = business.day
 	tomorrow.text = "Tomorrow: Day %d  |  Forecast: %s" % [next_day, "Rain (more customers stay home)" if business.weather_for_day(next_day) == "rain" else "Sunny"]
-	if business.rival_open(): tomorrow.text += "  |  Sharma General Store is open nearby"
+	var sale: Dictionary = business.rival_sale()
+	if not sale.is_empty(): tomorrow.text += "\nSharma's sale: %s for %s (was %s). Match it to keep customers." % [Catalog.NAMES[sale.id], _money(int(sale.price)), _money(business.rival_price(sale.id))]
+	elif business.rival_open(): tomorrow.text += "  |  Sharma General Store is open nearby"
 	tip.text = _tip(report)
 	start_button.text = "START DAY %d" % next_day
 	move_to_front()

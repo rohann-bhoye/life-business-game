@@ -42,6 +42,9 @@ func refresh() -> void:
 		if business.farm.ready(index, business.farm_time()): ready_beds += 1
 	if ready_beds > 0:
 		next["farm_ready"] = _entry("Crops ready to harvest", "%d farm %s ready. Carry produce to storage or shop shelves." % [ready_beds, "bed" if ready_beds == 1 else "beds"])
+	var sale: Dictionary = business.rival_sale()
+	if not sale.is_empty() and business.product_stock(sale.id) > 0 and business.product_price(sale.id) > int(sale.price):
+		next["rival_sale"] = _entry("Sharma's sale: %s %s%d" % [business.Catalog.NAMES[sale.id], String.chr(8377), sale.price], "You charge %s%d. Match it on the shop PC: Shop > Orders > Match, or customers go to Sharma." % [String.chr(8377), business.product_price(sale.id)], "", true)
 	if business.rival_open() and business.price_index() > 1.05:
 		next["rival"] = _entry("Customers prefer %s" % business.RIVAL_NAME, "Your prices are %d%% higher. Lower prices or raise your reputation." % roundi((business.price_index() - 1.0) * 100.0), "", true)
 	if business.loan_left() > 0 and business.loan_missed_payments > 0:
@@ -62,7 +65,7 @@ func refresh() -> void:
 		if id != "bottle" and business.inventory[id].purchased == 0: continue
 		var stock: int = business.product_stock(id)
 		if stock <= 2:
-			var detail := "Order more at the management PC."
+			var detail := "Order more on the shop PC: Wholesale."
 			if business.incoming_boxes.any(func(box): return box.product == id): detail = "Delivery is on the way."
 			elif business.queued_boxes.any(func(box): return box.product == id) or (business.pending_product == id and business.boxed_stock > 0): detail = "Box in the product bay outside the warehouse."
 			elif business.pending_product == id and business.carried_stock + business.worker_carried_stock > 0: detail = "A box is waiting to be shelved."

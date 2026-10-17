@@ -25,6 +25,23 @@ func _key(code: Key) -> void:
 	event.keycode = code
 	root.push_input(event)
 
+## The loading screen covers the scene change, then waits paused for any key and
+## fades out with a welcome message.
+func _through_loading(expected: String) -> void:
+	var loading = root.get_node_or_null("LoadingScreen")
+	assert(loading != null and loading.info.text.begins_with(expected), "Loading screen must show the save line")
+	assert(loading.get_index() == root.get_child_count() - 1, "Loading screen must take input before the game")
+	for frame in range(900):
+		if loading.stage == "ready": break
+		await process_frame
+	assert(loading.stage == "ready" and paused and loading.ready_label.visible and not loading.tip_label.text.is_empty())
+	await _capture("loading_ready_%s" % expected.split(" ")[0].to_lower())
+	await _key(KEY_SPACE)
+	assert(not paused and loading.stage == "done")
+	assert(current_scene.get_node("Ui").feedback_label.text.begins_with("Welcome"))
+	await create_timer(0.7).timeout
+	assert(root.get_node_or_null("LoadingScreen") == null)
+
 func _stop_game() -> void:
 	current_scene.get_node("DayClock").set_process(false)
 	current_scene.get_node("CustomerSpawner/SpawnTimer").stop()
@@ -67,12 +84,14 @@ func _run() -> void:
 	settings._apply()
 	assert(not settings.visible and menu.content.visible and FileAccess.file_exists(settings_path))
 	menu.new_button.pressed.emit()
+	assert(root.get_node_or_null("LoadingScreen") != null and menu.launching)
 	await scene_changed
 	await process_frame
 	_stop_game()
+	await _through_loading("New shop")
 	var shop = current_scene.get_node("Shop/ShopArea")
 	var player = current_scene.get_node("Player")
-	assert(shop.money == 50000 and shop.stock == 10 and shop.business.save_path == save_path)
+	assert(shop.money == 10000 and shop.business.starting_money == 10000 and shop.stock == 10 and shop.business.save_path == save_path, "New Game starts with beginner money")
 	assert(player.mouse_sensitivity == 0.006 and player.invert_y and player.camera.fov == 68)
 	assert(not current_scene.get_node("DirectionalLight3D").shadow_enabled, "Default Low preset must disable sun shadows")
 	assert(current_scene.get_meta("session_settings_path") == settings_path)
@@ -125,6 +144,7 @@ func _run() -> void:
 	await scene_changed
 	await process_frame
 	_stop_game()
+	await _through_loading("Continue")
 	shop = current_scene.get_node("Shop/ShopArea")
 	assert(shop.money == money and shop.business.incoming_boxes.size() == 2)
 	current_scene.get_node("Ui/PauseMenu").open_menu()
@@ -137,8 +157,9 @@ func _run() -> void:
 	await scene_changed
 	await process_frame
 	_stop_game()
+	await _through_loading("New shop")
 	shop = current_scene.get_node("Shop/ShopArea")
-	assert(shop.money == 50000 and shop.stock == 10 and shop.business.incoming_boxes.is_empty())
+	assert(shop.money == 10000 and shop.stock == 10 and shop.business.incoming_boxes.is_empty())
 	var history := DirAccess.open(directory.path_join("save_history"))
 	assert(history != null and history.get_files().size() > 0)
 	var found_old := false

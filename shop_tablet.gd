@@ -1,6 +1,12 @@
 extends Node3D
 
 const DISTANCE := 0.9
+const KenneyTheme := preload("res://kenney_theme.gd")
+# Tablet look, drawn on the screen panel behind its controls (no extra nodes, so
+# the layout stays exactly the shop menu's): teal header, light page, white cards.
+const HEADER := Color("0f766e")
+const PAGE := Color("eef2f4")
+const STAT_ACCENTS := [Color("2563eb"), Color("16a34a"), Color("ea580c"), Color("15803d"), Color("7c3aed"), Color("dc2626")]
 var ui: CanvasLayer
 var source: Panel
 var screen_viewport: SubViewport
@@ -29,6 +35,12 @@ func configure(owner_ui: CanvasLayer) -> void:
 	screen_menu.modulate = Color.WHITE
 	screen_viewport.add_child(screen_menu)
 	_bind(source, screen_menu)
+	screen_menu.draw.connect(_draw_chrome)
+	for node_name in ["TitleLabel", "MoneyLabel", "StockLabel"]:
+		screen_menu.get_node(node_name).add_theme_color_override("font_color", Color.WHITE)
+	screen_menu.get_node("TitleLabel").add_theme_font_override("font", KenneyTheme.heading_font())
+	screen_menu.get_node("SectionLabel").add_theme_font_override("font", KenneyTheme.heading_font())
+	screen_menu.get_node("SectionLabel").add_theme_color_override("font_color", HEADER)
 	for pair in pairs:
 		pair[0].mouse_filter = Control.MOUSE_FILTER_IGNORE
 		pair[0].focus_mode = Control.FOCUS_NONE
@@ -193,7 +205,40 @@ func sync_controls() -> void:
 		elif original is TabBar:
 			copy.current_tab = original.current_tab
 		copy.size = original.size
+	# The header bar replaces the divider line; the section title sits on the card.
+	screen_menu.get_node("HeaderDivider").hide()
+	screen_menu.get_node("SectionLabel").modulate = Color.WHITE
+	screen_menu.get_node("StockLabel").horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	screen_menu.queue_redraw()
 	syncing = false
+
+func _rounded(colour: Color, radius: int, border := Color.TRANSPARENT) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = colour
+	style.set_corner_radius_all(radius)
+	if border.a > 0:
+		style.border_color = border
+		style.set_border_width_all(1)
+	return style
+
+func _draw_chrome() -> void:
+	var size := screen_menu.size
+	var tab: int = ui.selected_tab
+	screen_menu.draw_style_box(_rounded(PAGE, 14), Rect2(Vector2.ZERO, size))
+	var header := _rounded(HEADER, 14)
+	header.corner_radius_bottom_left = 0
+	header.corner_radius_bottom_right = 0
+	screen_menu.draw_style_box(header, Rect2(0, 0, size.x, 112))
+	var wide := size.x >= 600
+	if tab == 0 and wide:
+		# Business summary as six stat tiles with a coloured edge.
+		for index in range(6):
+			var label := screen_menu.get_node(ui.TAB_CONTROLS[0][index]) as Control
+			var rect := Rect2(label.position - Vector2(12, 12), Vector2(label.size.x + 16, 56))
+			screen_menu.draw_style_box(_rounded(Color.WHITE, 10, Color("dbe3e7")), rect)
+			screen_menu.draw_rect(Rect2(rect.position + Vector2(0, 8), Vector2(5, rect.size.y - 16)), STAT_ACCENTS[index])
+	else:
+		screen_menu.draw_style_box(_rounded(Color.WHITE, 12, Color("dbe3e7")), Rect2(12, 180, size.x - 24, 362))
 
 func commit_input() -> void:
 	if not is_instance_valid(screen_menu): return

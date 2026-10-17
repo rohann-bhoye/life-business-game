@@ -67,6 +67,9 @@ func _ready() -> void:
 	retail_price.prefix = String.chr(8377)
 	add_child(retail_price)
 	retail_price.value_changed.connect(func(value): shop.business.set_product_price(Catalog.IDS[product_input.selected], int(value)))
+	# Price war: Sharma's price for the selected product today, and a quick match.
+	ui._label("RivalPriceLabel", self).clip_text = true
+	_button("MatchSharmaButton", _match_sharma).text = "Match"
 	money_label = ui._label("MoneyLabel", self)
 	status_label = ui._label("OrderStatusLabel", self)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -205,7 +208,7 @@ func _button(node_name: String, action: Callable) -> Button:
 
 func _select_tab(index: int) -> void:
 	selected_tab = index
-	for node_name in ["ProductSelector", "ProductLabel", "PriceLabel", "OrderStatusLabel", "OrderButton", "RetailPriceLabel", "RetailPriceInput", "BoxQuantityLabel", "BoxQuantityInput"]:
+	for node_name in ["ProductSelector", "ProductLabel", "PriceLabel", "OrderStatusLabel", "OrderButton", "RetailPriceLabel", "RetailPriceInput", "BoxQuantityLabel", "BoxQuantityInput", "RivalPriceLabel", "MatchSharmaButton"]:
 		get_node(node_name).visible = index == 0
 	for node_name in ["EmployeeRole", "ContractLabel", "ShiftLabel", "ShiftToLabel", "ShiftStartHour", "ShiftEndHour", "ApplyShiftButton"]:
 		get_node(node_name).visible = index == 1
@@ -265,10 +268,13 @@ func _layout() -> void:
 	ui._place(get_node("BoxQuantityLabel"), 16, 194, 100, 30)
 	ui._place(box_quantity, 120, 194, width - 136, 30)
 	ui._place(get_node("PriceLabel"), 16, 230, width - 32, 24)
-	ui._place(status_label, 16, 258, width - 32, 48)
-	ui._place(order_button, 16, 314, width - 32, 32)
-	ui._place(get_node("RetailPriceLabel"), 16, 354, 100, 30)
-	ui._place(retail_price, 120, 354, width - 136, 30)
+	ui._place(status_label, 16, 256, width - 32, 44)
+	ui._place(order_button, 16, 302, width - 32, 32)
+	ui._place(get_node("RetailPriceLabel"), 16, 340, 100, 30)
+	ui._place(retail_price, 120, 340, width - 136, 30)
+	# Ends at 404: fits the 408 px window on 640x480 screens.
+	ui._place(get_node("RivalPriceLabel"), 16, 376, width - 140, 26)
+	ui._place(get_node("MatchSharmaButton"), width - 116, 376, 100, 28)
 	ui._place(role_input, 16, 126, width - 32, 32)
 	ui._place(cashier_label, 16, 166, width - 32, 24)
 	ui._place(stock_worker_label, 16, 166, width - 32, 24)
@@ -320,7 +326,7 @@ func _layout() -> void:
 		ui._place(company_column.get_node("CompanyHeading"), 0, 0, 176, 24)
 		ui._place(company_list, 0, 34, 176, 144)
 		company_list.select(0 if selected_tab == 0 else 1)
-		for node_name in ["ProductSelector", "ProductLabel", "PriceLabel", "OrderStatusLabel", "OrderButton", "RetailPriceLabel", "RetailPriceInput", "BoxQuantityLabel", "BoxQuantityInput", "RackProductSelector", "FurnitureQuoteLabel", "BuyRackButton", "RackDeliveryLabel", "RackSelector", "RackInfoLabel", "MoveRackButton", "SetRestockRackButton", "PackRackButton"]:
+		for node_name in ["ProductSelector", "ProductLabel", "PriceLabel", "OrderStatusLabel", "OrderButton", "RetailPriceLabel", "RetailPriceInput", "BoxQuantityLabel", "BoxQuantityInput", "RivalPriceLabel", "RackProductSelector", "FurnitureQuoteLabel", "BuyRackButton", "RackDeliveryLabel", "RackSelector", "RackInfoLabel", "MoveRackButton", "SetRestockRackButton", "PackRackButton"]:
 			var control: Control = get_node(node_name)
 			control.position.x += 192
 			if node_name not in ["RetailPriceLabel", "BoxQuantityLabel"]: control.size.x -= 192
@@ -345,6 +351,9 @@ func _refresh() -> void:
 	var product: String = Catalog.IDS[product_input.selected]
 	var quantity := int(box_quantity.value)
 	get_node("ProductLabel").text = "Shelf: %d | Warehouse: %d | Box of 10" % [business.product_stock(product), business.logistics.stored_units(product)]
+	var sharma: int = business.rival_price_today(product)
+	get_node("RivalPriceLabel").text = ("Sharma: %s%d%s" % [String.chr(8377), sharma, " (SALE)" if business.rival_sale().get("id", "") == product else ""]) if business.rival_open() else "Sharma opens day %d" % business.RIVAL_OPEN_DAY
+	get_node("MatchSharmaButton").disabled = not business.rival_open() or business.product_price(product) <= sharma or sharma % 10 != 0
 	var order_total: int = business.order_cost(product, quantity)
 	var bulk: bool = quantity >= business.BULK_BOXES
 	get_node("PriceLabel").text = ("%d items | Total: %s%s (10%% bulk discount)" if bulk else "%d items | Total: %s%s | 5+ boxes: 10%% off") % [quantity * 10, String.chr(8377), shop._format_money(order_total)]
@@ -392,7 +401,7 @@ func _refresh() -> void:
 	else:
 		status_label.text = "Ready to order" if business.money >= Catalog.COSTS[product] else "Not enough money"
 	if business.supply_box_count() > 1:
-		status_label.text = "%d in transit | %d boxes outside\n%s" % [business.incoming_boxes.size(), business.queued_boxes.size() + (1 if business.boxed_stock > 0 else 0), "Handling: " + Catalog.NAMES[business.pending_product] if business.carried_stock + business.worker_carried_stock > 0 else "Ready for pickup"]
+		status_label.text = "%d in transit | %d outside | %s" % [business.incoming_boxes.size(), business.queued_boxes.size() + (1 if business.boxed_stock > 0 else 0), "Handling: " + Catalog.NAMES[business.pending_product] if business.carried_stock + business.worker_carried_stock > 0 else "Ready for pickup"]
 
 func open_menu(from_warehouse := false) -> void:
 	shop.sale_price_input.apply()
@@ -422,6 +431,11 @@ func _order() -> void:
 	if shop.business.order_stock(product, int(box_quantity.value)):
 		ui.show_feedback("Ordered %d %s: %s." % [int(box_quantity.value), "box" if int(box_quantity.value) == 1 else "boxes", Catalog.NAMES[product]])
 	else: ui.show_feedback("Cannot order: check funds or supply limit.", true)
+	_refresh()
+
+func _match_sharma() -> void:
+	var product: String = Catalog.IDS[product_input.selected]
+	if shop.business.set_product_price(product, shop.business.rival_price_today(product)): _load_product()
 	_refresh()
 
 func _load_product() -> void:

@@ -81,6 +81,54 @@ func _run() -> void:
 	market.customer_reviews.reputation = 100
 	assert(market.rival_traffic_factor() >= 0.85)
 
+	# --- Beginner money: New Game starts small; older saves (no field) keep 50,000 ---
+	var beginner = Backend.new()
+	beginner.save_path = _path()
+	beginner.starting_money = Backend.BEGINNER_MONEY
+	beginner.money = Backend.BEGINNER_MONEY
+	assert(beginner.save_progress())
+	var reloaded = Backend.new()
+	reloaded.load_progress(beginner.save_path)
+	assert(reloaded.save_status == "Save: Loaded" and reloaded.money == 10000 and reloaded.starting_money == 10000)
+	var legacy: Dictionary = Backend.new().snapshot()
+	legacy.erase("starting_money")
+	assert(beginner._is_valid_snapshot(legacy), "Saves from before keep their 50,000 start")
+	var cheat: Dictionary = reloaded.snapshot()
+	cheat.starting_money = 99999
+	cheat.money = 99999
+	assert(not beginner._is_valid_snapshot(cheat), "Only real starting amounts are accepted")
+
+	# --- Price war: Sharma's deterministic daily sale ---
+	assert(Backend.rival_sale_for_day(2).is_empty())
+	var sale_days := 0
+	for day_number in range(3, 43):
+		var offer: Dictionary = Backend.rival_sale_for_day(day_number)
+		assert(offer == Backend.rival_sale_for_day(day_number), "The daily sale is deterministic")
+		if offer.is_empty(): continue
+		sale_days += 1
+		assert(offer.cut in [10, 20] and offer.price == Backend.rival_price(offer.id) - offer.cut and offer.price >= 50, str(offer))
+	assert(sale_days > 15 and sale_days < 40, "Sharma runs a sale on most days, not every day")
+	var sale_day := 3
+	while Backend.rival_sale_for_day(sale_day).is_empty(): sale_day += 1
+	market.day = sale_day
+	var today: Dictionary = market.rival_sale()
+	for id in market.Catalog.IDS:
+		assert(market.rival_price_today(id) == (today.price if id == today.id else Backend.rival_price(id)))
+
+	# --- Music volume setting and the Music bus ---
+	var Settings := preload("res://game_settings.gd")
+	var settings_path := OS.get_environment("TEMP").path_join("economy_settings_%d.cfg" % Time.get_ticks_usec())
+	var settings = Settings.new()
+	settings.music_volume = 0.25
+	assert(settings.save_file(settings_path))
+	var loaded = Settings.new()
+	loaded.load_file(settings_path)
+	assert(is_equal_approx(loaded.music_volume, 0.25))
+	loaded.apply_global()
+	var music_bus := AudioServer.get_bus_index("Music")
+	assert(music_bus > 0 and is_equal_approx(AudioServer.get_bus_volume_db(music_bus), linear_to_db(0.25)))
+	DirAccess.remove_absolute(settings_path)
+
 	# --- In the game ---
 	var fixture = load("res://main.tscn.tscn").instantiate()
 	fixture.get_node("Shop/ShopArea").save_path = _path()
@@ -97,11 +145,23 @@ func _run() -> void:
 	var audio = current_scene.get_node("WorldAudio")
 	assert(audio.music.stream != null and audio.ambience.stream != null and audio.rain.stream != null)
 	assert(audio.music.stream.loop_mode == AudioStreamWAV.LOOP_FORWARD)
+	# One continuous music player under the root, shared with the lobby.
+	assert(audio.music == root.get_node("BackgroundMusic") and audio.music.bus == "Music")
+	assert(audio.music.stream.resource_path.ends_with("music_nature.wav") and audio.night_ambience.stream.loop_mode == AudioStreamWAV.LOOP_FORWARD)
 	assert(current_scene.get_node("Ui/ClockLabel").text.ends_with("Sunny") or not current_scene.get_node("DayClock").is_processing())
 	var rival: Node3D = current_scene.get_node("Neighbourhood/RivalStore")
 	assert(not rival.visible)
 	business.advance_clock(2 * 1440.0)
 	assert(rival.visible, "Sharma store opens on day 3")
+	# Orders > Sale price shows Sharma's price and matches his sale in one click.
+	var supplier = current_scene.get_node("Ui").supplier_menu
+	var offer_today: Dictionary = business.rival_sale()
+	if not offer_today.is_empty():
+		supplier.product_input.select(business.Catalog.IDS.find(offer_today.id))
+		supplier._refresh()
+		assert(supplier.get_node("RivalPriceLabel").text.contains("SALE") and not supplier.get_node("MatchSharmaButton").disabled)
+		supplier.get_node("MatchSharmaButton").pressed.emit()
+		assert(business.product_price(offer_today.id) == offer_today.price)
 	var terminal = current_scene.get_node("ShopOperations").pc.get_node("ComputerTerminal")
 	terminal.open(true)
 	for frame in range(10): await process_frame
@@ -117,5 +177,5 @@ func _run() -> void:
 	for path in paths:
 		for suffix in ["", ".bak", ".tmp"]:
 			if FileAccess.file_exists(path + suffix): DirAccess.remove_absolute(path + suffix)
-	print("PASS: bank loan instalments/repay/validation, deterministic rain weather with traffic and farm effects, rival store pricing, music/rain/bank wiring")
+	print("PASS: bank loan instalments/repay/validation, deterministic rain weather with traffic and farm effects, rival store pricing, Sharma daily sale and Match, music volume bus and continuous nature music, rain/bank wiring")
 	quit()

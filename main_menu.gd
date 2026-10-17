@@ -1,6 +1,7 @@
 extends Control
 
 const Session := preload("res://game_session.gd")
+const LoadingScreen := preload("res://loading_screen.gd")
 const Settings := preload("res://game_settings.gd")
 const SettingsMenu := preload("res://settings_menu.gd")
 const MenuSkin := preload("res://menu_skin.gd")
@@ -18,13 +19,12 @@ var version_label: Label
 var lobby_panel: Panel
 var news_panel: Panel
 var launching := false
-var waiting_for_game := false
 const GAME_SCENE := "res://main.tscn.tscn"
 
 const KenneyTheme := preload("res://kenney_theme.gd")
 const CREDITS := "Made by Bucketstudy team"
-const VERSION := "Development Demo | v0.6"
-const WHATS_NEW := ["Your own family home with a bedroom, kitchen and TV", "APNA Wholesale online store on the shop PC", "Grow tomatoes, carrots, cabbage, corn and apples", "Hire Kiran to run the farm for you", "Customers now buy mixed baskets", "End-of-day report and reputation bonus"]
+const VERSION := "Development Demo | v0.7"
+const WHATS_NEW := ["Traffic: autos, scooters, a car and a bus", "Night life: stars, lamps, shops close", "Sharma price war: daily sales, Match button", "Calm nature music + music volume", "End-of-day report: profit or loss", "Beginner start: ₹10,000 for a new shop"]
 
 ## Lobby look: Kenney buttons (green / blue / grey / red) on dark glass panels,
 ## white labels, dark text on grey buttons.
@@ -46,16 +46,11 @@ func _ready() -> void:
 	if not ResourceLoader.has_cached(GAME_SCENE): ResourceLoader.load_threaded_request(GAME_SCENE, "", true)
 	get_tree().root.content_scale_size = Vector2i.ZERO
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	var music := AudioStreamPlayer.new()
-	music.name = "LobbyMusic"
-	music.stream = load("res://assets/audio/generated/music_lobby.wav")
-	music.volume_db = -14.0
-	add_child(music)
-	if DisplayServer.get_name() != "headless": music.play()
 	theme = make_theme()
 	var settings = Settings.new()
 	settings.load_file(settings_path)
 	settings.apply_global()
+	preload("res://background_music.gd").ensure(get_tree())
 	var background := TextureRect.new()
 	background.name = "ShopBackground"
 	background.texture = load("res://assets/ui/main_menu_shop_v2.png")
@@ -213,9 +208,13 @@ func _layout() -> void:
 	lobby_panel.size = content.size + Vector2(56, 48)
 	# News card only when there is room beside the menu.
 	news_panel.visible = viewport_size.x >= 900 and viewport_size.y >= 560 and content.visible
-	news_panel.size = Vector2(minf(380, viewport_size.x - 520), 300)
+	var items: Label = news_panel.get_node("Items")
+	var width := minf(380, viewport_size.x - 520)
+	items.size = Vector2(width - 40, 0)
+	# Grow with the list so longer news never spills out of the card.
+	news_panel.size = Vector2(width, minf(viewport_size.y - 96, 72 + items.get_combined_minimum_size().y))
 	news_panel.position = Vector2(viewport_size.x - news_panel.size.x - 48, 48)
-	news_panel.get_node("Items").size = Vector2(news_panel.size.x - 40, news_panel.size.y - 64)
+	items.size = Vector2(width - 40, news_panel.size.y - 64)
 	footer.position = Vector2(24 if compact else 64, viewport_size.y - 36)
 	footer.size = Vector2(maxf(0, viewport_size.x - 48), 26)
 	version_label.size = Vector2(260, 22)
@@ -296,7 +295,8 @@ func _continue() -> void:
 	if launching: return
 	_refresh_save()
 	if continue_button.disabled: return
-	_start_game()
+	var state = Session.save_summary(save_path).state
+	_start_game("Continue  |  Slot %d  |  Day %d  |  %s%s" % [slot, state.day, String.chr(8377), _money(state.money)], "Welcome back! Day %d, %02d:%02d. Good luck today." % [state.day, int(state.minutes_of_day) / 60, int(state.minutes_of_day) % 60])
 
 func _request_new() -> void:
 	if launching: return
@@ -313,28 +313,30 @@ func _new_game() -> void:
 		_cancel_new()
 		status_label.text = error
 		return
-	_start_game()
+	_start_game("New shop  |  Slot %d  |  Day 1  |  %s%s" % [slot, String.chr(8377), _money(Session.Backend.BEGINNER_MONEY)], "Welcome to your new shop! Follow the First Day guide to get started.")
 
-func _start_game() -> void:
+static func _money(value: int) -> String:
+	var digits := str(absi(value))
+	var result := ""
+	for index in range(digits.length()):
+		if index > 0 and (digits.length() - index) % 3 == 0: result += ","
+		result += digits[index]
+	return ("-" if value < 0 else "") + result
+
+# The game scene loads on a background thread from the moment the menu opens; the
+# loading screen shows that progress, covers the scene change and waits for a key.
+func _start_game(summary: String, greeting: String) -> void:
 	launching = true
-	waiting_for_game = true
 	status_label.text = "Loading game..."
-
-# The game scene loads on a background thread from the moment the menu opens,
-# so Continue/New Game show progress instead of freezing the window.
-func _process(_delta: float) -> void:
-	if not waiting_for_game: return
-	var progress := []
-	var status := ResourceLoader.load_threaded_get_status(GAME_SCENE, progress)
-	if status == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
-		status_label.text = "Loading game... %d%%" % int(100.0 * float(progress[0]))
-		return
-	waiting_for_game = false
-	if status == ResourceLoader.THREAD_LOAD_LOADED: ResourceLoader.load_threaded_get(GAME_SCENE)
-	var error := Session.launch_game(get_tree(), save_path, settings_path)
-	if error != OK:
+	var tree := get_tree()
+	var path := save_path
+	var settings := settings_path
+	var loading = LoadingScreen.new()
+	tree.root.add_child(loading)
+	loading.failed.connect(func():
 		launching = false
-		status_label.text = "Could not start the game."
+		status_label.text = "Could not start the game.")
+	loading.begin(func(): return Session.launch_game(tree, path, settings), summary, greeting)
 
 func _cancel_new() -> void:
 	confirmation.hide()

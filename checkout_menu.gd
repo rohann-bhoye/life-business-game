@@ -73,11 +73,13 @@ func close_menu() -> void:
 
 func _refresh() -> void:
 	scan_button.disabled = true
-	scan_button.show()
 	pay_button.disabled = true
 	scan_button.text = "Aim at each item and press E"
 	pay_button.text = "Awaiting scanned items"
-	for button in payment_buttons.values(): button.disabled = true
+	var paying: bool = is_instance_valid(customer) and customer == operations.checkout_customer() and customer.state == customer.State.PAYING
+	scan_button.visible = not paying
+	# Runs every frame: flipping disabled off and on would cancel a click mid-press.
+	for button in payment_buttons.values(): button.disabled = not paying
 	if not is_instance_valid(customer) or customer != operations.checkout_customer():
 		customer_label.text = "Waiting for customer"
 		items_label.text = "Items: 0"
@@ -92,12 +94,10 @@ func _refresh() -> void:
 		payment_label.text = "Use the counter scanner"
 		scan_button.text = "Close, aim at item %d / %d, press E" % [customer.scanned_count + 1, customer.total_items()]
 	elif customer.state == customer.State.PAYING:
-		scan_button.hide()
 		payment_label.text = "Customer presents: %s" % customer.payment_method
 		if customer.payment_method == "Cash":
 			payment_label.text += "\nReceived: %s%d | Change: %s%d" % [String.chr(8377), customer.cash_tendered, String.chr(8377), customer.change_due()]
 		pay_button.text = "Choose the matching payment below"
-		for button in payment_buttons.values(): button.disabled = false
 		if wrong_payment_seconds > 0.0:
 			payment_label.text += "\nWrong method. Select %s." % customer.payment_method
 			payment_label.modulate = Color(1.0, 0.55, 0.5)

@@ -31,11 +31,12 @@ func _ready() -> void:
 	world_audio.set_script(preload("res://world_audio.gd"))
 	get_parent().add_child.call_deferred(world_audio)
 	add_child(street_life)
-	# Town edge (the town was enlarged to x +-74, z -55..59).
-	for x in [-74.0, 74.0]:
-		_collider("BoundaryX%s" % x, self, Vector3(0.3, 5, 116), Vector3(x, 2.5, 2))
-	for z in [-55.0, 59.0]:
-		_collider("BoundaryZ%s" % z, self, Vector3(148, 5, 0.3), Vector3(0, 2.5, z))
+	# Edge of the open town (the old 64 m map); town_boundary.gd shows the see-through
+	# barrier and sends the player home. The land beyond opens in a later phase.
+	for x in [-31.5, 31.5]:
+		_collider("BoundaryX%s" % x, self, Vector3(0.3, 5, 64), Vector3(x, 2.5, 0))
+	for z in [-31.5, 31.5]:
+		_collider("BoundaryZ%s" % z, self, Vector3(64, 5, 0.3), Vector3(0, 2.5, z))
 
 func set_quality(quality: int) -> void:
 	var show_scenery := quality > 0
@@ -49,6 +50,8 @@ func set_quality(quality: int) -> void:
 	if street_life != null:
 		street_life.visible = show_scenery
 		street_life.set_physics_process(show_scenery)
+	var traffic := get_node_or_null("Traffic")
+	if traffic != null: traffic.set_quality(quality)
 
 func _material(color: Color) -> StandardMaterial3D:
 	if not materials.has(color):
@@ -296,7 +299,7 @@ var light_pool_material: StandardMaterial3D
 func _light_pool_material() -> StandardMaterial3D:
 	if light_pool_material != null: return light_pool_material
 	var gradient := Gradient.new()
-	gradient.set_color(0, Color(1, 0.85, 0.55, 0.55))
+	gradient.set_color(0, Color(1, 0.85, 0.55, 0.8))
 	gradient.set_color(1, Color(1, 0.85, 0.55, 0.0))
 	var texture := GradientTexture2D.new()
 	texture.gradient = gradient
@@ -340,10 +343,16 @@ func _build_background() -> void:
 	expansion.set_script(preload("res://town_expansion.gd"))
 	add_child(expansion)
 	expansion.build(self)
-	var rival_life := Node3D.new()
-	rival_life.set_script(preload("res://rival_shop.gd"))
-	add_child(rival_life)
-	rival_life.build(self, get_parent().get_node("Shop/ShopArea").business)
+	# Town life (Sharma shop, moving traffic, night) built after the scenery it uses.
+	for script in [preload("res://rival_shop.gd"), preload("res://traffic.gd"), preload("res://night_life.gd")]:
+		var life := Node3D.new()
+		life.set_script(script)
+		add_child(life)
+		life.build(self, get_parent().get_node("Shop/ShopArea").business)
+	var boundary := Node3D.new()
+	boundary.set_script(preload("res://town_boundary.gd"))
+	add_child(boundary)
+	boundary.build(self)
 
 # Show Kenney City Kit Suburban houses in place of the block buildings. The
 # original box colliders stay; only their visible meshes are hidden.

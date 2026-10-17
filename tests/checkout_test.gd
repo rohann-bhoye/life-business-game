@@ -35,6 +35,21 @@ func _press_e() -> void:
 	event.keycode = KEY_E
 	root.push_input(event)
 
+## A real mouse click whose press and release land on different frames.
+func _click(button: Button) -> void:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.position = button.get_global_rect().get_center()
+	event.global_position = event.position
+	event.pressed = true
+	Input.parse_input_event(event)
+	await process_frame
+	await process_frame
+	event = event.duplicate()
+	event.pressed = false
+	Input.parse_input_event(event)
+	await process_frame
+
 func _stop() -> void:
 	current_scene.get_node("DayClock").set_process(false)
 	current_scene.get_node("CustomerSpawner/SpawnTimer").stop()
@@ -150,12 +165,12 @@ func _run() -> void:
 		var total: int = visitor.payment_total()
 		var reviews_before: int = shop.business.customer_reviews.review_count
 		var wrong_method: String = ["Card", "UPI", "Cash"][index]
-		ui.checkout_menu.payment_buttons[wrong_method].pressed.emit()
+		await _click(ui.checkout_menu.payment_buttons[wrong_method])
 		assert(visitor.state == visitor.State.PAYING and ui.checkout_menu.visible)
 		assert(ui.checkout_menu.payment_label.text.contains("Wrong method"))
 		assert(shop.money == before_money and shop.stock == before_stock)
 		assert(shop.business.customer_reviews.review_count == reviews_before)
-		ui.checkout_menu.payment_buttons[visitor.payment_method].pressed.emit()
+		await _click(ui.checkout_menu.payment_buttons[visitor.payment_method])
 		assert(shop.money == before_money + total and shop.stock == before_stock - visitor.basket_count)
 		assert(ui.hud_money.text == shop.money_label.text)
 		assert(ui.feedback_label.text.begins_with("Receipt:"))

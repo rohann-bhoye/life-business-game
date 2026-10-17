@@ -14,6 +14,106 @@ Latest feature: playable tomato farming, a Farm tablet tab/seed stall, three far
 expansions, tomato warehouse/shelf/checkout integration, a road-end Coming Next
 board and a local suggestion form. See Farming section below for controls and limits.
 
+## Full-Screen PC, APNA OS Desktop, Staff Page, Checkout Click Fix (2026-10-18)
+
+- Checkout payment (checkout_menu.gd): `_refresh()` ran every frame and set the
+  Cash/Card/UPI buttons disabled then enabled; Godot cancels a press when a button is
+  disabled, so real clicks never fired. Now `disabled = not paying` once per frame.
+  checkout_test clicks with press/release on different frames (old code hangs).
+- computer_terminal.gd: the SubViewport renders at 1920x1080 with
+  `size_2d_override` 960x540 (layout/input still in 960x540). After the 0.3 s camera
+  move, `_fit_transform()` puts the camera so the monitor fills the window
+  (letterboxed if not 16:9) and a CanvasLayer (layer 2) shows the sharp texture
+  exactly over the projected monitor, so `screen_point()` mouse mapping is unchanged.
+- Desktop home (`app` = home/store/staff/manager/bank, `show_app()`): app tiles,
+  Shelf Stock card (racked products, fewest first), Today card, taskbar with Exit PC.
+  Shop PC opens on home; warehouse PC (`open(true)`) opens the manager window.
+  The manager window (supplier_menu copy) hides the Staff/People tabs on the PC and
+  its X button returns home. Game feedback shows as a toast over the PC.
+- staff_page.gd "APNA JOBS": portrait cards (assets/ui/staff/<role>.png made by
+  tools/staff_portraits.gd), hire / hire again, cashier L1-L3 chips, manage panel
+  (hours -/+ and save, Working/Day off, auto-collect, assign box, talk, overtime).
+  Talk opens the staff dialog, which closes the PC. Test: tests/pc_desktop_test.gd.
+- loading_screen.gd: Continue/New Game add a root-level CanvasLayer (layer 100,
+  PROCESS_MODE_ALWAYS) that shows the threaded scene load as real progress, says
+  "Building the town" before the blocking scene change, keeps covering the first
+  frames (shader/physics hitches), then pauses the tree with "Press any key to start"
+  and fades out with a welcome toast. It holds the loaded PackedScene so launch_game
+  reuses it (before, the menu's threaded load was dropped and loaded again).
+  main_menu_test goes through it with `_through_loading()`.
+- Checkout counter sits 0.3 m lower (top 0.88 m for the 1.45 m characters) and the
+  checkout monitor moved to the cashier's side (x 1.0, turned 0.6 rad) so it no longer
+  hides the customer; the card terminal moved to the customer side.
+- Tablet and PC Shop Manager restyle is drawn on the copy panel's `draw` signal (no
+  extra child controls, so the no-overlap layout tests still hold): tablet teal header,
+  stat tiles on Overview, white content card; Shop Manager amber header with Back,
+  money and Shop online, product picture on Orders, Space tab hidden on the PC.
+- Town customers (scene meta `town_customers`, set by launch_game like
+  `mixed_baskets`; test scenes keep the old short door route): SHOPPER_TYPES quick
+  35% (1 item), regular 40% (1-3 + maybe 1 extra), family 20% (2-4 + 1-2 extra
+  products x1-2, no haggling), bulk 5% (5-7 of one product). Budget per item varies by
+  type and they pick an affordable in-stock product. They start 22-28 m down the
+  shop-side pavement (z 3.9 +-0.3), walk to the door, and after shopping walk out to
+  x +-32 (70% carry on, 30% turn back) before being freed. The spawner counts only
+  non-leaving customers toward its 3-shopper limit (8 in total). Checkout basket
+  shows two rows of five. Test: tests/town_customers_test.gd.
+- Orders tab: Sharma's line moves with the order column and was tightened to fit
+  640x480 (physical_shop_test passes again); multi-box status is one line.
+
+## Demo v0.7: Beginner Money, Faster Loading (2026-10-18)
+
+- Owner: "demo work only" from now on (polish, fixes, build), no big new systems.
+- New Game starts with `BEGINNER_MONEY` Rs10,000 (game_session.new_game). Saves store
+  `starting_money`; saves without it are legacy Rs50,000 starts. Validation accepts
+  only those two amounts. Backend.new() (tests, direct editor play) still 50,000.
+- Loading fix: pc_store.gd and bank_page.gd filled their Kenney Theme AFTER assigning
+  it, so every theme change re-themed the page on the first frame (~30 s for the two
+  PCs). Build the Theme first, then assign. Continue went ~70 s -> ~30 s headless.
+  Still slow (measured with `tools/load_timing.gd`): runtime `load()` of models in
+  _ready (home decor ~3-5 s, the PCs' _configure ~1.5 s each, FutureTown houses).
+  Owner said to look at the rest later.
+- Lobby: version v0.7 and a new What's New list (card grows to fit the text).
+
+## Traffic, Price War, Night Life, Nature Music, Town Edge (2026-10-18)
+
+- `traffic.gd` (Neighbourhood/Traffic): 8 vehicles (autos, scooters, car, city bus)
+  on the main road, left-hand traffic (east lane z 5.6, west lane z 8.4). They slow
+  and stop for the player, customers and staff in their lane, keep a gap to the
+  vehicle ahead, wrap at x +-76, and have AnimatableBody3D colliders. The bus halts
+  6 s at the bus stop (x -45) by day; the waiting passenger boards. At night (and on
+  Low graphics) half the fleet rests; headlights glow 18:30-06:30.
+- `night_life.gd`: market shutters down 21:00-08:00, chai stall open 05:00-23:00,
+  porch lamps + light pools on the 16 town houses, 1 in 3 passers-by at night.
+  `day_night.gd`: navy night sky, star dome (one MultiMesh), brighter lamp lenses,
+  glow-only expansion streetlights (`_streetlight(..., real_light false)` adds a
+  ground light pool instead of a SpotLight3D; still 8 real lights).
+- Price war: `rival_sale_for_day(day)` is deterministic (about 70% of days from day 3:
+  Rs10/20 off one product, never below Rs50); `rival_price_today()` feeds
+  `price_index()`. Sale board by Sharma's path, notification when you sell that
+  product dearer, customers say "Sharma sells this for RsX!" at the till
+  (`customer.say()`), Orders tab shows "Sharma today" with a Match button, and the
+  day report names the coming sale. Nothing new is saved.
+- Music: `background_music.gd` keeps ONE `BackgroundMusic` player under the tree root
+  (process always) so `music_nature.wav` (96 s seamless: pads, flute, kalimba,
+  stream, birds) plays continuously from lobby into the game. It uses the "Music"
+  bus; Settings has "Master volume" and "Music volume" (`music_volume`, default 0.6).
+  Night swaps street ambience for `ambience_night.wav` (crickets). The old raag
+  tracks were removed; regenerate all with `tools/make_audio.gd` (~1.5 min).
+- Open town = the OLD 64 m map (owner's call): solid walls at x/z +-31.5
+  (neighbourhood.gd) and `town_boundary.gd`, a see-through blue barrier on all four
+  sides (always faint, brighter within 14 m); within 2 m a "This area opens in a
+  future update / Returning home in 3..2..1" countdown, then
+  `House/HouseArea.spawn_player()`. Stepping back cancels.
+- Next phase: town_expansion.gd builds the market street, 8 shops, 16 houses, chai
+  stall and parked vehicles under `Neighbourhood/FutureTown`, hidden with
+  PROCESS_MODE_DISABLED (no collisions). `unlock_future_town()` opens it; then move
+  the walls/barrier out to x +-74, z -55..59 and widen street_life (x +-70).
+  Outside the wall the road, lamps and trees stay visible; traffic drives through.
+  The bus stop is inside the town at x -24.
+- Tests: `town_life_test` (traffic, bus, edge, night), `economy_world_test` (sale,
+  Match, music bus). `tests/menu_background_capture.gd` is a window-only tool that
+  rewrites the lobby image; skip it in suite runs.
+
 ## End-of-Day Report Screen (2026-10-18)
 
 - Sleeping opens `day_report_screen.gd` (Ui/DayReportScreen): full-screen dim, big
@@ -27,9 +127,9 @@ board and a local suggestion form. See Farming section below for controls and li
 
 ## Bigger Town and Sharma Shop Life (2026-10-18)
 
-- Map grew from the 64 m block to x +-74, z -56..60. `main.tscn.tscn` Ground box is
-  150x120; boundary walls are in `neighbourhood.gd` (x +-74, z -55/59). Terrain was
-  regenerated with `tools/build_landscape.gd -- --rebuild` (flat town, hills beyond).
+- Land grew to x +-74, z -56..60 (`main.tscn.tscn` Ground box 150x120; terrain
+  regenerated with `tools/build_landscape.gd -- --rebuild`, flat with hills beyond),
+  but the open town is still the old 64 m map; see the section above.
 - `town_expansion.gd` (built by `neighbourhood.gd`): main road extended both ways,
   market street at x 50 with 8 Indian shops (Chai Point, Gupta Medical, Mithai House,
   Mobile Repair, Pani Puri, Tailor, Hardware, Bakery), crossing, streetlights, 16
@@ -38,7 +138,7 @@ board and a local suggestion form. See Farming section below for controls and li
 - `rival_shop.gd`: Sharma General Store gets a path and forecourt to the pavement,
   a produce display, Mr. Sharma (name tag) at the door from day 3, and two shoppers
   who walk from the street, go inside for 6 s and walk away (only while shops open).
-- `street_life.gd`: 12 passers-by walking the whole road (bounce at x +-70).
+- `street_life.gd`: 12 passers-by on both pavements (bounce at x +-29).
 - Pure scenery: no save/economy change. Tests: `town_life_test`, updated
   `terrain_landscape_test` and `street_assets_test`. Preview: `tools/map_overview.gd`
   (top/angle/west/market/road/rival PNGs in %TEMP%).
@@ -46,11 +146,10 @@ board and a local suggestion form. See Farming section below for controls and li
 ## Music, Save Slots, Bank Loan, Weather, Rival Shop (2026-10-18)
 
 - Music/ambience: tools/make_audio.gd composes original WAVs in assets/audio/generated
-  (music_lobby, music_day: tanpura drone + Raag Bhupali plucks, day track with soft
-  tabla; ambience_street: breeze, birds, traffic, horn; rain). .import loop_mode=2.
-  world_audio.gd (added by neighbourhood): day music 06-20, calm track at night,
-  ambience quieter indoors, rain sound and CPUParticles3D rain that follow the camera
-  (350 drops on Low, 900 otherwise). Lobby plays music_lobby (LobbyMusic).
+  (ambience_street: breeze, birds, traffic, horn; rain). .import loop_mode=2.
+  world_audio.gd (added by neighbourhood): ambience quieter indoors, rain sound and
+  CPUParticles3D rain that follow the camera (350 drops on Low, 900 otherwise).
+  The first raag music tracks were replaced by continuous nature music (see above).
 - Save slots (main_menu.gd): SlotRow with Slot1..3; slot_path(base, n) = base for 1,
   "<name>_<n>.json" otherwise; last slot remembered in <settings dir>/lobby.cfg;
   returning from a slot-n game recovers base_save_path and slot. Compact lobby

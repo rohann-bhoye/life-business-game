@@ -71,7 +71,7 @@ func _run() -> void:
 	query = PhysicsRayQueryParameters3D.create(Vector3(15, 2, 7), Vector3(15, -1, 7))
 	var ground: Dictionary = space.intersect_ray(query)
 	assert(not ground.is_empty() and is_equal_approx(ground["position"].y, 0.1))
-	query = PhysicsRayQueryParameters3D.create(Vector3(72, 1, 7), Vector3(76, 1, 7))
+	query = PhysicsRayQueryParameters3D.create(Vector3(30, 1, 7), Vector3(33, 1, 7))
 	assert(not space.intersect_ray(query).is_empty())
 	player.global_position = Vector3(-3, 1.1, 3.6)
 	player.rotation.y = 0

@@ -15,8 +15,31 @@ var clock: Label
 var desktop_theme: Theme
 var store: Panel
 var bank: Panel
+var staff: Panel
+var desktop: Control
+## Which desktop app fills the screen: home, store, staff, manager or bank.
+var app := "home"
+var greeting: Label
+var today_values := {}
+var low_rows: Array = []
+var task_buttons := {}
+var toast: Label
+var widget_seconds := 0.0
+# Full-screen view: once the camera reaches the monitor, a sharp 2D copy of the
+# screen covers the window exactly where the monitor is drawn.
+var overlay: CanvasLayer
+var overlay_image: TextureRect
+var fitted_size := Vector2.ZERO
+const Catalog := preload("res://product_catalog.gd")
 const KenneyTheme := preload("res://kenney_theme.gd")
 const UiStyle := preload("res://ui_style.gd")
+const SCREEN := Vector2(960, 540)
+const RENDER_SCALE := 2
+const HALF_SCREEN := Vector2(0.39, 0.22)
+# Staff and People live in the Staff app (and Space has nothing to do), so the
+# Shop Manager window hides those tabs.
+const STAFF_TABS := [1, 2, 3]
+const MANAGER_BRAND := Color("b45309")
 @onready var world = get_tree().current_scene
 @onready var player = world.get_node("Player")
 @onready var ui = world.get_node("Ui")
@@ -38,98 +61,45 @@ func _configure() -> void:
 	source = ui.supplier_menu
 	screen_viewport = SubViewport.new()
 	screen_viewport.name = "DesktopViewport"
-	screen_viewport.size = Vector2i(960, 540)
+	# Drawn at 2x and shown at SCREEN size so the full-screen view stays sharp.
+	screen_viewport.size = Vector2i(SCREEN) * RENDER_SCALE
+	screen_viewport.size_2d_override = Vector2i(SCREEN)
+	screen_viewport.size_2d_override_stretch = true
 	screen_viewport.disable_3d = true
 	screen_viewport.gui_embed_subwindows = true
 	screen_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	add_child(screen_viewport)
-	var desktop := ColorRect.new()
-	desktop.name = "Desktop"
-	desktop.color = UiStyle.PAGE
-	desktop.size = Vector2(960, 540)
-	screen_viewport.add_child(desktop)
-	var topbar := ColorRect.new()
-	topbar.name = "TopBar"
-	topbar.color = UiStyle.NAVY
-	topbar.size = Vector2(960, 64)
-	desktop.add_child(topbar)
-	var title := Label.new()
-	title.text = "APNA OPERATIONS"
-	title.position = Vector2(28, 17)
-	title.add_theme_font_size_override("font_size", 22)
-	title.add_theme_color_override("font_color", Color(0.9, 0.98, 0.96))
-	desktop.add_child(title)
-	var status := Label.new()
-	status.text = "SYSTEM ONLINE"
-	status.position = Vector2(760, 22)
-	status.size = Vector2(170, 24)
-	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	status.add_theme_font_size_override("font_size", 14)
-	status.add_theme_color_override("font_color", Color(0.5, 0.94, 0.72))
-	desktop.add_child(status)
-	var welcome := Label.new()
-	welcome.text = "Business desk\nOpen Orders or Warehouse staff to manage today."
-	welcome.position = Vector2(34, 100)
-	welcome.size = Vector2(620, 84)
-	welcome.add_theme_font_size_override("font_size", 20)
-	welcome.add_theme_color_override("font_color", UiStyle.TEXT)
-	desktop.add_child(welcome)
-	var cards := [["Orders", "Buy stock and set prices"], ["Team", "Shifts and staff work"], ["Storage", "Delivery and warehouse status"]]
-	for index in range(cards.size()):
-		var entry = cards[index]
-		var card := Panel.new()
-		card.add_theme_stylebox_override("panel", UiStyle.card())
-
-		card.position = Vector2(34 + index * 294, 215)
-		card.size = Vector2(270, 92)
-		desktop.add_child(card)
-		var card_title := Label.new()
-		card_title.text = entry[0]
-		card_title.position = Vector2(14, 12)
-		card_title.add_theme_font_size_override("font_size", 18)
-		card_title.add_theme_color_override("font_color", UiStyle.BRAND)
-		card.add_child(card_title)
-		var card_text := Label.new()
-		card_text.text = entry[1]
-		card_text.position = Vector2(14, 48)
-		card_text.add_theme_font_size_override("font_size", 13)
-		card_text.add_theme_color_override("font_color", UiStyle.MUTED)
-		card.add_child(card_text)
-	var taskbar := ColorRect.new()
-	taskbar.color = UiStyle.NAVY
-	taskbar.position = Vector2(0, 500)
-	taskbar.size = Vector2(960, 40)
-	desktop.add_child(taskbar)
-	for index in range(3):
-		var button := Button.new()
-		button.text = ["APNA", "Orders", "Staff"][index]
-		button.add_theme_font_size_override("font_size", 15)
-		button.position = Vector2(12 + index * 160, 504)
-		button.size = Vector2(150, 32)
-		button.theme_type_variation = "PrimaryButton" if index == 0 else ""
-		desktop.add_child(button)
-		button.pressed.connect(func():
-			source.tabs.current_tab = 1 if index == 2 else 0
-			if index == 2: source.role_input.select(2); source.role_input.item_selected.emit(2))
-	clock = Label.new()
-	clock.position = Vector2(812, 508)
-	clock.size = Vector2(136, 24)
-	clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	clock.add_theme_color_override("font_color", Color("e2e8f0"))
-	desktop.add_child(clock)
 	desktop_theme = Theme.new()
 	desktop_theme.default_font_size = 18
 	UiStyle.apply(desktop_theme, true)
 	KenneyTheme.apply(desktop_theme)
-	desktop.theme = desktop_theme
+	_build_desktop()
 	screen_menu = source.duplicate(0) as Panel
 	screen_menu.name = "OperationsWindow"
 	screen_menu.modulate = Color.WHITE
 	screen_menu.theme = desktop_theme
 	screen_viewport.add_child(screen_menu)
 	_bind(source, screen_menu)
+	var copy_tabs: TabBar = screen_menu.get_node("ManagementTabs")
+	for index in STAFF_TABS: copy_tabs.set_tab_hidden(index, true)
+	screen_menu.draw.connect(_draw_manager)
+	var title: Label = screen_menu.get_node("TitleLabel")
+	title.add_theme_font_override("font", KenneyTheme.heading_font())
 	screen_menu.hide()
 	_build_store(desktop)
+	toast = Label.new()
+	toast.name = "Toast"
+	toast.position = Vector2(230, 452)
+	toast.size = Vector2(500, 36)
+	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	toast.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	toast.add_theme_font_size_override("font_size", 15)
+	toast.add_theme_color_override("font_color", Color.WHITE)
+	toast.add_theme_stylebox_override("normal", _round(Color(0.06, 0.09, 0.16, 0.92), 18))
+	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	toast.hide()
+	screen_viewport.add_child(toast)
+	_build_overlay()
 	screen_mesh = MeshInstance3D.new()
 	screen_mesh.name = "LiveScreen"
 	var quad := QuadMesh.new()
@@ -175,65 +145,362 @@ func _configure() -> void:
 	add_child(focus_camera)
 	source.visibility_changed.connect(func():
 		if active and not source.visible: close())
+	show_home()
 	_sync()
 
-# APNA Wholesale shopping page (pc_store.gd), drawn over the operations window.
-# Opened from the green "Shop online" header button or the taskbar "Store" button.
-func _build_store(desktop: Control) -> void:
+func _round(colour: Color, radius := 12) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = colour
+	style.set_corner_radius_all(radius)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	return style
+
+func _text(parent: Control, text: String, position: Vector2, width: float, font_size: int, colour: Color) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.position = position
+	label.size = Vector2(width, font_size + 10)
+	label.clip_text = true
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", colour)
+	parent.add_child(label)
+	return label
+
+func _picture(parent: Control, path: String, rect: Rect2) -> TextureRect:
+	var image := TextureRect.new()
+	image.texture = load(path)
+	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	image.position = rect.position
+	image.size = rect.size
+	image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(image)
+	return image
+
+# APNA OS home screen: wallpaper, app tiles, a "Today" summary, shelf stock and a
+# taskbar. Each app (store, staff, shop manager, bank) opens over it.
+func _build_desktop() -> void:
+	desktop = Control.new()
+	desktop.name = "Desktop"
+	desktop.size = SCREEN
+	desktop.theme = desktop_theme
+	screen_viewport.add_child(desktop)
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color("0f172a"))
+	gradient.set_color(1, Color("0f766e"))
+	var wallpaper_texture := GradientTexture2D.new()
+	wallpaper_texture.gradient = gradient
+	wallpaper_texture.fill_from = Vector2(0, 0)
+	wallpaper_texture.fill_to = Vector2(1, 1)
+	var wallpaper := TextureRect.new()
+	wallpaper.name = "Wallpaper"
+	wallpaper.texture = wallpaper_texture
+	wallpaper.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	wallpaper.size = SCREEN
+	wallpaper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	desktop.add_child(wallpaper)
+	for circle in [Rect2(620, -160, 460, 460), Rect2(-180, 330, 420, 420)]:
+		var glow := Panel.new()
+		glow.position = circle.position
+		glow.size = circle.size
+		glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		glow.add_theme_stylebox_override("panel", _round(Color(1, 1, 1, 0.05), 230))
+		desktop.add_child(glow)
+	greeting = _text(desktop, "", Vector2(40, 26), 520, 30, Color.WHITE)
+	_text(desktop, "APNA OS | Apna Kirana Store", Vector2(42, 68), 520, 14, Color("99f6e4"))
+	var apps := [
+		["store", "Wholesale", Color("16a34a"), ""],
+		["staff", "Staff", Color("7c3aed"), "res://assets/ui/staff/cashier.png"],
+		["manager", "Shop Manager", Color("d97706"), ""],
+		["bank", "Bank", Color("2563eb"), ""],
+	]
+	for index in range(apps.size()):
+		var entry: Array = apps[index]
+		var tile := Button.new()
+		tile.name = "App_" + entry[0]
+		tile.position = Vector2(40 + index * 134, 108)
+		tile.size = Vector2(116, 116)
+		tile.focus_mode = Control.FOCUS_NONE
+		tile.clip_contents = true
+		tile.tooltip_text = "Open " + entry[1]
+		for state in [["normal", entry[2]], ["hover", entry[2].lightened(0.15)], ["pressed", entry[2].darkened(0.15)], ["hover_pressed", entry[2].darkened(0.15)]]:
+			var style := _round(state[1], 26)
+			style.shadow_color = Color(0, 0, 0, 0.25)
+			style.shadow_size = 6
+			style.shadow_offset = Vector2(0, 3)
+			tile.add_theme_stylebox_override(state[0], style)
+		tile.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		desktop.add_child(tile)
+		if entry[3] != "": _picture(tile, entry[3], Rect2(18, 14, 80, 80))
+		elif entry[0] == "store":
+			# A few products from the catalogue, grouped like a shop window.
+			for item in [["milk", Rect2(-2, 6, 76, 96)], ["bottle", Rect2(44, 4, 76, 96)], ["snack", Rect2(16, 26, 84, 90)]]:
+				_picture(tile, "res://assets/ui/products/%s.png" % item[0], item[1])
+		elif entry[0] == "bank": _text(tile, String.chr(8377), Vector2(0, 14), 116, 56, Color.WHITE).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		else:
+			# A little shelf with boxes for the Shop Manager.
+			for row in range(3):
+				var shelf := ColorRect.new()
+				shelf.color = Color.WHITE
+				shelf.position = Vector2(24, 40 + row * 24)
+				shelf.size = Vector2(68, 5)
+				shelf.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				tile.add_child(shelf)
+				for item in range(3 - row % 2):
+					var box := ColorRect.new()
+					box.color = [Color("fde68a"), Color("fecaca"), Color("bbf7d0")][(row + item) % 3]
+					box.position = Vector2(28 + item * 22, 26 + row * 24)
+					box.size = Vector2(16, 14)
+					box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+					tile.add_child(box)
+		var label := _text(desktop, entry[1], Vector2(tile.position.x - 10, 230), 136, 15, Color.WHITE)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tile.pressed.connect(show_app.bind(entry[0]))
+	# Shelf stock card: the products on the racks with the fewest items left.
+	var shelf_card := Panel.new()
+	shelf_card.name = "ShelfCard"
+	shelf_card.position = Vector2(40, 272)
+	shelf_card.size = Vector2(518, 210)
+	shelf_card.add_theme_stylebox_override("panel", _round(Color(1, 1, 1, 0.95), 16))
+	desktop.add_child(shelf_card)
+	var shelf_title := _text(shelf_card, "SHELF STOCK", Vector2(18, 12), 300, 16, Color("0f766e"))
+	shelf_title.add_theme_font_override("font", KenneyTheme.heading_font())
+	var restock := Button.new()
+	restock.name = "RestockButton"
+	restock.text = "Restock"
+	restock.theme_type_variation = "PrimaryButton"
+	restock.position = Vector2(384, 10)
+	restock.size = Vector2(120, 32)
+	restock.focus_mode = Control.FOCUS_NONE
+	restock.add_theme_font_size_override("font_size", 14)
+	restock.pressed.connect(open_store)
+	shelf_card.add_child(restock)
+	for index in range(4):
+		var row := Control.new()
+		row.position = Vector2(18, 50 + index * 38)
+		row.size = Vector2(482, 36)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		shelf_card.add_child(row)
+		var icon := _picture(row, "res://assets/ui/products/bottle.png", Rect2(0, 0, 34, 34))
+		var name_label := _text(row, "", Vector2(44, 6), 190, 15, KenneyTheme.TEXT)
+		var count := _text(row, "", Vector2(240, 6), 240, 14, KenneyTheme.MUTED)
+		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		low_rows.append({"row": row, "icon": icon, "name": name_label, "count": count})
+	# Today card.
+	var today := Panel.new()
+	today.name = "TodayCard"
+	today.position = Vector2(590, 26)
+	today.size = Vector2(330, 456)
+	today.add_theme_stylebox_override("panel", _round(Color(1, 1, 1, 0.95), 16))
+	desktop.add_child(today)
+	var today_title := _text(today, "TODAY", Vector2(20, 14), 290, 16, Color("0f766e"))
+	today_title.add_theme_font_override("font", KenneyTheme.heading_font())
+	today_values["money"] = _text(today, "", Vector2(20, 44), 290, 30, KenneyTheme.GREEN)
+	_text(today, "Money", Vector2(22, 84), 290, 12, KenneyTheme.MUTED)
+	var rows := [["day", "Day"], ["shop", "Shop"], ["staff", "Staff on duty"], ["sold", "Items sold"], ["delivery", "Deliveries"], ["loan", "Loan"], ["rival", "Sharma's store"]]
+	for index in range(rows.size()):
+		var y := 116 + index * 46
+		var divider := ColorRect.new()
+		divider.color = Color("e5e7eb")
+		divider.position = Vector2(20, y)
+		divider.size = Vector2(290, 1)
+		today.add_child(divider)
+		_text(today, rows[index][1], Vector2(20, y + 10), 140, 14, KenneyTheme.MUTED)
+		var value := _text(today, "", Vector2(140, y + 10), 170, 15, KenneyTheme.TEXT)
+		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		today_values[rows[index][0]] = value
+	# Taskbar.
+	var taskbar := ColorRect.new()
+	taskbar.name = "Taskbar"
+	taskbar.color = Color(0.03, 0.05, 0.09, 0.96)
+	taskbar.position = Vector2(0, 500)
+	taskbar.size = Vector2(SCREEN.x, 40)
+	desktop.add_child(taskbar)
+	var buttons := [["home", "APNA", 90], ["store", "Wholesale", 140], ["staff", "Staff", 92], ["manager", "Shop", 92], ["bank", "Bank", 92]]
+	var x := 8.0
+	for entry in buttons:
+		var button := Button.new()
+		button.name = "Task_" + entry[0]
+		button.text = entry[1]
+		button.position = Vector2(x, 504)
+		button.size = Vector2(entry[2], 32)
+		button.focus_mode = Control.FOCUS_NONE
+		button.add_theme_font_size_override("font_size", 14)
+		button.pressed.connect(show_app.bind(entry[0]))
+		desktop.add_child(button)
+		task_buttons[entry[0]] = button
+		x += entry[2] + 6
+	var exit := Button.new()
+	exit.name = "ExitButton"
+	exit.text = "Exit PC"
+	exit.theme_type_variation = "DangerButton"
+	exit.position = Vector2(x + 18, 504)
+	exit.size = Vector2(104, 32)
+	exit.focus_mode = Control.FOCUS_NONE
+	exit.add_theme_font_size_override("font_size", 14)
+	exit.tooltip_text = "Leave the computer (E / Esc)"
+	exit.pressed.connect(close)
+	desktop.add_child(exit)
+	clock = Label.new()
+	clock.position = Vector2(780, 508)
+	clock.size = Vector2(168, 24)
+	clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	clock.add_theme_font_size_override("font_size", 15)
+	clock.add_theme_color_override("font_color", Color("e2e8f0"))
+	desktop.add_child(clock)
+
+# APNA Wholesale (pc_store.gd), APNA Bank (bank_page.gd) and APNA Jobs
+# (staff_page.gd) are full pages over the desktop; Back returns home.
+func _build_store(_desktop: Control) -> void:
 	store = Panel.new()
 	store.set_script(preload("res://pc_store.gd"))
 	store.position = Vector2(24, 12)
 	screen_viewport.add_child(store)
 	store.setup(ui.shop.business, ui.shop._format_money)
 	store.hide()
-	store.back_requested.connect(func(): store.hide())
+	store.back_requested.connect(show_home)
 	var shop_online := Button.new()
 	shop_online.name = "ShopOnlineButton"
 	shop_online.text = "Shop online"
 	shop_online.theme_type_variation = "PrimaryButton"
-	shop_online.position = Vector2(680, 8)
-	shop_online.size = Vector2(170, 34)
+	shop_online.position = Vector2(590, 12)
+	shop_online.size = Vector2(150, 36)
+	shop_online.add_theme_font_size_override("font_size", 15)
 	shop_online.focus_mode = Control.FOCUS_NONE
 	screen_menu.add_child(shop_online)
 	shop_online.pressed.connect(open_store)
-	var store_button := Button.new()
-	store_button.name = "StoreTaskbarButton"
-	store_button.text = "Store"
-	store_button.theme_type_variation = "PrimaryButton"
-	store_button.position = Vector2(492, 504)
-	store_button.size = Vector2(150, 32)
-	store_button.add_theme_font_size_override("font_size", 15)
-	desktop.add_child(store_button)
-	store_button.pressed.connect(open_store)
-	# APNA Bank page (bank_page.gd): business loan.
 	bank = Panel.new()
 	bank.set_script(preload("res://bank_page.gd"))
 	bank.position = Vector2(24, 12)
 	screen_viewport.add_child(bank)
 	bank.setup(ui.shop.business, ui.shop._format_money)
 	bank.hide()
-	bank.back_requested.connect(func(): bank.hide())
-	var bank_button := Button.new()
-	bank_button.name = "BankTaskbarButton"
-	bank_button.text = "Bank"
-	bank_button.theme_type_variation = "InfoButton"
-	bank_button.position = Vector2(652, 504)
-	bank_button.size = Vector2(150, 32)
-	bank_button.add_theme_font_size_override("font_size", 15)
-	desktop.add_child(bank_button)
-	bank_button.pressed.connect(open_bank)
+	bank.back_requested.connect(show_home)
+	staff = Panel.new()
+	staff.set_script(preload("res://staff_page.gd"))
+	staff.position = Vector2(24, 12)
+	screen_viewport.add_child(staff)
+	staff.setup(ui.shop.business, ui.shop._format_money, world.get_node_or_null("ShopOperations"))
+	staff.hide()
+	staff.back_requested.connect(show_home)
+	# Talking happens in person: the staff dialog closes the computer.
+	staff.talk_requested.connect(func(role): ui.staff_dialog.open_for(role))
+
+func show_home() -> void:
+	show_app("home")
+
+func show_app(target: String) -> void:
+	app = target
+	if target == "manager" and source.tabs.current_tab in STAFF_TABS: source.tabs.current_tab = 0
+	for pair in pairs:
+		if pair[1] is OptionButton: pair[1].get_popup().hide()
+	if is_instance_valid(store):
+		store.visible = target == "store"
+		if store.visible: store.refresh()
+	if is_instance_valid(bank):
+		bank.visible = target == "bank"
+		if bank.visible: bank.refresh()
+	if is_instance_valid(staff):
+		staff.visible = target == "staff"
+		if staff.visible: staff.select_role(staff.selected)
+	for key in task_buttons: task_buttons[key].theme_type_variation = "PrimaryButton" if key == target else ""
+	for card_name in ["ShelfCard", "TodayCard"]: desktop.get_node(card_name).visible = target == "home"
+	_refresh_desktop()
+	if active: _sync()
 
 func open_bank() -> void:
-	if not is_instance_valid(bank): return
-	if is_instance_valid(store): store.hide()
-	bank.refresh()
-	bank.show()
+	show_app("bank")
 
 func open_store() -> void:
-	if not is_instance_valid(store): return
-	if is_instance_valid(bank): bank.hide()
-	store.refresh()
-	store.show()
+	show_app("store")
+
+func open_staff(role := "") -> void:
+	if is_instance_valid(staff) and role != "": staff.selected = role
+	show_app("staff")
+
+func _refresh_desktop() -> void:
+	if not is_instance_valid(desktop): return
+	var business = ui.shop.business
+	var minutes := int(business.minutes_of_day)
+	greeting.text = "Good %s, Boss" % ("morning" if minutes < 720 else ("afternoon" if minutes < 1020 else "evening"))
+	today_values.money.text = String.chr(8377) + ui.shop._format_money(business.money)
+	today_values.day.text = "Day %d  %02d:%02d" % [business.day, minutes / 60, minutes % 60]
+	today_values.shop.text = "Open" if business.shop_is_open() else "Closed"
+	today_values.shop.add_theme_color_override("font_color", KenneyTheme.GREEN if business.shop_is_open() else Color("b91c1c"))
+	var hired := 0
+	var working := 0
+	for role in business.staff.ROLES:
+		if business.staff.active(business, role): hired += 1
+	working = int(business.cashier_on_shift()) + int(business.stock_worker_on_shift()) + int(business.warehouse_worker_on_shift())
+	today_values.staff.text = "%d of %d hired" % [working, hired] if hired > 0 else "Nobody hired"
+	today_values.sold.text = str(business.items_sold)
+	var outside: int = business.queued_boxes.size() + (1 if business.boxed_stock > 0 else 0)
+	today_values.delivery.text = "%d on way | %d outside" % [business.incoming_boxes.size(), outside]
+	today_values.loan.text = String.chr(8377) + ui.shop._format_money(business.loan_left()) + " left" if business.loan_left() > 0 else "None"
+	today_values.rival.text = "Open" if business.rival_open() else "Opens day %d" % business.RIVAL_OPEN_DAY
+	var products: Array = []
+	for record in business.racks.records:
+		for slot in record.slots:
+			if slot.product != "" and slot.product not in products: products.append(slot.product)
+	if products.is_empty(): products = ["bottle"]
+	products.sort_custom(func(a, b): return business.product_stock(a) < business.product_stock(b))
+	for index in range(low_rows.size()):
+		var row: Dictionary = low_rows[index]
+		row.row.visible = index < products.size()
+		if not row.row.visible: continue
+		var id: String = products[index]
+		var left: int = business.product_stock(id)
+		row.icon.texture = load("res://assets/ui/products/%s.png" % id)
+		row.name.text = Catalog.NAMES[id]
+		row.count.text = "Shelf %d | Warehouse %d" % [left, business.logistics.stored_units(id)]
+		row.count.add_theme_color_override("font_color", Color("b91c1c") if left <= 3 else KenneyTheme.MUTED)
+
+func _build_overlay() -> void:
+	overlay = CanvasLayer.new()
+	overlay.name = "FullScreen"
+	overlay.layer = 2
+	overlay.visible = false
+	add_child(overlay)
+	var back := ColorRect.new()
+	back.color = Color(0.02, 0.025, 0.035)
+	back.set_anchors_preset(Control.PRESET_FULL_RECT)
+	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(back)
+	overlay_image = TextureRect.new()
+	overlay_image.name = "Screen"
+	overlay_image.texture = screen_viewport.get_texture()
+	overlay_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	overlay_image.stretch_mode = TextureRect.STRETCH_SCALE
+	overlay_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(overlay_image)
+
+## Camera pose where the monitor fills the window (letterboxed when the window
+## is not 16:9), looking straight at the screen.
+func _fit_transform() -> Transform3D:
+	var view := get_viewport().get_visible_rect().size
+	var centre := screen_mesh.global_position
+	var half_width := (screen_mesh.to_global(Vector3(HALF_SCREEN.x, 0, 0)) - centre).length()
+	var half_height := (screen_mesh.to_global(Vector3(0, HALF_SCREEN.y, 0)) - centre).length()
+	var needed := maxf(half_height, half_width * view.y / maxf(1.0, view.x))
+	var basis := screen_mesh.global_basis.orthonormalized()
+	return Transform3D(basis, centre + basis.z * needed / tan(deg_to_rad(focus_camera.fov * 0.5)))
+
+func _fit_overlay() -> void:
+	fitted_size = get_viewport().get_visible_rect().size
+	focus_camera.global_transform = _fit_transform()
+	var top_left := focus_camera.unproject_position(screen_mesh.to_global(Vector3(-HALF_SCREEN.x, HALF_SCREEN.y, 0)))
+	var bottom_right := focus_camera.unproject_position(screen_mesh.to_global(Vector3(HALF_SCREEN.x, -HALF_SCREEN.y, 0)))
+	overlay_image.position = top_left
+	overlay_image.size = bottom_right - top_left
+
+func _show_full_screen() -> void:
+	if not active: return
+	_fit_overlay()
+	overlay.visible = true
+	overlay_image.modulate.a = 0.0
+	create_tween().tween_property(overlay_image, "modulate:a", 1.0, 0.12)
 
 func _bind(original: Control, copy: Control) -> void:
 	pairs.append([original, copy])
@@ -241,6 +508,8 @@ func _bind(original: Control, copy: Control) -> void:
 		copy.item_selected.connect(func(index): original.select(index); original.item_selected.emit(index))
 	elif copy is ItemList:
 		copy.item_selected.connect(func(index): original.select(index); original.item_selected.emit(index))
+	elif copy is Button and original.name == "CloseButton" and original.get_parent() == source:
+		copy.pressed.connect(show_home)
 	elif copy is Button:
 		copy.pressed.connect(func(): original.pressed.emit())
 		if copy.toggle_mode: copy.toggled.connect(func(value):
@@ -262,7 +531,7 @@ func _sync() -> void:
 	for pair in pairs:
 		var original: Control = pair[0]
 		var copy: Control = pair[1]
-		copy.visible = original.visible if original != source else active
+		copy.visible = original.visible if original != source else (active and app == "manager")
 		copy.position = original.position
 		copy.size = original.size
 		if original is Label: copy.text = original.text
@@ -283,7 +552,8 @@ func _sync() -> void:
 			if original.toggle_mode: copy.set_pressed_no_signal(original.button_pressed)
 		elif original is SpinBox:
 			if not copy.get_line_edit().has_focus(): copy.set_value_no_signal(original.value)
-		elif original is TabBar: copy.current_tab = original.current_tab
+		elif original is TabBar:
+			if not copy.is_tab_hidden(original.current_tab): copy.current_tab = original.current_tab
 		elif original is ProgressBar: copy.value = original.value
 		if original.get_parent() == source and is_equal_approx(original.position.x + original.size.x, source.size.x - 16): copy.size.x += 912 - source.size.x
 		if copy is Button and not copy is OptionButton:
@@ -303,14 +573,18 @@ func _sync() -> void:
 			copy.add_theme_font_size_override("font_size", 18)
 	screen_menu.position = Vector2(24, 12)
 	screen_menu.size = Vector2(912, 468)
-	screen_menu.add_theme_stylebox_override("panel", desktop_theme.get_stylebox("panel", "Panel"))
+	screen_menu.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	_style_manager()
 	var close_button: Button = screen_menu.get_node("CloseButton")
-	close_button.position = Vector2(864, 10)
-	close_button.text = ""
+	close_button.position = Vector2(748, 12)
+	close_button.text = "Back"
 	close_button.custom_minimum_size = Vector2.ZERO
-	close_button.icon = load("res://assets/ui/kenney/close.png")
-	close_button.size = Vector2(40, 28)
-	close_button.tooltip_text = "Close computer"
+	close_button.icon = null
+	close_button.size = Vector2(146, 36)
+	close_button.tooltip_text = "Back to desktop"
+	# Game messages (orders, hours saved) would be hidden behind the full screen.
+	toast.visible = active and ui.feedback_seconds > 0 and not ui.feedback_label.text.is_empty()
+	if toast.visible: toast.text = ui.feedback_label.text
 	screen_menu.get_node("ShiftLabel").size.x = 108
 	screen_menu.get_node("ShiftStartHour").position.x = 130
 	var hour_width := (912.0 - 178) / 2
@@ -319,6 +593,44 @@ func _sync() -> void:
 	screen_menu.get_node("ShiftEndHour").size.x = hour_width
 	screen_menu.get_node("ShiftToLabel").position.x = 134 + hour_width
 	syncing = false
+
+## Shop Manager window in the style of the other PC apps: amber header with the
+## title, money, Shop online and Back; tabs under it; content on a white card.
+func _style_manager() -> void:
+	var title: Label = screen_menu.get_node("TitleLabel")
+	title.text = "WAREHOUSE ORDERS" if str(source.get_node("TitleLabel").text).begins_with("WAREHOUSE") else "APNA SHOP MANAGER"
+	title.position = Vector2(18, 8)
+	title.size = Vector2(400, 34)
+	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_color_override("font_color", Color.WHITE)
+	var money: Label = screen_menu.get_node("MoneyLabel")
+	money.position = Vector2(400, 18)
+	money.size = Vector2(176, 26)
+	money.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	money.add_theme_font_size_override("font_size", 16)
+	money.add_theme_color_override("font_color", Color.WHITE)
+	var tabs_copy: Control = screen_menu.get_node("ManagementTabs")
+	tabs_copy.position = Vector2(16, 70)
+	screen_menu.queue_redraw()
+
+func _draw_manager() -> void:
+	var size := screen_menu.size
+	screen_menu.draw_style_box(_round(Color("fff7ed"), 12), Rect2(Vector2.ZERO, size))
+	var header := _round(MANAGER_BRAND, 12)
+	screen_menu.draw_style_box(header, Rect2(0, 0, size.x, 60))
+	screen_menu.draw_string(screen_menu.get_theme_default_font(), Vector2(20, 52), "Prices, racks and shelves for your shop", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("fde68a"))
+	var card := _round(Color.WHITE, 12)
+	card.border_color = Color("fed7aa")
+	card.set_border_width_all(1)
+	screen_menu.draw_style_box(card, Rect2(8, 114, size.x - 16, size.y - 122))
+	# Orders: a picture of the selected product under the company list.
+	var column: Control = screen_menu.get_node("CompanyColumn")
+	if source.selected_tab == 0 and column.visible:
+		var id: String = Catalog.IDS[source.product_input.selected]
+		var picture: Texture2D = load("res://assets/ui/products/%s.png" % id)
+		var frame := Rect2(column.position.x, 316, column.size.x, 136)
+		screen_menu.draw_style_box(_round(Color("fff7ed"), 10), frame)
+		screen_menu.draw_texture_rect(picture, Rect2(frame.position + Vector2((frame.size.x - 124) / 2, 6), Vector2(124, 124)), false)
 
 func open(warehouse_context := false) -> void:
 	if active or player._menu_is_open(): return
@@ -336,11 +648,12 @@ func open(warehouse_context := false) -> void:
 	focus_camera.current = true
 	var landscape = world.get_node_or_null("Landscape")
 	if landscape != null: landscape.set_camera(focus_camera)
-	var target := screen_mesh.global_transform
-	target.origin += target.basis.z * 0.7
+	# The shop PC starts on the desktop; the warehouse PC is an orders terminal.
+	show_app("manager" if warehouse_context else "home")
 	transition = create_tween()
 	transition.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	transition.tween_property(focus_camera, "global_transform", target, 0.3)
+	transition.tween_property(focus_camera, "global_transform", _fit_transform(), 0.3)
+	transition.tween_callback(_show_full_screen)
 	screen_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	_sync()
 
@@ -360,8 +673,10 @@ func close() -> void:
 		var landscape = world.get_node_or_null("Landscape")
 		if landscape != null: landscape.set_camera(previous_camera)
 	screen_menu.hide()
-	if is_instance_valid(store): store.hide()
-	if is_instance_valid(bank): bank.hide()
+	overlay.visible = false
+	toast.hide()
+	# The monitor in the shop keeps showing the desktop.
+	show_home()
 	screen_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 func screen_point(pixel: Vector2) -> Vector2:
@@ -372,7 +687,7 @@ func screen_point(pixel: Vector2) -> Vector2:
 	if point == null: return Vector2(-1, -1)
 	var local: Vector3 = screen_mesh.to_local(point)
 	var uv := Vector2(local.x / 0.78 + 0.5, 0.5 - local.y / 0.44)
-	return uv * Vector2(screen_viewport.size) if Rect2(Vector2.ZERO, Vector2.ONE).has_point(uv) else Vector2(-1, -1)
+	return uv * SCREEN if Rect2(Vector2.ZERO, Vector2.ONE).has_point(uv) else Vector2(-1, -1)
 
 func _input(event: InputEvent) -> void:
 	if not active: return
@@ -407,8 +722,14 @@ func _input(event: InputEvent) -> void:
 			screen_viewport.push_input(copy, true)
 		get_viewport().set_input_as_handled()
 
-func _process(_delta: float) -> void:
-	if active: _sync()
+func _process(delta: float) -> void:
+	if not active: return
+	_sync()
+	if overlay.visible and get_viewport().get_visible_rect().size != fitted_size: _fit_overlay()
+	widget_seconds -= delta
+	if app == "home" and widget_seconds <= 0.0:
+		widget_seconds = 0.25
+		_refresh_desktop()
 
 func _exit_tree() -> void:
 	if active and is_instance_valid(source): source.modulate = Color.WHITE; source.active_terminal = null
