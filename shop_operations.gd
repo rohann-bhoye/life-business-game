@@ -268,7 +268,7 @@ func _ready() -> void:
 	stock_worker.set_script(load("res://stock_worker.gd"))
 	stock_worker.position = Vector3(-4.6, 0.1, -1.8)
 	stock_worker.get_node("CharacterVisual").shirt_color = Color(0.7, 0.42, 0.18)
-	stock_worker.get_node("CharacterVisual").model = "male-e"
+	stock_worker.get_node("CharacterVisual").model = "staff-f"
 	employee_tag(shop.worker, "Ramesh")
 	employee_tag(stock_worker, "Sunil")
 	get_parent().add_child.call_deferred(stock_worker)

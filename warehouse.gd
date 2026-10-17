@@ -228,7 +228,7 @@ func _build_receiver() -> void:
 	visual.name = "CharacterVisual"
 	visual.set_script(preload("res://character_visual.gd"))
 	visual.shirt_color = Color(0.15, 0.45, 0.66)
-	visual.model = "male-b"
+	visual.model = "warehouse"
 	receiver.add_child(visual)
 	add_child(receiver)
 	var label: Label3D = operations._sign(receiver, "EmployeeName", "Anil - Warehouse", Vector3(0, 1.85, 0))

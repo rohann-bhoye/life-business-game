@@ -7,12 +7,13 @@ extends Node3D
 const DOOR := Vector3(25.0, 0.1, 14.7)
 const PATH_START := Vector3(25.0, 0.1, 11.0)
 const SPEED := 1.25
-const MODELS := ["female-b", "male-d"]
+const MODELS := ["aunty", "uncle"]
 const Catalog := preload("res://product_catalog.gd")
 
 var business
 var town: Node3D
 var keeper: Node3D
+var helper: Node3D
 var sale_board: Node3D
 var sale_label: Label3D
 var shoppers: Array[Node3D] = []
@@ -48,7 +49,9 @@ func build(neighbourhood: Node3D, business_ref) -> void:
 	sale_label.outline_size = 0
 	sale_label.modulate = Color(1, 0.95, 0.6)
 	sale_board.add_child(sale_label)
-	keeper = _person("MrSharma", "male-c", store.to_global(Vector3(1.0, 0, -0.5)), 0.0)
+	# Sharma's people wear the store's red uniform.
+	keeper = _person("MrSharma", "rival-m", store.to_global(Vector3(1.0, 0, -0.5)), 0.0)
+	helper = _person("SharmaHelper", "rival-f", store.to_global(Vector3(-2.75, 0, -0.9)), 0.0)
 	var tag := Label3D.new()
 	tag.text = "Mr. Sharma"
 	tag.position = Vector3(0, 1.85, 0)
@@ -83,6 +86,7 @@ func _update_visibility() -> void:
 	if not sale.is_empty():
 		sale_label.text = "TODAY'S SALE\n%s\n%s%d  (was %s%d)" % [Catalog.NAMES[sale.id], String.chr(8377), sale.price, String.chr(8377), business.rival_price(sale.id)]
 	keeper.visible = open
+	helper.visible = open
 	for shopper in shoppers: shopper.visible = open and shopper.visible
 	set_physics_process(open)
 

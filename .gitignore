@@ -14,3 +14,6 @@ Thumbs.db
 
 # Terrain3D temporary DLL copies made by the editor
 addons/terrain_3d/bin/~*
+
+# Blender auto-backups
+*.blend1

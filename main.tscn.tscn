@@ -127,7 +127,7 @@ mesh = SubResource("CapsuleMesh_wp5od")
 script = ExtResource("9_character")
 feet_offset = -1.0
 face_movement = true
-model = "male-d"
+model = "shopkeeper"
 
 [node name="CameraPivot" type="Node3D" parent="Player" unique_id=431017728]
 transform = Transform3D(1, 0, 0, 0, 0.9781476, 0.20791169, 0, -0.20791169, 0.9781476, 0, 0.7, 0)

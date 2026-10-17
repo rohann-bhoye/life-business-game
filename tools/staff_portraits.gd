@@ -1,9 +1,9 @@
 extends SceneTree
 
 # Renders a 256x256 transparent head-and-shoulders portrait of each employee (the
-# same Kenney Mini models they use in the shop) into assets/ui/staff/<role>.png for
+# same uniformed models they use in the shop) into assets/ui/staff/<role>.png for
 # the PC staff page. Run graphically: Godot --path . --script res://tools/staff_portraits.gd
-const MODELS := {"cashier": "male-a", "stock": "male-e", "warehouse": "male-b"}
+const MODELS := {"cashier": "staff", "stock": "staff-f", "warehouse": "warehouse"}
 
 func _initialize() -> void:
 	call_deferred("_run")
@@ -43,7 +43,7 @@ func _run() -> void:
 	camera.current = true
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://assets/ui/staff"))
 	for role in MODELS:
-		var model: Node3D = (load("res://assets/characters/kenney/character-%s.glb" % MODELS[role]) as PackedScene).instantiate()
+		var model: Node3D = (load("res://assets/characters/custom/character-%s.glb" % MODELS[role]) as PackedScene).instantiate()
 		studio.add_child(model)
 		model.rotation.y = 0.35
 		var players := model.find_children("*", "AnimationPlayer", true, false)

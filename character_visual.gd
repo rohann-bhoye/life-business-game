@@ -5,11 +5,14 @@ extends Node3D
 @export var hair_color := Color(0.1, 0.085, 0.07)
 @export var feet_offset := 0.0
 @export var face_movement := false
-## Kenney Mini character id ("male-a".."female-f"); empty picks a random customer look.
+## Kenney Mini character id ("male-a".."female-f") or one of our own ("shopkeeper");
+## empty picks a random customer look.
 @export var model := ""
 
 const MODEL_DIR := "res://assets/characters/kenney/character-%s.glb"
-const RANDOM_MODELS := ["female-a", "female-b", "female-c", "female-d", "female-e", "female-f", "male-c", "male-f"]
+## Our own characters, built in Blender by tools/blender/*.py on the Kenney rig.
+const CUSTOM_DIR := "res://assets/characters/custom/character-%s.glb"
+const RANDOM_MODELS := ["female-a", "female-c", "female-f", "male-c", "male-f", "uncle", "sikh", "aunty", "student"]
 const MODEL_SCALE := 2.15
 const LOOPED := ["idle", "walk", "holding-both"]
 static var model_scenes: Dictionary = {}
@@ -133,7 +136,8 @@ func _ready() -> void:
 # working; the visible body is an animated Kenney Mini character.
 func _attach_model() -> void:
 	model_id = model if not model.is_empty() else RANDOM_MODELS.pick_random()
-	var path := MODEL_DIR % model_id
+	var path := CUSTOM_DIR % model_id
+	if not ResourceLoader.exists(path): path = MODEL_DIR % model_id
 	if not model_scenes.has(model_id):
 		model_scenes[model_id] = load(path) as PackedScene if ResourceLoader.exists(path) else null
 	if model_scenes[model_id] == null: return

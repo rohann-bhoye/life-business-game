@@ -21,7 +21,7 @@ func _ready() -> void:
 	var visual := Node3D.new()
 	visual.name = "CharacterVisual"
 	visual.set_script(preload("res://character_visual.gd"))
-	visual.model = "female-b"
+	visual.model = "farmer"
 	visual.shirt_color = Color(0.3, 0.55, 0.25)
 	add_child(visual)
 	var label: Label3D = world.get_node("ShopOperations")._sign(self, "EmployeeName", "Kiran - Farm", Vector3(0, 1.85, 0))
