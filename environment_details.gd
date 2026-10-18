@@ -1,13 +1,23 @@
 extends Node3D
 
-const WIND_SHADER := preload("res://assets/materials/foliage_wind.gdshader")
 var clouds: Array[Node3D] = []
 var cloud_material: StandardMaterial3D
-var detailed_ground: Material
-var low_ground: StandardMaterial3D
+var detailed_ground: ShaderMaterial
+
+const GRASS_SHADER := preload("res://assets/materials/grass_blades.gdshader")
+const GRASS_CELL := 8.0
+const GRASS_DENSITY := 9.0
+const MASK_STEP := 0.25
+const MASK_SIZE := 256
+var grass_chunks: Array[MultiMeshInstance3D] = []
+var grass_quality := 2
 
 func _ready() -> void:
-	_build_grass()
+	var grass := Node3D.new()
+	grass.name = "WindGrass"
+	add_child(grass)
+	# Planted once the whole town (farm, warehouse, houses) exists, to keep off it.
+	call_deferred("_build_grass")
 	_build_clouds()
 	_build_ground()
 	_build_water()
@@ -20,40 +30,113 @@ func _process(delta: float) -> void:
 		cloud.position.x += delta * 0.34
 		if cloud.position.x > 48.0: cloud.position.x = -48.0
 
+## Dense lawn on every open patch of the town: clumps of thin curved blades, kept off
+## anything solid or flat on the ground (roads, paths, floors, soil, buildings, found
+## from the scene), in 8 m chunks that only draw near the camera.
 func _build_grass() -> void:
-	var builder := SurfaceTool.new()
-	builder.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for point in [Vector3(-0.065, 0, 0), Vector3(0.065, 0, 0), Vector3(0.03, 0.55, 0), Vector3(0, 0, -0.065), Vector3(0, 0, 0.065), Vector3(0, 0.45, 0.03)]:
-		builder.add_vertex(point)
-	builder.generate_normals()
-	var blade := builder.commit()
-	var material := ShaderMaterial.new()
-	material.shader = WIND_SHADER
-	material.set_shader_parameter("base_color", Color(0.2, 0.46, 0.2))
-	material.set_shader_parameter("wind_strength", 0.1)
-	blade.surface_set_material(0, material)
-	var transforms: Array[Transform3D] = []
-	var rng := RandomNumberGenerator.new()		
+	# The farm joins the scene deferred too; one frame later everything is in place.
+	await get_tree().process_frame
+	if not is_inside_tree(): return
+	var mask := _grass_mask()
+	var clump := _grass_clump()
+	var rng := RandomNumberGenerator.new()
 	rng.seed = 481516
-	for strip_z in [1.65, 12.35, -11.5, 18.0]:
-		for index in range(90):
-			var x := rng.randf_range(-30.0, 30.0)
-			if absf(x + 3.0) < 5.0 and strip_z < 3.0: continue
-			var z: float = strip_z + rng.randf_range(-1.0, 1.0)
-			if z > 11.2 and x > -16.6 and x < 6.5: continue
-			if absf(x - 4.0) < 2.0 and z < 3.0: continue
-			var basis := Basis(Vector3.UP, rng.randf_range(0.0, TAU)).scaled(Vector3.ONE * rng.randf_range(0.75, 1.25))
-			transforms.append(Transform3D(basis, Vector3(x, 0.13, z)))
-	var multimesh := MultiMesh.new()
-	multimesh.transform_format = MultiMesh.TRANSFORM_3D
-	multimesh.instance_count = transforms.size()
-	multimesh.mesh = blade
-	for index in range(transforms.size()): multimesh.set_instance_transform(index, transforms[index])
-	var grass := MultiMeshInstance3D.new()
-	grass.name = "WindGrass"
-	grass.multimesh = multimesh
-	grass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(grass)
+	var holder := get_node("WindGrass")
+	for cell_x in range(-4, 4):
+		for cell_z in range(-4, 4):
+			var transforms: Array[Transform3D] = []
+			for index in range(int(GRASS_CELL * GRASS_CELL * GRASS_DENSITY)):
+				var x := (cell_x + rng.randf()) * GRASS_CELL
+				var z := (cell_z + rng.randf()) * GRASS_CELL
+				if absf(x) > 31.2 or absf(z) > 31.2: continue
+				if mask[int((z + 32.0) / MASK_STEP) * MASK_SIZE + int((x + 32.0) / MASK_STEP)]: continue
+				var size := rng.randf_range(0.8, 1.25)
+				var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(size, size * rng.randf_range(0.75, 1.35), size))
+				transforms.append(Transform3D(basis, Vector3(x, 0.1, z)))
+			if transforms.is_empty(): continue
+			var multimesh := MultiMesh.new()
+			multimesh.transform_format = MultiMesh.TRANSFORM_3D
+			multimesh.use_custom_data = true
+			multimesh.mesh = clump
+			multimesh.instance_count = transforms.size()
+			for index in range(transforms.size()):
+				multimesh.set_instance_transform(index, transforms[index])
+				multimesh.set_instance_custom_data(index, Color(rng.randf(), 0, 0, 0))
+			var chunk := MultiMeshInstance3D.new()
+			chunk.name = "GrassChunk%d_%d" % [cell_x, cell_z]
+			chunk.multimesh = multimesh
+			chunk.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			chunk.visibility_range_end = 38.0
+			chunk.visibility_range_end_margin = 4.0
+			holder.add_child(chunk)
+			grass_chunks.append(chunk)
+	_apply_grass_quality()
+
+## One clump: six thin blades of different heights, each a tapered two-part blade
+## leaning outwards. UV.y runs from root (0) to tip (1) for colour and wind.
+func _grass_clump() -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_normal(Vector3.UP)
+	for blade in range(6):
+		var angle := rng.randf() * TAU
+		var outward := Vector3(cos(angle), 0, sin(angle))
+		var root := outward * rng.randf_range(0.0, 0.07)
+		var height := rng.randf_range(0.13, 0.3)
+		var facing := rng.randf() * TAU
+		var side := Vector3(cos(facing), 0, sin(facing)) * rng.randf_range(0.011, 0.017)
+		var lean := outward * rng.randf_range(0.02, 0.1)
+		var middle := root + Vector3(0, height * 0.55, 0) + lean * 0.3
+		var tip := root + Vector3(0, height, 0) + lean
+		for point in [[root - side, 0.0], [root + side, 0.0], [middle + side * 0.6, 0.55], [root - side, 0.0], [middle + side * 0.6, 0.55], [middle - side * 0.6, 0.55], [middle - side * 0.6, 0.55], [middle + side * 0.6, 0.55], [tip, 1.0]]:
+			st.set_uv(Vector2(0, point[1]))
+			st.add_vertex(point[0])
+	var mesh := st.commit()
+	var material := ShaderMaterial.new()
+	material.shader = GRASS_SHADER
+	mesh.surface_set_material(0, material)
+	return mesh
+
+## 0.25 m cells over the town (-32..32): 1 where grass must not grow.
+func _grass_mask() -> PackedByteArray:
+	var mask := PackedByteArray()
+	mask.resize(MASK_SIZE * MASK_SIZE)
+	var world := get_tree().current_scene
+	var ground := world.get_node("MeshInstance3D")
+	# Visibility is ignored on purpose: Low Fast hides the pond, but grass must stay
+	# out of it when the player switches to a higher setting later.
+	for shape in world.find_children("*", "CollisionShape3D", true, false):
+		if not shape.shape is BoxShape3D or shape.disabled: continue
+		var body := shape.get_parent()
+		if body.name == "Ground" or body is CharacterBody3D: continue
+		var box: AABB = shape.global_transform * AABB(-shape.shape.size / 2.0, shape.shape.size)
+		if box.position.y < 0.6: _mark(mask, box, 0.1)
+	for mesh in world.find_children("*", "MeshInstance3D", true, false):
+		if mesh == ground or not (mesh.mesh is BoxMesh or mesh.mesh is PlaneMesh): continue
+		var box: AABB = mesh.global_transform * mesh.get_aabb()
+		if box.position.y < 0.35 and box.end.y < 0.45 and box.size.x * box.size.z > 0.2: _mark(mask, box, 0.05)
+	# Merged block paths (block_path.gd) mark themselves.
+	for path in get_tree().get_nodes_in_group("no_grass"):
+		_mark(mask, path.global_transform * path.get_aabb(), 0.05)
+	return mask
+
+func _mark(mask: PackedByteArray, box: AABB, margin: float) -> void:
+	if box.end.x < -32.0 or box.position.x > 32.0 or box.end.z < -32.0 or box.position.z > 32.0: return
+	var first_x := clampi(int((box.position.x - margin + 32.0) / MASK_STEP), 0, MASK_SIZE - 1)
+	var last_x := clampi(int((box.end.x + margin + 32.0) / MASK_STEP), 0, MASK_SIZE - 1)
+	var first_z := clampi(int((box.position.z - margin + 32.0) / MASK_STEP), 0, MASK_SIZE - 1)
+	var last_z := clampi(int((box.end.z + margin + 32.0) / MASK_STEP), 0, MASK_SIZE - 1)
+	for z in range(first_z, last_z + 1):
+		for x in range(first_x, last_x + 1):
+			mask[z * MASK_SIZE + x] = 1
+
+## High draws every blade, Balanced half, Low Fast a quarter and only close by.
+func _apply_grass_quality() -> void:
+	for chunk in grass_chunks:
+		chunk.multimesh.visible_instance_count = -1 if grass_quality >= 2 else chunk.multimesh.instance_count / (2 if grass_quality == 1 else 4)
+		chunk.visibility_range_end = 38.0 if grass_quality > 0 else 24.0
 
 func _build_clouds() -> void:
 	cloud_material = StandardMaterial3D.new()
@@ -91,28 +174,12 @@ func _build_ground() -> void:
 	material.shader = preload("res://assets/materials/grass_ground.gdshader")
 	detailed_ground = material
 	get_tree().current_scene.get_node("MeshInstance3D").material_override = material
-	low_ground = StandardMaterial3D.new()
-	var noise := FastNoiseLite.new()
-	noise.seed = 481516
-	noise.frequency = 0.08
-	var texture := NoiseTexture2D.new()
-	texture.width = 128
-	texture.height = 128
-	texture.seamless = true
-	texture.noise = noise
-	var ramp := Gradient.new()
-	ramp.colors = PackedColorArray([Color(0.19, 0.29, 0.11), Color(0.32, 0.45, 0.2)])
-	texture.color_ramp = ramp
-	low_ground.albedo_texture = texture
-	low_ground.uv1_scale = Vector3(24, 24, 1)
-	low_ground.roughness = 0.98
 
 func set_quality(quality: int) -> void:
-	var grass := get_node("WindGrass") as MultiMeshInstance3D
-	grass.visible = quality > 0
-	grass.multimesh.visible_instance_count = -1
-	grass.visibility_range_end = 55.0
-	get_tree().current_scene.get_node("MeshInstance3D").material_override = low_ground if quality == 0 else detailed_ground
+	grass_quality = quality
+	_apply_grass_quality()
+	# Low Fast keeps the lawn shader but skips its fine grain and bump.
+	detailed_ground.set_shader_parameter("fine_detail", quality > 0)
 	for cloud in clouds:
 		cloud.visible = quality > 0
 	get_node("GardenWater").visible = quality > 0

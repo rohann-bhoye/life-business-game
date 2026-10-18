@@ -93,6 +93,19 @@ func _build_entrance() -> void:
 	farm_title.position = Vector3(-24, 2.72, -0.555)
 	farm_title.font_size = 36
 	farm_title.pixel_size = 0.004
+	_build_block_paths()
+
+## Bare earth inside the fence and cement-block paths: along the front, down the
+## aisles between the bed columns and up to the seed stall. One merged mesh.
+func _build_block_paths() -> void:
+	builder._box("FarmGround", self, Vector3(12.5, 0.01, 11.15), Vector3(-23.15, 0.112, -6.325), Color(0.33, 0.24, 0.15))
+	get_node("FarmPath").visible = false
+	var paths := preload("res://block_path.gd")
+	for aisle in range(3):
+		var x := -26.7 + aisle * 2.6
+		paths.lay(self, "FarmAisle%d" % aisle, Vector2(x, -1.95), Vector2(x, -11.6), 2)
+	paths.lay(self, "FarmFrontPath", Vector2(-29.45, -1.5), Vector2(-18.55, -1.5), 2, 0.48)
+	paths.lay(self, "SeedStallPath", Vector2(-18.0, -1.95), Vector2(-18.0, -3.2), 2)
 
 func _fence_segment(node_name: String, start: Vector3, end: Vector3) -> void:
 	var fence := Node3D.new()

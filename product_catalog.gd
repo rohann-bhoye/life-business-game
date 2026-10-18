@@ -1,7 +1,8 @@
 extends RefCounted
 
 const IDS := ["bottle", "snack", "soap", "tomato", "oil", "milk", "bread", "chocolate", "honey", "carrot", "cabbage", "corn", "apple"]
-const NAMES := {"bottle": "Reusable bottles", "snack": "Snack packs", "soap": "Soap bars", "tomato": "Farm tomatoes", "oil": "Cooking oil", "milk": "Milk cartons", "bread": "Bread loaves", "chocolate": "Chocolate bars", "honey": "Honey jars", "carrot": "Farm carrots", "cabbage": "Cabbages", "corn": "Sweet corn", "apple": "Apples"}
+# Kirana names (ids stay the same, so saves and racks are unchanged).
+const NAMES := {"bottle": "Cold drink", "snack": "Masala namkeen", "soap": "Neem soap", "tomato": "Desi tomatoes", "oil": "Mustard oil", "milk": "Fresh milk", "bread": "Pav bread", "chocolate": "Chocolate", "honey": "Pure honey", "carrot": "Red carrots", "cabbage": "Patta gobhi", "corn": "Bhutta", "apple": "Kashmiri apples"}
 const COSTS := {"bottle": 500, "snack": 400, "soap": 600, "tomato": 500, "oil": 1000, "milk": 400, "bread": 350, "chocolate": 300, "honey": 1200, "carrot": 400, "cabbage": 450, "corn": 400, "apple": 600}
 const PRICES := {"snack": 80, "soap": 120, "tomato": 80, "oil": 150, "milk": 60, "bread": 50, "chocolate": 50, "honey": 180, "carrot": 60, "cabbage": 70, "corn": 60, "apple": 90}
 ## Every SKU tracked in the inventory dictionary (bottle stock is derived from the aggregate).

@@ -13,8 +13,16 @@ const ROOM_MAX_X := -0.06
 const BACK_Z := -7.44
 const FRONT_Z := 2.44
 const SHELF_HEIGHTS := [2.35, 2.85]
+# Indian shop touches: marigold torans, rangoli, tulsi planter and a small mandir.
+const MARIGOLD := [Color(1.0, 0.5, 0.04), Color(1.0, 0.76, 0.08)]
+const LEAF := Color(0.16, 0.48, 0.14)
+# The front doorway is 2 m wide (x -4..-2) and 2.4 m high; the wall's outer face is z 2.56.
+const DOOR_X := -3.0
+const DOOR_TOP := 2.44
 
 var fans: Array[Node3D] = []
+var diya_light: OmniLight3D
+var flicker := 0.0
 
 func build(counter: Node3D) -> void:
 	name = "ShopDecor"
@@ -37,6 +45,180 @@ func build(counter: Node3D) -> void:
 	_sign_panel("PaymentBoard", "CASH  |  CARD  |  UPI\nAll payments accepted", Vector3(ROOM_MAX_X - 0.02, 1.75, -0.1), -PI / 2, Vector2(1.1, 0.5), Color(0.1, 0.42, 0.36))
 	_sign_panel("WelcomeBoard", "APNA MART\nDaily needs - Fresh - Sasta", Vector3(-3.0, 3.48, BACK_Z + 0.02), 0.0, Vector2(2.6, 0.5), Color(0.12, 0.3, 0.26))
 	_counter_sweets(counter)
+	_indian_touches()
+
+func _indian_touches() -> void:
+	for z in [FRONT_Z - 0.05, 2.62]: _toran("Toran", Vector3(DOOR_X, DOOR_TOP, z), 1.9)
+	_rangoli(Vector3(DOOR_X, 0.126, 3.2))
+	_tulsi(Vector3(-4.45, 0.1, 2.95))
+	_mandir(Vector3(ROOM_MAX_X - 0.02, 1.55, -1.3))
+
+## Instanced spheres; each item is [Transform3D, Color].
+func _spheres(node_name: String, radius: float, items: Array, parent: Node = self) -> MultiMeshInstance3D:
+	var mesh := SphereMesh.new()
+	mesh.radius = radius
+	mesh.height = radius * 2
+	mesh.radial_segments = 8
+	mesh.rings = 4
+	var material := StandardMaterial3D.new()
+	material.vertex_color_use_as_albedo = true
+	material.roughness = 0.8
+	mesh.material = material
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.use_colors = true
+	multimesh.mesh = mesh
+	multimesh.instance_count = items.size()
+	for index in range(items.size()):
+		multimesh.set_instance_transform(index, items[index][0])
+		multimesh.set_instance_color(index, items[index][1])
+	var node := MultiMeshInstance3D.new()
+	node.name = node_name
+	node.multimesh = multimesh
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(node, true)
+	return node
+
+## Marigold strings hanging from a cord, with mango leaves between them.
+func _toran(node_name: String, center: Vector3, width: float) -> void:
+	var flowers: Array = []
+	var leaves: Array = []
+	var strands := int(width / 0.1)
+	for index in range(strands + 1):
+		var x := -width / 2 + index * width / strands
+		flowers.append([Transform3D(Basis(), center + Vector3(x, 0, 0)), MARIGOLD[index % 2]])
+		if index % 2 == 0:
+			for drop in range(1, 4 + int(index % 4 == 0)):
+				flowers.append([Transform3D(Basis(), center + Vector3(x, -drop * 0.062, 0)), MARIGOLD[(index / 2 + drop) % 2]])
+		else:
+			var tilt := Basis(Vector3.FORWARD, 0.25 * (1 if index % 4 == 1 else -1))
+			leaves.append([Transform3D(tilt.scaled(Vector3(0.45, 1.6, 0.12)), center + Vector3(x, -0.085, 0)), LEAF])
+	_spheres(node_name + "Flowers", 0.034, flowers)
+	_spheres(node_name + "Leaves", 0.05, leaves)
+
+## A round rangoli on the pavement: coloured rings, petals and white dots.
+func _rangoli(center: Vector3) -> void:
+	var holder := Node3D.new()
+	holder.name = "Rangoli"
+	holder.position = center
+	add_child(holder)
+	var rings := [[0.52, Color(0.86, 0.12, 0.45)], [0.44, Color(1.0, 0.8, 0.12)], [0.35, Color(0.1, 0.62, 0.35)], [0.26, Color(1.0, 0.45, 0.05)], [0.16, Color(0.98, 0.96, 0.9)], [0.08, Color(0.85, 0.1, 0.12)]]
+	for index in range(rings.size()):
+		var disc := MeshInstance3D.new()
+		var mesh := CylinderMesh.new()
+		mesh.top_radius = rings[index][0]
+		mesh.bottom_radius = rings[index][0]
+		mesh.height = 0.004
+		mesh.radial_segments = 32
+		disc.mesh = mesh
+		disc.material_override = _material(rings[index][1])
+		disc.position.y = index * 0.0015
+		disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		holder.add_child(disc)
+	var petals: Array = []
+	for index in range(8):
+		var angle := index * TAU / 8
+		var basis := Basis(Vector3.UP, -angle).scaled(Vector3(1.0, 0.05, 0.45))
+		petals.append([Transform3D(basis, Vector3(cos(angle), 0.012, sin(angle)) * Vector3(0.4, 1, 0.4) + Vector3(0, 0.012, 0)), Color(0.55, 0.2, 0.75) if index % 2 else Color(0.98, 0.3, 0.2)])
+	_spheres("Petals", 0.09, petals, holder)
+	var dots: Array = []
+	for index in range(20):
+		var angle := index * TAU / 20
+		dots.append([Transform3D(Basis().scaled(Vector3(1, 0.3, 1)), Vector3(cos(angle) * 0.57, 0.004, sin(angle) * 0.57)), Color(0.98, 0.97, 0.92)])
+	_spheres("Dots", 0.022, dots, holder)
+
+## A tulsi planter: terracotta box with a saffron band and a leafy plant.
+func _tulsi(base: Vector3) -> void:
+	var holder := Node3D.new()
+	holder.name = "TulsiPlanter"
+	holder.position = base
+	add_child(holder)
+	var pot := _box("Pot", Vector3.ZERO, Vector3(0.38, 0.46, 0.38), _material(Color(0.72, 0.33, 0.2)))
+	pot.reparent(holder, false)
+	pot.position = Vector3(0, 0.23, 0)
+	var band := _box("Band", Vector3.ZERO, Vector3(0.39, 0.06, 0.39), _material(Color(0.98, 0.55, 0.1)))
+	band.reparent(holder, false)
+	band.position = Vector3(0, 0.38, 0)
+	var leaves: Array = []
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	for index in range(18):
+		var spot := Vector3(rng.randf_range(-0.13, 0.13), 0.52 + rng.randf_range(0.0, 0.3), rng.randf_range(-0.13, 0.13))
+		leaves.append([Transform3D(Basis().scaled(Vector3.ONE * rng.randf_range(0.8, 1.2)), spot), LEAF.lerp(Color(0.25, 0.6, 0.2), rng.randf())])
+	for index in range(6):
+		leaves.append([Transform3D(Basis().scaled(Vector3(0.5, 1.4, 0.5)), Vector3(rng.randf_range(-0.1, 0.1), 0.86 + rng.randf_range(0.0, 0.06), rng.randf_range(-0.1, 0.1))), Color(0.45, 0.22, 0.5)])
+	_spheres("Leaves", 0.065, leaves, holder)
+
+## A small wall mandir by the counter: shelf, red cloth, framed picture with a
+## marigold garland, two diyas with a warm flickering light and SHUBH LABH below.
+func _mandir(wall_point: Vector3) -> void:
+	var holder := Node3D.new()
+	holder.name = "Mandir"
+	holder.position = wall_point
+	holder.rotation.y = -PI / 2
+	add_child(holder)
+	var parts := [
+		["Shelf", Vector3(0, 0, 0.13), Vector3(0.7, 0.04, 0.26), Color(0.5, 0.3, 0.16)],
+		["Cloth", Vector3(0, 0.022, 0.13), Vector3(0.64, 0.006, 0.25), Color(0.78, 0.08, 0.1)],
+		["ClothFront", Vector3(0, -0.01, 0.262), Vector3(0.64, 0.07, 0.006), Color(0.78, 0.08, 0.1)],
+		["Frame", Vector3(0, 0.25, 0.03), Vector3(0.38, 0.44, 0.03), Color(0.86, 0.64, 0.18)],
+		["Picture", Vector3(0, 0.25, 0.048), Vector3(0.3, 0.36, 0.006), Color(1.0, 0.56, 0.12)],
+		["Halo", Vector3(0, 0.3, 0.053), Vector3(0.16, 0.16, 0.004), Color(1.0, 0.86, 0.36)],
+		["LabhBoard", Vector3(0, -0.17, 0.02), Vector3(0.62, 0.16, 0.02), Color(0.99, 0.84, 0.22)],
+	]
+	for part in parts:
+		var node := _box(part[0], Vector3.ZERO, part[2], _material(part[3]))
+		node.reparent(holder, false)
+		node.position = part[1]
+	for side in [-1, 1]:
+		var bracket := _box("Bracket", Vector3.ZERO, Vector3(0.03, 0.12, 0.22), _material(Color(0.2, 0.22, 0.24)))
+		bracket.reparent(holder, false)
+		bracket.position = Vector3(side * 0.28, -0.08, 0.11)
+	var garland: Array = []
+	for index in range(15):
+		var t := index / 14.0
+		garland.append([Transform3D(Basis(), Vector3(lerpf(-0.19, 0.19, t), 0.47 - 0.14 * sin(PI * t), 0.07)), MARIGOLD[index % 2]])
+	_spheres("Garland", 0.024, garland, holder)
+	var flame_material := StandardMaterial3D.new()
+	flame_material.albedo_color = Color(1.0, 0.72, 0.2)
+	flame_material.emission_enabled = true
+	flame_material.emission = Color(1.0, 0.6, 0.15)
+	flame_material.emission_energy_multiplier = 3.0
+	for side in [-1, 1]:
+		var bowl := MeshInstance3D.new()
+		var clay := CylinderMesh.new()
+		clay.top_radius = 0.045
+		clay.bottom_radius = 0.028
+		clay.height = 0.028
+		bowl.mesh = clay
+		bowl.material_override = _material(Color(0.6, 0.3, 0.16))
+		bowl.position = Vector3(side * 0.22, 0.04, 0.17)
+		holder.add_child(bowl)
+		var flame := MeshInstance3D.new()
+		var tip := SphereMesh.new()
+		tip.radius = 0.012
+		tip.height = 0.052
+		flame.mesh = tip
+		flame.material_override = flame_material
+		flame.position = Vector3(side * 0.22, 0.078, 0.17)
+		flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		holder.add_child(flame)
+	diya_light = OmniLight3D.new()
+	diya_light.name = "DiyaLight"
+	diya_light.light_color = Color(1.0, 0.62, 0.28)
+	diya_light.light_energy = 0.7
+	diya_light.omni_range = 1.1
+	diya_light.position = Vector3(0, 0.14, 0.22)
+	holder.add_child(diya_light)
+	var words := Label3D.new()
+	words.name = "ShubhLabh"
+	words.text = "SHUBH   LABH"
+	words.font_size = 44
+	words.pixel_size = 0.0021
+	words.outline_size = 0
+	words.modulate = Color(0.72, 0.06, 0.08)
+	words.position = Vector3(0, -0.17, 0.034)
+	holder.add_child(words)
 
 func _wall_shelf(center: Vector3, size: Vector3, board: Material, bracket: Material, placements: Dictionary, seed: int) -> void:
 	var along_z := size.z > size.x
@@ -128,3 +310,6 @@ func _material(color: Color) -> StandardMaterial3D:
 
 func _process(delta: float) -> void:
 	for fan in fans: fan.rotate_y(delta * 4.0)
+	if is_instance_valid(diya_light):
+		flicker += delta
+		diya_light.light_energy = 0.62 + 0.08 * sin(flicker * 13.0) + 0.05 * sin(flicker * 7.3)

@@ -12,13 +12,17 @@ func _ready() -> void:
 	_update_shop_upgrade()
 	_build_streets()
 	_build_garden()
-	for point in [Vector3(-11, 0.1, -8), Vector3(-18, 0.1, 12), Vector3(11, 0.1, -11), Vector3(12, 0.1, 0), Vector3(15, 0.1, 13), Vector3(-17, 0.1, 0), Vector3(-21, 0.1, -14), Vector3(23, 0.1, -18), Vector3(25, 0.1, 3), Vector3(-24, 0.1, 16)]:
+	for point in [Vector3(-11, 0.1, -8), Vector3(-18, 0.1, 12), Vector3(11, 0.1, -11), Vector3(12, 0.1, 0), Vector3(17.8, 0.1, 13.4), Vector3(-17, 0.1, 0), Vector3(-21, 0.1, -14), Vector3(23, 0.1, -18), Vector3(25, 0.1, 3), Vector3(-24, 0.1, 16)]:
 		_tree(point)
 	for x in [-18.0, -8.0, 8.0, 18.0]:
 		_streetlight(Vector3(x, 0.1, 3.3))
 		_streetlight(Vector3(x + 1.0, 0.1, 10.7), PI)
 	_build_background()
 	_build_street_details()
+	var indian_street := Node3D.new()
+	indian_street.set_script(preload("res://indian_street.gd"))
+	add_child(indian_street)
+	indian_street.build(self)
 	var environment := Node3D.new()
 	environment.name = "EnvironmentDetails"
 	environment.set_script(preload("res://environment_details.gd"))
@@ -40,18 +44,16 @@ func _ready() -> void:
 
 func set_quality(quality: int) -> void:
 	var show_scenery := quality > 0
-	for child in get_children():
-		if not child.name.begins_with("Tree"): continue
-		child.visible = show_scenery
-		for body_name in ["TrunkBody", "CanopyBody"]:
-			var body := child.get_node_or_null(body_name) as StaticBody3D
-			if body != null: body.collision_layer = 1 if show_scenery else 0
+	# Trees stay on every setting: their leaves are merged into StreetBatch, so hiding
+	# the trunks left tree tops floating in the air.
 	var street_life := get_node_or_null("StreetLife")
 	if street_life != null:
 		street_life.visible = show_scenery
 		street_life.set_physics_process(show_scenery)
 	var traffic := get_node_or_null("Traffic")
 	if traffic != null: traffic.set_quality(quality)
+	var indian_street := get_node_or_null("IndianStreet")
+	if indian_street != null: indian_street.set_quality(quality)
 
 func _material(color: Color) -> StandardMaterial3D:
 	if not materials.has(color):
@@ -270,18 +272,19 @@ func _streetlight(offset: Vector3, facing := 0.0, real_light := true) -> void:
 	glow.emission_enabled = true
 	glow.emission = Color(0.4, 0.35, 0.2)
 	lens.material_override = glow
-	if not real_light:
-		var pool := MeshInstance3D.new()
-		pool.name = "Pool"
-		var plane := PlaneMesh.new()
-		plane.size = Vector2(6, 6)
-		pool.mesh = plane
-		pool.position = Vector3(0, 0.03, 0.65)
-		pool.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		pool.material_override = _light_pool_material()
-		pool.visible = false
-		lamp.add_child(pool)
-		return
+	# A glowing pool on the ground: the only light under the lamps out of town, and
+	# the cheap stand-in for the real spot light on Low Fast (day_night.gd).
+	var pool := MeshInstance3D.new()
+	pool.name = "Pool"
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(6, 6)
+	pool.mesh = plane
+	pool.position = Vector3(0, 0.03, 0.65)
+	pool.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	pool.material_override = _light_pool_material()
+	pool.visible = false
+	lamp.add_child(pool)
+	if not real_light: return
 	var light := SpotLight3D.new()
 	light.name = "Light"
 	light.position = Vector3(0, 3.0, 0.65)
@@ -338,6 +341,7 @@ func _build_background() -> void:
 		for side in [-1, 1]:
 			_box("SouthShopWindow%d_%d" % [index, side], self, Vector3(2, 1.6, 0.06), Vector3(x + side * 2.1, 1.7, depth - 2.54), Color(0.36, 0.65, 0.72))
 	_dress_buildings()
+	_build_lanes()
 	_build_rival_store()
 	var expansion := Node3D.new()
 	expansion.set_script(preload("res://town_expansion.gd"))
@@ -354,11 +358,33 @@ func _build_background() -> void:
 	add_child(boundary)
 	boundary.build(self)
 
-# Show Kenney City Kit Suburban houses in place of the block buildings. The
+# Cement-block paths to every house door. North: a back lane behind the shop and
+# home with a short step to each door, joining the street left of the shop and past
+# the home. South: a path round the bus stop to the corner house, and corridors
+# between the front houses to lanes along the back row.
+const BlockPath := preload("res://block_path.gd")
+const LANES := [
+	["BackLane", Vector2(-16.0, -13.6), Vector2(14.0, -13.6), 3],
+	["BackLaneWest", Vector2(-7.0, -12.97), Vector2(-7.0, 2.6), 3],
+	["BackLaneEast", Vector2(13.4, -12.97), Vector2(13.4, 2.6), 3],
+	["BusStopPath", Vector2(-26.6, 11.4), Vector2(-26.6, 13.47), 3],
+	["CornerHousePath", Vector2(-27.23, 14.1), Vector2(-24.1, 14.1), 3],
+	["WestCorridor", Vector2(-19.6, 11.4), Vector2(-19.6, 21.47), 3],
+	["WestBackLane", Vector2(-24.9, 22.1), Vector2(-18.97, 22.1), 3],
+	["EastCorridor", Vector2(20.0, 11.4), Vector2(20.0, 21.47), 3],
+	["EastBackLane", Vector2(14.1, 22.1), Vector2(25.9, 22.1), 3],
+	["SouthHousePath", Vector2(15.0, 11.4), Vector2(15.0, 14.75), 3],
+]
+func _build_lanes() -> void:
+	for lane in LANES:
+		BlockPath.lay(self, lane[0], lane[1], lane[2], lane[3])
+	for x in [-15.0, -6.0, 3.0, 12.0]:
+		BlockPath.lay(self, "DoorStep%d" % int(x), Vector2(x, -14.75), Vector2(x, -14.23), 3)
+
+# Show Indian town houses (indian_house.gd) in place of the block buildings. The
 # original box colliders stay; only their visible meshes are hidden.
-const HOUSE_MODELS := ["a", "c", "e", "g", "i", "k", "m", "o", "q", "s"]
+const IndianHouse := preload("res://indian_house.gd")
 func _dress_buildings() -> void:
-	var Kenney = preload("res://kenney_assets.gd")
 	var spots: Array = []
 	for index in range(4):
 		spots.append(["NeighbourHouse%d" % index, 0.0, Vector3(6.2, 6.0, 5.2), ["NeighbourBuilding%d", "NeighbourRoof%d", "NeighbourWindow%d_0", "NeighbourWindow%d_1", "NeighbourWindow%d_2"], index])
@@ -371,7 +397,8 @@ func _dress_buildings() -> void:
 		for pattern in spot[3]:
 			var part := get_node_or_null(String(pattern % spot[4]).validate_node_name()) as Node3D
 			if part != null: part.visible = false
-		Kenney.fit(self, spot[0], "res://assets/buildings/kenney/building-type-%s.glb" % HOUSE_MODELS[number], spot[2], Vector3(building.position.x, 0.1, building.position.z), spot[1])
+		# Sharma's store front (x 25) hangs on its house, so that one has no balcony.
+		IndianHouse.build(self, spot[0], spot[2], Vector3(building.position.x, 0.1, building.position.z), spot[1], number, {"balcony": absf(building.position.x - 25.0) > 1.0})
 
 # Sharma General Store, the rival shop: a shop front on the south-side house at
 # x 25, shown from the day it opens (business.rival_open()).

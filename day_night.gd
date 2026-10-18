@@ -5,6 +5,7 @@ var streetlights_on := false
 var street_lights: Array[SpotLight3D] = []
 var lamp_materials: Array[StandardMaterial3D] = []
 var light_pools: Array[MeshInstance3D] = []
+var fallback_pools: Array[MeshInstance3D] = []
 var moon: DirectionalLight3D
 var interior_light: OmniLight3D
 var environment: Environment
@@ -38,8 +39,9 @@ func _ready() -> void:
 		if not lamp.has_node("Lens"): continue
 		lamp_materials.append(lamp.get_node("Lens").material_override)
 		if lamp.has_node("Light"): street_lights.append(lamp.get_node("Light"))
-		# Town expansion lamps have no real light, only a glowing pool on the ground.
-		if lamp.has_node("Pool"): light_pools.append(lamp.get_node("Pool"))
+		# Town expansion lamps have no real light, only a glowing pool on the ground;
+		# town lamps light their pool instead of the spot light on Low Fast.
+		if lamp.has_node("Pool"): (fallback_pools if lamp.has_node("Light") else light_pools).append(lamp.get_node("Pool"))
 	_build_stars()
 	business.clock_changed.connect(_on_clock_changed)
 	business.changed.connect(_refresh)
@@ -116,11 +118,15 @@ func _refresh() -> void:
 		sky_material.sky_top_color = sky_material.sky_top_color.lerp(grey, 0.7)
 		sky_material.sky_horizon_color = horizon.lerp(grey, 0.6)
 		environment.fog_density *= 2.5
-	streetlights_on = not low_quality and (business.minutes_of_day < 390.0 or business.minutes_of_day >= 1110.0)
+	# Lamps glow at night on every setting; Low Fast swaps the real spot lights for
+	# the cheap glowing pools on the ground.
+	streetlights_on = business.minutes_of_day < 390.0 or business.minutes_of_day >= 1110.0
 	for pool in light_pools:
 		pool.visible = streetlights_on
+	for pool in fallback_pools:
+		pool.visible = streetlights_on and low_quality
 	for light in street_lights:
-		light.visible = streetlights_on
+		light.visible = streetlights_on and not low_quality
 	for material in lamp_materials:
 		material.emission_enabled = streetlights_on
 		material.emission_energy_multiplier = 3.0 if streetlights_on else 0.0

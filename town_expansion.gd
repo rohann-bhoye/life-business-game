@@ -7,7 +7,7 @@ extends Node3D
 # chai stall, more houses and parked autos/scooters. The bus stop sits inside the
 # open town. Built once by neighbourhood.gd; uses its box/tree/streetlight helpers.
 const Kenney = preload("res://kenney_assets.gd")
-const HOUSE := "res://assets/buildings/kenney/building-type-%s.glb"
+const IndianHouse := preload("res://indian_house.gd")
 const MARKET_X := 50.0
 const BUS_STOP_X := -24.0
 const SHOPS := [
@@ -30,6 +30,7 @@ func build(neighbourhood: Node3D) -> void:
 	future.name = "FutureTown"
 	town.add_child(future)
 	_roads()
+	_horizon_road()
 	_houses()
 	_market()
 	_chai_stall()
@@ -47,7 +48,7 @@ func _box(node_name: String, size: Vector3, position: Vector3, colour: Color, so
 	return town._box(node_name, town if parent == null else parent, size, position, colour, solid)
 
 func _roads() -> void:
-	var road_material: Material = town.get_parent().get_node("Road").material_override
+	var road_material := _road_material()
 	var paving := Color(0.66, 0.69, 0.67)
 	for side in [-1, 1]:
 		var road := _box("RoadExtension%d" % side, Vector3(43, 0.012, 5.5), Vector3(side * 53.5, 0.111, 7), Color(0.16, 0.18, 0.19))
@@ -71,8 +72,67 @@ func _roads() -> void:
 		town._streetlight(Vector3(x, 0.1, 3.3), 0.0, false)
 		town._streetlight(Vector3(x + 1.0, 0.1, 10.7), PI, false)
 
+const Horizon := preload("res://horizon.gd")
+const ROAD_Z := 7.0
+
+## Past the future town the road, pavements and markings climb the crest and run
+## down the valley (horizon.gd) in 1 m steps; the landscape beside the road is
+## lowered to match once it has loaded.
+func _horizon_road() -> void:
+	var road_material := _road_material()
+	var paving := Color(0.66, 0.69, 0.67)
+	var line := Color(0.83, 0.86, 0.83)
+	for side in [-1, 1]:
+		var road := SurfaceTool.new()
+		road.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var edges := SurfaceTool.new()
+		edges.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for step in range(50):
+			var x0: float = side * (Horizon.START + step)
+			var x1: float = side * (Horizon.START + step + 1.0)
+			_slope_strip(road, x0, x1, 4.25, 9.75, 0.117, Color.WHITE)
+			_slope_strip(edges, x0, x1, 2.6, 4.2, 0.114, paving)
+			_slope_strip(edges, x0, x1, 9.8, 11.4, 0.114, paving)
+			for z in [4.35, 9.65]: _slope_strip(edges, x0, x1, z - 0.025, z + 0.025, 0.124, line)
+			if step % 4 < 2: _slope_strip(edges, x0, x1, 6.955, 7.045, 0.124, Color(0.88, 0.86, 0.68))
+		for part in [[road, road_material, "HorizonRoad"], [edges, IndianHouse._material(), "HorizonPavements"]]:
+			var mesh := MeshInstance3D.new()
+			mesh.name = "%s%d" % [part[2], side]
+			mesh.mesh = part[0].commit()
+			mesh.material_override = part[1]
+			town.add_child(mesh)
+	call_deferred("_lower_valley")
+
+## The town road's asphalt (shop_presentation.gd builds it; the main Road node only
+## gets it later in that node's _ready, so ask the builder directly).
+func _road_material() -> Material:
+	var presentation := town.get_parent().get_node_or_null("ShopPresentation")
+	if presentation != null and presentation.has_method("surface"): return presentation.surface(Vector2(0, 0.5), 3.0)
+	return town.get_parent().get_node("Road").material_override
+
+## A flat strip across the road from z0 to z1 between x0 and x1, following the hill.
+func _slope_strip(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float, y: float, colour: Color) -> void:
+	var y0 := y + Horizon.height(x0)
+	var y1 := y + Horizon.height(x1)
+	var normal := Vector3(-Horizon.slope((x0 + x1) / 2.0), 1.0, 0.0).normalized()
+	IndianHouse._quad(st, Vector3(x0, y0, z0), Vector3(x1, y1, z0), Vector3(x1, y1, z1), Vector3(x0, y0, z1), normal, colour)
+
+## Lowers the landscape along the road into the valley, blending back to the
+## original hills 45 m to each side.
+func _lower_valley() -> void:
+	var landscape := town.get_parent().get_node_or_null("Landscape")
+	if landscape == null or landscape.get_class() != "Terrain3D": return
+	var data = landscape.data
+	for side in [-1, 1]:
+		for step in range(53):
+			var x: float = side * (Horizon.START + step)
+			for z in range(int(ROAD_Z) - 45, int(ROAD_Z) + 46):
+				var weight := 1.0 - smoothstep(6.0, 45.0, absf(z - ROAD_Z))
+				var point := Vector3(x, 0, z)
+				data.set_height(point, lerpf(data.get_height(point), 0.06 + Horizon.height(x), weight))
+	data.update_maps()
+
 func _houses() -> void:
-	var types := ["b", "d", "f", "h", "j", "l", "n", "p", "r", "t", "u", "a", "c", "e", "g", "i"]
 	var spots := [
 		# [x, z, yaw] — north side faces the road (+z), south side faces it (-z).
 		[-40.0, -6.0, 0.0], [-50.0, -6.0, 0.0], [-60.0, -6.0, 0.0], [-70.0, -6.0, 0.0],
@@ -83,7 +143,7 @@ func _houses() -> void:
 	]
 	for index in range(spots.size()):
 		var spot: Array = spots[index]
-		Kenney.fit(future, "TownHouse%d" % index, HOUSE % types[index % types.size()], Vector3(6.6, 6.5, 5.6), Vector3(spot[0], 0.1, spot[1]), spot[2])
+		IndianHouse.build(future, "TownHouse%d" % index, Vector3(6.4, 0, 5.4), Vector3(spot[0], 0.1, spot[1]), spot[2], index + 3)
 		town._collider("TownHouseBody%d" % index, future, Vector3(5.8, 4.0, 4.8), Vector3(spot[0], 2.1, spot[1]))
 		# Short garden path from the pavement to each front door.
 		var front: float = spot[1] + (2.9 if spot[2] == 0.0 else -2.9)

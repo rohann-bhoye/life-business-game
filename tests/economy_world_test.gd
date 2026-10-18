@@ -147,7 +147,7 @@ func _run() -> void:
 	assert(audio.music.stream.loop_mode == AudioStreamWAV.LOOP_FORWARD)
 	# One continuous music player under the root, shared with the lobby.
 	assert(audio.music == root.get_node("BackgroundMusic") and audio.music.bus == "Music")
-	assert(audio.music.stream.resource_path.ends_with("music_nature.wav") and audio.night_ambience.stream.loop_mode == AudioStreamWAV.LOOP_FORWARD)
+	assert(audio.music.stream.resource_path.ends_with("music_indian.wav") and audio.night_ambience.stream.loop_mode == AudioStreamWAV.LOOP_FORWARD)
 	assert(current_scene.get_node("Ui/ClockLabel").text.ends_with("Sunny") or not current_scene.get_node("DayClock").is_processing())
 	var rival: Node3D = current_scene.get_node("Neighbourhood/RivalStore")
 	assert(not rival.visible)
@@ -177,5 +177,5 @@ func _run() -> void:
 	for path in paths:
 		for suffix in ["", ".bak", ".tmp"]:
 			if FileAccess.file_exists(path + suffix): DirAccess.remove_absolute(path + suffix)
-	print("PASS: bank loan instalments/repay/validation, deterministic rain weather with traffic and farm effects, rival store pricing, Sharma daily sale and Match, music volume bus and continuous nature music, rain/bank wiring")
+	print("PASS: bank loan instalments/repay/validation, deterministic rain weather with traffic and farm effects, rival store pricing, Sharma daily sale and Match, music volume bus and continuous Indian music, rain/bank wiring")
 	quit()

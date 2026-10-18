@@ -1,9 +1,9 @@
 extends RefCounted
 
 # One continuous background music player for the whole game. It lives under the
-# scene tree root, so the calm nature track keeps playing smoothly from the lobby
+# scene tree root, so the calm Indian track keeps playing smoothly from the lobby
 # into the game, through pause and sleep, and back (scene changes never restart it).
-const TRACK := "res://assets/audio/generated/music_nature.wav"
+const TRACK := "res://assets/audio/generated/music_indian.wav"
 const VOLUME_DB := -12.0
 static var player: AudioStreamPlayer
 

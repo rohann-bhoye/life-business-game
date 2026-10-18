@@ -21,11 +21,12 @@ func _run() -> void:
 	settings.apply_graphics(current_scene)
 	await process_frame
 	var details = current_scene.get_node("Neighbourhood/EnvironmentDetails")
-	assert(not details.get_node("WindGrass").visible and not details.get_node("GardenWater").visible and not details.is_processing())
+	assert(details.get_node("WindGrass").visible and details.grass_chunks.all(func(chunk): return chunk.multimesh.visible_instance_count < chunk.multimesh.instance_count and chunk.visibility_range_end < 30.0))
+	assert(not details.get_node("GardenWater").visible and not details.is_processing())
 	assert(details.clouds.all(func(cloud): return not cloud.visible))
 	var neighbourhood = current_scene.get_node("Neighbourhood")
 	var tree = neighbourhood.find_child("Tree*", false, false)
-	assert(tree != null and not tree.visible and not neighbourhood.get_node("StreetLife").visible and not neighbourhood.get_node("StreetLife").is_physics_processing())
+	assert(tree != null and tree.visible and not neighbourhood.get_node("StreetLife").visible and not neighbourhood.get_node("StreetLife").is_physics_processing())
 	assert(not current_scene.get_node("DirectionalLight3D").shadow_enabled)
 	var lighting = current_scene.get_node("DayNight")
 	assert(not lighting.environment.fog_enabled and not lighting.streetlights_on)
@@ -50,5 +51,5 @@ func _run() -> void:
 		await process_frame
 		await RenderingServer.frame_post_draw
 		assert(root.get_texture().get_image().save_png(OS.get_environment("TEMP").path_join("light_graphics_preview.png")) == OK)
-	print("PASS: Low Fast removes decorative scenery effects while preserving road, shop, warehouse, racks and farm; Balanced restores them")
+	print("PASS: Low Fast keeps light close-by grass and removes other decorative scenery effects while preserving road, shop, warehouse, racks and farm; Balanced restores them")
 	quit()

@@ -58,6 +58,155 @@ func _ready() -> void:
 		var holder := Kenney.fit(self, "%s%d" % [piece[0], index], FURNITURE % piece[0], piece[1], piece[2], piece[3])
 		if piece[4]: _collider(holder.name + "Body", piece[1], piece[2], piece[3])
 	Kenney.fit(self, "PorchLamp", FURNITURE % "lampWall", Vector3(0.25, 0.35, 0.2), Vector3(1.05, 2.05, FRONT + 0.12))
+	_build_yard()
+
+const IndianHouse := preload("res://indian_house.gd")
+const IndianStreet := preload("res://indian_street.gd")
+const YARD_Z := 6.3
+const GATE_HALF := 1.1
+const MARIGOLD := [Color(1.0, 0.5, 0.04), Color(1.0, 0.76, 0.08)]
+
+## Indian front yard: a compound wall with gate pillars, globe lamps, an open iron
+## gate and a nameplate; a tulsi chaura, a parked scooter, a charpai, a marigold
+## toran over the door, rangoli on the path and a DTH dish on the wall. Static
+## parts merge into one vertex-coloured mesh; walls, pillars and big items are solid.
+func _build_yard() -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var cream := Color(0.95, 0.9, 0.78)
+	var maroon := Color(0.55, 0.16, 0.12)
+	# [start x, end x, z] runs along the front, then [x, start z, end z] down the sides.
+	for run in [[-3.3, -GATE_HALF - 0.3], [GATE_HALF + 0.3, 4.0]]:
+		_yard_wall(st, Vector3((run[0] + run[1]) / 2, 0, YARD_Z), Vector3(absf(run[1] - run[0]), 1.0, 0.16), cream, maroon)
+	_yard_wall(st, Vector3(-3.3, 0, (YARD_Z + FRONT) / 2), Vector3(0.16, 1.0, YARD_Z - FRONT), cream, maroon)
+	_yard_wall(st, Vector3(4.0, 0, (YARD_Z + 3.8) / 2), Vector3(0.16, 1.0, YARD_Z - 3.8), cream, maroon)
+	for side in [-1, 1]:
+		var pillar := Vector3(side * (GATE_HALF + 0.15), 0, YARD_Z)
+		IndianHouse.box(st, pillar + Vector3(0, 0.72, 0), Vector3(0.32, 1.44, 0.32), cream)
+		IndianHouse.box(st, pillar + Vector3(0, 1.47, 0), Vector3(0.4, 0.07, 0.4), maroon)
+		IndianStreet._ball(st, pillar + Vector3(0, 1.64, 0), 0.13, Color(0.98, 0.96, 0.88), 5, 8)
+		_collider("GatePillar%d" % side, Vector3(0.32, 1.44, 0.32), pillar, 0.0)
+		_gate_leaf(side)
+	IndianHouse.box(st, Vector3(GATE_HALF + 0.15, 1.05, YARD_Z + 0.17), Vector3(0.26, 0.15, 0.02), Color(0.78, 0.62, 0.25))
+	_tulsi(st, Vector3(-1.75, 0, 5.6))
+	_scooter(st, Vector3(2.75, 0, 5.0))
+	_charpai(st, Vector3(-2.6, 0, 5.0))
+	# Toran over the door: marigold strings and mango leaves on a cord.
+	for index in range(15):
+		var x := -0.75 + index * 0.107
+		var drop := 0.06 * sin(PI * index / 14.0)
+		for bead in range(3 if index % 2 == 0 else 1):
+			IndianStreet._ball(st, Vector3(x, DOOR_TOP + 0.24 - drop - bead * 0.07, FRONT + 0.06), 0.035, MARIGOLD[(index + bead) % 2], 3, 5)
+		if index % 2 == 1:
+			IndianStreet._blob(st, Vector3(x, DOOR_TOP + 0.13 - drop, FRONT + 0.05), Vector3(0.025, 0.08, 0.01), Color(0.16, 0.48, 0.14), 3, 4)
+	# Rangoli on the path in front of the porch.
+	var rangoli := Vector3(0, 0.03, 3.8)
+	for ring in [[0.5, Color(0.85, 0.12, 0.3)], [0.38, Color(1.0, 0.75, 0.1)], [0.26, Color(0.1, 0.55, 0.45)], [0.12, Color(0.98, 0.98, 0.95)]]:
+		IndianStreet._blob(st, rangoli + Vector3(0, 0.001 * (0.5 - ring[0]) * 20, 0), Vector3(ring[0], 0.004, ring[0]), ring[1], 2, 20)
+	for petal in range(8):
+		var angle := TAU * petal / 8.0
+		IndianStreet._blob(st, rangoli + Vector3(cos(angle) * 0.62, 0.0, sin(angle) * 0.62), Vector3(0.09, 0.004, 0.09), Color(0.98, 0.45, 0.08), 2, 8)
+	var mesh := MeshInstance3D.new()
+	mesh.name = "Yard"
+	mesh.mesh = st.commit()
+	mesh.material_override = IndianHouse._material()
+	add_child(mesh)
+	var plate := Label3D.new()
+	plate.name = "Nameplate"
+	plate.text = "APNA GHAR"
+	plate.font_size = 22
+	plate.pixel_size = 0.004
+	plate.modulate = Color(0.25, 0.12, 0.05)
+	plate.outline_size = 0
+	plate.position = Vector3(GATE_HALF + 0.15, 1.05, YARD_Z + 0.185)
+	add_child(plate)
+	_dth_dish()
+
+func _yard_wall(st: SurfaceTool, base: Vector3, size: Vector3, colour: Color, cap: Color) -> void:
+	IndianHouse.box(st, base + Vector3(0, size.y / 2, 0), size, colour)
+	IndianHouse.box(st, base + Vector3(0, size.y + 0.03, 0), size + Vector3(0.06, -size.y + 0.06, 0.06), cap)
+	IndianHouse.box(st, base + Vector3(0, 0.08, 0), size + Vector3(0.02, -size.y + 0.16, 0.02), Color(0.6, 0.58, 0.54))
+	_collider("YardWall%d" % get_child_count(), size, base, 0.0)
+
+## One leaf of the iron gate, hinged on its pillar and standing open into the yard.
+func _gate_leaf(side: int) -> void:
+	var leaf := Node3D.new()
+	leaf.name = "GateLeaf%d" % side
+	leaf.position = Vector3(side * GATE_HALF, 0, YARD_Z)
+	leaf.rotation.y = side * deg_to_rad(-72.0)
+	add_child(leaf)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var iron := Color(0.1, 0.28, 0.2)
+	var width := GATE_HALF - 0.04
+	for rail in [0.12, 0.6, 1.08]:
+		IndianHouse.box(st, Vector3(-side * width / 2, rail, 0), Vector3(width, 0.05, 0.04), iron)
+	for bar in range(11):
+		var x := -side * (0.04 + bar * (width - 0.08) / 10.0)
+		IndianHouse.box(st, Vector3(x, 0.62, 0), Vector3(0.025, 1.1, 0.025), iron)
+		IndianStreet._ball(st, Vector3(x, 1.2, 0), 0.025, Color(0.85, 0.68, 0.2), 2, 4)
+	var mesh := MeshInstance3D.new()
+	mesh.name = "Bars"
+	mesh.mesh = st.commit()
+	mesh.material_override = IndianHouse._material()
+	leaf.add_child(mesh)
+
+func _tulsi(st: SurfaceTool, base: Vector3) -> void:
+	IndianHouse.box(st, base + Vector3(0, 0.32, 0), Vector3(0.5, 0.64, 0.5), Color(0.92, 0.45, 0.18))
+	IndianHouse.box(st, base + Vector3(0, 0.66, 0), Vector3(0.56, 0.06, 0.56), Color(0.98, 0.95, 0.88))
+	IndianHouse.box(st, base + Vector3(0, 0.36, 0.252), Vector3(0.16, 0.16, 0.01), Color(0.98, 0.95, 0.88))
+	for leaf in range(9):
+		var angle := TAU * leaf / 9.0
+		var lift := 0.08 * (leaf % 3)
+		IndianStreet._blob(st, base + Vector3(cos(angle) * 0.1, 0.82 + lift, sin(angle) * 0.1), Vector3(0.09, 0.07, 0.09), Color(0.16, 0.45, 0.15).lightened(0.05 * (leaf % 3)), 3, 6)
+	_collider("TulsiChauraBody", Vector3(0.5, 0.7, 0.5), base, 0.0)
+
+## A parked scooter (Activa style) facing the gate.
+func _scooter(st: SurfaceTool, base: Vector3) -> void:
+	var paint := Color(0.62, 0.1, 0.12)
+	var black := Color(0.08, 0.08, 0.09)
+	for z in [-0.6, 0.62]:
+		IndianStreet._blob(st, base + Vector3(0, 0.24, z), Vector3(0.06, 0.24, 0.24), black, 5, 12)
+		IndianStreet._blob(st, base + Vector3(0, 0.24, z), Vector3(0.065, 0.1, 0.1), Color(0.75, 0.76, 0.76), 3, 8)
+	IndianStreet._blob(st, base + Vector3(0, 0.55, -0.42), Vector3(0.24, 0.24, 0.42), paint, 6, 12)
+	IndianHouse.box(st, base + Vector3(0, 0.3, 0.08), Vector3(0.3, 0.08, 0.6), Color(0.18, 0.18, 0.19))
+	IndianStreet._beam(st, base + Vector3(0, 0.3, 0.5), base + Vector3(0, 0.95, 0.6), 0.3, paint)
+	IndianStreet._blob(st, base + Vector3(0, 0.8, -0.38), Vector3(0.17, 0.06, 0.34), black, 4, 10)
+	IndianStreet._beam(st, base + Vector3(0, 0.95, 0.6), base + Vector3(0, 1.05, 0.55), 0.08, black)
+	IndianStreet._beam(st, base + Vector3(-0.32, 1.05, 0.55), base + Vector3(0.32, 1.05, 0.55), 0.035, Color(0.6, 0.62, 0.63))
+	IndianStreet._blob(st, base + Vector3(0, 1.02, 0.66), Vector3(0.09, 0.07, 0.04), Color(0.98, 0.97, 0.85), 3, 8)
+	_collider("ScooterBody", Vector3(0.5, 1.0, 1.6), base, 0.0)
+
+## A charpai (rope cot) resting against the side wall.
+func _charpai(st: SurfaceTool, base: Vector3) -> void:
+	var wood := Color(0.45, 0.28, 0.15)
+	for x in [-0.4, 0.4]:
+		for z in [-0.9, 0.9]:
+			IndianHouse.box(st, base + Vector3(x, 0.22, z), Vector3(0.07, 0.44, 0.07), wood)
+	for x in [-0.4, 0.4]:
+		IndianHouse.box(st, base + Vector3(x, 0.42, 0), Vector3(0.06, 0.06, 1.86), wood)
+	for z in [-0.9, 0.9]:
+		IndianHouse.box(st, base + Vector3(0, 0.42, z), Vector3(0.86, 0.06, 0.06), wood)
+	IndianHouse.box(st, base + Vector3(0, 0.43, 0), Vector3(0.76, 0.02, 1.76), Color(0.86, 0.77, 0.58))
+	for stripe in range(8):
+		IndianHouse.box(st, base + Vector3(0, 0.442, -0.77 + stripe * 0.22), Vector3(0.76, 0.006, 0.05), Color(0.72, 0.6, 0.4))
+	_collider("CharpaiBody", Vector3(0.9, 0.46, 1.9), base, 0.0)
+
+## A DTH dish on a bracket high on the front wall.
+func _dth_dish() -> void:
+	var dish := MeshInstance3D.new()
+	dish.name = "DthDish"
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	IndianHouse.disc(st, Vector3.ZERO, 0.28, 0.03, Color(0.92, 0.92, 0.9), 16)
+	IndianStreet._beam(st, Vector3(0, -0.2, 0.0), Vector3(0, 0.0, 0.35), 0.025, Color(0.5, 0.5, 0.5))
+	IndianStreet._blob(st, Vector3(0, 0.0, 0.36), Vector3(0.04, 0.04, 0.05), Color(0.3, 0.3, 0.32), 3, 6)
+	IndianStreet._beam(st, Vector3(0, -0.28, -0.25), Vector3(0, -0.05, -0.02), 0.04, Color(0.4, 0.4, 0.42))
+	dish.mesh = st.commit()
+	dish.material_override = IndianHouse._material()
+	dish.position = Vector3(2.55, 2.55, FRONT + 0.3)
+	dish.rotation = Vector3(-0.5, 0.4, 0)
+	add_child(dish)
 
 func _retire_old_house(house: Node) -> void:
 	for node_path in ["Walls", "Roof", "LeftWindow", "RightWindow", "RoofBody"]:
@@ -100,7 +249,7 @@ func _refit_gameplay_nodes(house: Node) -> void:
 		light.omni_range = 6.0
 
 func _build_shell() -> void:
-	var wall := _material(Color(0.93, 0.87, 0.74))
+	var wall := _material(Color(0.97, 0.84, 0.56))
 	var trim := _material(Color(0.45, 0.28, 0.18))
 	var floor := _material(Color(0.6, 0.44, 0.3))
 	var mid_z := (FRONT + BACK) / 2
@@ -122,7 +271,7 @@ func _build_shell() -> void:
 
 func _build_roof() -> void:
 	var tiles := _material(Color(0.66, 0.27, 0.2))
-	var gable := _material(Color(0.9, 0.82, 0.68))
+	var gable := _material(Color(0.95, 0.81, 0.53))
 	var mid_z := (FRONT + BACK) / 2
 	var half_depth := (FRONT - BACK) / 2 + 0.35
 	var angle := deg_to_rad(30.0)

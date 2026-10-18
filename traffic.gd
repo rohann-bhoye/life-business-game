@@ -4,8 +4,11 @@ extends Node3D
 # and a city bus. Eastbound (+x) uses the north lane, westbound the south lane. Every
 # vehicle stops for the player, customers and staff in its lane, keeps a gap to the
 # vehicle ahead, and the westbound bus halts at the bus stop during the day. Fewer
-# vehicles drive at night and all of them show headlights. Pure scenery: no economy.
-const ROAD_END := 76.0
+# vehicles drive at night and all of them show headlights. Past the town the road
+# goes over a crest and down a valley (horizon.gd): vehicles follow it, tilting on
+# the slope, and loop round far below the horizon. Pure scenery: no economy.
+const Horizon := preload("res://horizon.gd")
+const ROAD_END := 118.0
 const EAST_LANE := 5.6
 const WEST_LANE := 8.4
 const SAFE_GAP := 3.0
@@ -179,3 +182,5 @@ func _physics_process(delta: float) -> void:
 			vehicle.position.x = -ROAD_END * state.direction
 			state.served = false
 			if vehicle == bus and is_instance_valid(bus_passenger): bus_passenger.visible = not night
+		vehicle.position.y = 0.1 + Horizon.height(vehicle.position.x)
+		vehicle.rotation.x = atan(Horizon.slope(vehicle.position.x) * state.direction)

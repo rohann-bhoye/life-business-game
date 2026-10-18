@@ -36,10 +36,10 @@ const MIXED_CHANCE := 0.5
 ## from the edge of town and walks away down the street after shopping.
 ## budget is per item in tens of rupees; items is the main product's count.
 const SHOPPER_TYPES := {
-	"quick": {"weight": 35, "items": [1, 1], "extras": [0, 0], "budget": [8, 15], "say": ["Just one thing, please.", "Quick shopping today!"]},
-	"regular": {"weight": 40, "items": [1, 3], "extras": [0, 1], "budget": [10, 20], "say": ["Need a few things.", "Namaste!"]},
-	"family": {"weight": 20, "items": [2, 4], "extras": [1, 2], "budget": [14, 25], "say": ["Big shopping for the family!", "Monthly ration time!"]},
-	"bulk": {"weight": 5, "items": [5, 7], "extras": [0, 0], "budget": [12, 20], "say": ["I need a lot for my tea stall!"]},
+	"quick": {"weight": 35, "items": [1, 1], "extras": [0, 0], "budget": [8, 15], "say": ["Bhaiya, bas ek cheez chahiye.", "Jaldi karna bhaiya!"]},
+	"regular": {"weight": 40, "items": [1, 3], "extras": [0, 1], "budget": [10, 20], "say": ["Namaste bhaiya!", "Thoda saaman lena hai."]},
+	"family": {"weight": 20, "items": [2, 4], "extras": [1, 2], "budget": [14, 25], "say": ["Mahine ka ration lena hai!", "Ghar ka poora saaman!"]},
+	"bulk": {"weight": 5, "items": [5, 7], "extras": [0, 0], "budget": [12, 20], "say": ["Chai stall ke liye maal chahiye!"]},
 }
 const PAVEMENT_Z := 3.9
 const STREET_END_X := 32.0
@@ -215,7 +215,7 @@ func _physics_process(delta: float) -> void:
 						quoted_price = shop_area.business.product_price(product_id)
 						var sharma: int = shop_area.business.rival_price_today(product_id)
 						if shop_area.business.rival_open() and quoted_price > sharma:
-							say("Sharma sells this for %s%d!" % [String.chr(8377), sharma])
+							say("Sharma ji ke yahan %s%d mein milta hai!" % [String.chr(8377), sharma])
 						agreed_unit_price = quoted_price
 						state = State.SCANNING
 						auto_checkout_seconds = shop_area.business.cashier_scan_seconds()

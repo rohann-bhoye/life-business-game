@@ -16,6 +16,7 @@
 [ext_resource type="Script" path="res://shop_presentation.gd" id="14_presentation"]
 [ext_resource type="Script" path="res://rack_furnishing.gd" id="15_furnishing"]
 [ext_resource type="Script" path="res://warehouse.gd" id="16_warehouse"]
+[ext_resource type="Script" path="res://editor_preview.gd" id="17_editor_preview"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_wp5od"]
 size = Vector3(150, 0.2, 120)
@@ -508,3 +509,6 @@ script = ExtResource("15_furnishing")
 
 [node name="Warehouse" type="Node3D" parent="."]
 script = ExtResource("16_warehouse")
+
+[node name="EditorPreview" type="Node3D" parent="."]
+script = ExtResource("17_editor_preview")

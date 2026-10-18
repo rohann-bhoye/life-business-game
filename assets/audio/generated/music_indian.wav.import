@@ -3,12 +3,12 @@
 importer="wav"
 type="AudioStreamWAV"
 uid="uid://b4oorhdu50xss"
-path="res://.godot/imported/music_nature.wav-52b05bf48320b088a215b11db55c76d2.sample"
+path="res://.godot/imported/music_indian.wav-b784510b76685c9da39afb64b61723ef.sample"
 
 [deps]
 
-source_file="res://assets/audio/generated/music_nature.wav"
-dest_files=["res://.godot/imported/music_nature.wav-52b05bf48320b088a215b11db55c76d2.sample"]
+source_file="res://assets/audio/generated/music_indian.wav"
+dest_files=["res://.godot/imported/music_indian.wav-b784510b76685c9da39afb64b61723ef.sample"]
 
 [params]
 

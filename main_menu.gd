@@ -24,7 +24,7 @@ const GAME_SCENE := "res://main.tscn.tscn"
 const KenneyTheme := preload("res://kenney_theme.gd")
 const CREDITS := "Made by Bucketstudy team"
 const VERSION := "Development Demo | v0.7"
-const WHATS_NEW := ["Traffic: autos, scooters, a car and a bus", "Night life: stars, lamps, shops close", "Sharma price war: daily sales, Match button", "Calm nature music + music volume", "End-of-day report: profit or loss", "Beginner start: ₹10,000 for a new shop"]
+const WHATS_NEW := ["Traffic: autos, scooters, a car and a bus", "Night life: stars, lamps, shops close", "Sharma price war: daily sales, Match button", "Indian music: bansuri, tanpura, tabla", "End-of-day report: profit or loss", "Beginner start: ₹10,000 for a new shop"]
 
 ## Lobby look: Kenney buttons (green / blue / grey / red) on dark glass panels,
 ## white labels, dark text on grey buttons.

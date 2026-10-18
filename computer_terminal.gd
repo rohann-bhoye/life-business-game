@@ -424,7 +424,7 @@ func _refresh_desktop() -> void:
 	if not is_instance_valid(desktop): return
 	var business = ui.shop.business
 	var minutes := int(business.minutes_of_day)
-	greeting.text = "Good %s, Boss" % ("morning" if minutes < 720 else ("afternoon" if minutes < 1020 else "evening"))
+	greeting.text = "Namaste, Seth ji!" if minutes < 1020 else "Shubh sandhya, Seth ji!"
 	today_values.money.text = String.chr(8377) + ui.shop._format_money(business.money)
 	today_values.day.text = "Day %d  %02d:%02d" % [business.day, minutes / 60, minutes % 60]
 	today_values.shop.text = "Open" if business.shop_is_open() else "Closed"

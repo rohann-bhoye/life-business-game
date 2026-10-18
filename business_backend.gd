@@ -620,7 +620,7 @@ func upgrade_shop() -> bool:
 	upgrade_expenses += cost
 	shop_level += 1
 	_commit()
-	return true
+	return true	
 
 func customer_spawn_interval(marketing := false) -> float:
 	return CUSTOMER_INTERVALS[shop_level - 1] * (0.85 if marketing else 1.0) * reputation_traffic_factor() * (RAIN_TRAFFIC_FACTOR if is_raining() else 1.0) * rival_traffic_factor()
