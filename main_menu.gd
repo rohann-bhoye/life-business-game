@@ -5,6 +5,8 @@ const LoadingScreen := preload("res://loading_screen.gd")
 const Settings := preload("res://game_settings.gd")
 const SettingsMenu := preload("res://settings_menu.gd")
 const MenuSkin := preload("res://menu_skin.gd")
+const Coop := preload("res://coop.gd")
+const CoopMenu := preload("res://coop_menu.gd")
 @export var save_path := "user://business_save.json"
 @export var settings_path := "user://settings.cfg"
 var continue_button: Button
@@ -13,6 +15,7 @@ var save_label: Label
 var status_label: Label
 var content: VBoxContainer
 var settings_menu: Panel
+var coop_menu: Panel
 var confirmation: Panel
 var footer: Label
 var version_label: Label
@@ -111,6 +114,8 @@ func _ready() -> void:
 	new_button = _button(content, "New Game", _request_new)
 	new_button.name = "NewGameButton"
 	new_button.theme_type_variation = "InfoButton"
+	var coop := _button(content, "Co-op", _open_coop)
+	coop.name = "CoopButton"
 	_button(content, "Settings", _open_settings).name = "SettingsButton"
 	var quit := _button(content, "Quit", func(): get_tree().quit())
 	quit.name = "QuitButton"
@@ -128,11 +133,21 @@ func _ready() -> void:
 	settings_menu.name = "SettingsMenu"
 	add_child(settings_menu)
 	settings_menu.closed.connect(func(): content.show())
+	coop_menu = CoopMenu.new()
+	coop_menu.name = "CoopMenu"
+	coop_menu.lobby = self
+	add_child(coop_menu)
+	coop_menu.closed.connect(func(): content.show())
 	_build_confirmation()
 	content.minimum_size_changed.connect(_layout)
 	content.visibility_changed.connect(_layout)
 	get_viewport().size_changed.connect(_layout)
 	_refresh_save()
+	# Back from a co-op game: make sure the connection is closed and say why it ended.
+	if Coop.active: Coop.leave(get_tree())
+	if not Coop.last_message.is_empty():
+		status_label.text = Coop.last_message
+		Coop.last_message = ""
 	_layout()
 
 func _label(parent: Node, text: String, font_size: int) -> Label:
@@ -325,22 +340,55 @@ static func _money(value: int) -> String:
 
 # The game scene loads on a background thread from the moment the menu opens; the
 # loading screen shows that progress, covers the scene change and waits for a key.
-func _start_game(summary: String, greeting: String) -> void:
+func _start_game(summary: String, greeting: String, game_path := "") -> void:
 	launching = true
 	status_label.text = "Loading game..."
 	var tree := get_tree()
-	var path := save_path
+	var path := game_path if not game_path.is_empty() else save_path
 	var settings := settings_path
 	var loading = LoadingScreen.new()
 	tree.root.add_child(loading)
 	loading.failed.connect(func():
 		launching = false
+		if Coop.active: Coop.leave(tree)
 		status_label.text = "Could not start the game.")
 	loading.begin(func(): return Session.launch_game(tree, path, settings), summary, greeting)
 
 func _cancel_new() -> void:
 	confirmation.hide()
 	content.show()
+	# Cancelled hosting a co-op game on an old slot: stop hosting.
+	if Coop.active and not launching: Coop.leave(get_tree())
+
+# --- Co-op (coop_menu.gd picks host or join; these launch the game) ---
+
+func _open_coop() -> void:
+	if launching: return
+	content.hide()
+	coop_menu.open_menu()
+
+## Hosting runs this slot's shop: continue it, or start a new one in an empty slot.
+func start_coop_host() -> void:
+	Coop.menu_save_path = save_path
+	content.show()
+	_refresh_save()
+	if not continue_button.disabled: _continue()
+	else: _request_new()
+
+## A friend plays in a temporary save of their own (their slots stay untouched);
+## sharing the host's shop comes in the next co-op phase.
+func start_coop_client(address: String) -> void:
+	Coop.menu_save_path = save_path
+	var path := settings_path.get_base_dir().path_join("coop_friend_save.json")
+	for suffix in ["", ".bak", ".tmp", ".recovered", ".recovered.bak"]:
+		if FileAccess.file_exists(path + suffix): DirAccess.remove_absolute(path + suffix)
+	var error := Session.new_game(path)
+	if not error.is_empty():
+		Coop.leave(get_tree())
+		content.show()
+		status_label.text = error
+		return
+	_start_game("Co-op  |  Joining %s" % address, "You joined your friend's shop! Walk over and say hi.", path)
 
 func _open_settings() -> void:
 	content.hide()

@@ -65,6 +65,12 @@ var queue_wait_seconds := 0.0
 var patience_label: Label3D
 var speech_label: Label3D
 var speech_seconds := 0.0
+## Co-op: on a friend's screen this customer mirrors one in the host's game
+## (coop_world.gd moves it and fills in its basket and checkout). Its own behaviour
+## is off, and checkout actions (scan, bargain, pay) also go to the host's customer
+## through coop_forward.call(method, args).
+var coop_mirror := false
+var coop_forward := Callable()
 
 @onready var shop_area: Area3D = get_node(shop_area_path)
 @onready var purchase_point: Marker3D = get_node(purchase_point_path)
@@ -126,6 +132,7 @@ func say(text: String, seconds := 4.0) -> void:
 	speech_seconds = seconds
 
 func _physics_process(delta: float) -> void:
+	if coop_mirror: return
 	if speech_seconds > 0.0:
 		speech_seconds -= delta
 		if speech_seconds <= 0.0: speech_label.hide()
@@ -229,7 +236,7 @@ func _physics_process(delta: float) -> void:
 					review_outcome = "sold" if deal_sold else ("stock" if shop_area.stock <= 0 else "price")
 					leave_shop()
 		State.NEGOTIATING, State.CHECKOUT, State.SCANNING, State.PAYING:
-			if physical_shop() and shop_area.business.cashier_on_shift() and not operations.player_at_counter():
+			if physical_shop() and shop_area.business.cashier_on_shift() and not operations.someone_at_counter():
 				if not cashier_active:
 					auto_checkout_seconds = shop_area.business.cashier_scan_seconds() if state == State.SCANNING else 1.0
 				cashier_active = true
@@ -398,6 +405,7 @@ func leave_shop() -> void:
 func complete_checkout() -> void:
 	if not has_product:
 		return
+	_coop_send("complete_checkout", [])
 	if physical_shop() and (operations.checkout_customer() != self or state != State.PAYING or scanned_count != total_items()):
 		return
 	if not shop_area.business.shop_is_open():
@@ -411,6 +419,8 @@ func complete_checkout() -> void:
 		deal_sold = shop_area.business.sell_mixed_basket(lines, spending_budget)
 	review_outcome = "sold" if deal_sold else "stock"
 	if deal_sold: operations.play_sound("payment")
+	# Co-op team report: who served this sale (coop_world.gd, host only).
+	if deal_sold and not coop_mirror: get_tree().call_group("coop_team", "record_sale", payment_total(), cashier_active)
 	deal_result = "Receipt: %s | %s%d" % [payment_method, String.chr(8377), payment_total()] if deal_sold else "Customer left without buying."
 	leave_shop()
 	get_tree().current_scene.get_node("Ui").show_feedback(deal_result, not deal_sold)
@@ -431,6 +441,7 @@ func scan_next() -> bool:
 func scan_item(index: int) -> bool:
 	if state != State.SCANNING or operations.checkout_customer() != self or not shop_area.business.shop_is_open(): return false
 	if index < 0 or index >= total_items() or index in scanned_items or scanned_count >= total_items(): return false
+	_coop_send("scan_item", [index])
 	scanned_items.append(index)
 	scanned_count += 1
 	operations.play_sound("scan")
@@ -454,7 +465,15 @@ func prepare_payment(price: int) -> void:
 	bargain_seconds_left = 45.0
 	operations.show_payment(self)
 
+## Co-op mirror: also send this checkout action to the host's real customer. The
+## mirror runs it too, so the friend's menus react at once; the host's result
+## then comes back with the next customer update.
+func _coop_send(method: String, args: Array) -> void:
+	if coop_mirror and coop_forward.is_valid(): coop_forward.call(method, args)
+
 func player_is_near() -> bool:
+	# A friend serving at the counter (the host runs their action with this meta).
+	if has_meta("coop_cashier"): return true
 	if physical_shop():
 		return operations.player_at_counter() and operations.checkout_customer() == self
 	var player: Node3D = get_tree().current_scene.get_node("Player")
@@ -473,6 +492,7 @@ func _begin_bargaining() -> void:
 func resolve_bargain(choice: String, counter_price := 0) -> bool:
 	if state != State.NEGOTIATING or not player_is_near():
 		return false
+	_coop_send("resolve_bargain", [choice, counter_price])
 	if physical_shop() and not has_product:
 		return false
 	var price: int

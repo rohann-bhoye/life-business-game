@@ -31,7 +31,17 @@ static func launch_game(tree: SceneTree, path: String, settings_path: String) ->
 	scene.set_meta("mixed_baskets", true)
 	# Customers walk in along the pavement, shop by type and walk off down the street.
 	scene.set_meta("town_customers", true)
+	if preload("res://coop.gd").active: add_coop(scene)
 	return _launch(tree, scene)
+
+## Co-op: this player's chosen character and the CoopWorld node (coop_world.gd).
+static func add_coop(scene: Node) -> void:
+	scene.get_node("Player/MeshInstance3D").model = preload("res://coop.gd").model
+	var coop := Node.new()
+	coop.name = "CoopWorld"
+	coop.set_script(preload("res://coop_world.gd"))
+	scene.add_child(coop)
+	coop.owner = scene
 
 static func launch_menu(tree: SceneTree, path: String, settings_path: String) -> Error:
 	var scene = load("res://main_menu.tscn").instantiate()

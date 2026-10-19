@@ -631,8 +631,8 @@ func _build_day_report(theme: Theme) -> void:
 	day_report_screen.theme = theme
 	add_child(day_report_screen)
 
-func show_day_report() -> void:
-	day_report_screen.open(shop.business, shop._format_money)
+func show_day_report(team: Array = []) -> void:
+	day_report_screen.open(shop.business, shop._format_money, team)
 
 func _update_first_day_guide() -> void:
 	if not is_instance_valid(first_day_panel): return

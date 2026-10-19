@@ -7,7 +7,8 @@ const WORKER_HIRING_COST := BusinessBackend.HIRING_COST
 
 var player_inside := false
 @export var save_path := "user://business_save.json"
-var business = BusinessBackend.new()
+# A friend in co-op runs the host's shop through remote_backend.gd (sends actions to the host).
+var business = preload("res://remote_backend.gd").new() if preload("res://coop.gd").is_friend() else BusinessBackend.new()
 
 var money: int:
 	get:

@@ -21,13 +21,16 @@ var result_box: PanelContainer
 var income: GridContainer
 var costs: GridContainer
 var status_label: Label
+## Co-op: who sold and shelved what today (empty in single player).
+var team_label: Label
 var tomorrow: Label
 var tip: Label
 var start_button: Button
 
 func _ready() -> void:
 	name = "DayReportScreen"
-	process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	# Co-op never pauses the game (friends keep playing), so the report must work while it runs.
+	process_mode = Node.PROCESS_MODE_ALWAYS if preload("res://coop.gd").active else Node.PROCESS_MODE_WHEN_PAUSED
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	hide()
@@ -59,6 +62,9 @@ func _ready() -> void:
 	costs = _column("EXPENSES", RED, columns)
 	status_label = _label("", 14, Color.WHITE, form)
 	status_label.name = "Status"
+	team_label = _label("", 14, Color("fde68a"), form)
+	team_label.name = "Team"
+	team_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tomorrow = _label("", 14, Color("93c5fd"), form)
 	tomorrow.name = "Tomorrow"
 	tip = _label("", 14, Color("fcd34d"), form)
@@ -111,7 +117,8 @@ func _row(grid: GridContainer, text: String, value: String, colour := Color.WHIT
 func is_open() -> bool:
 	return visible
 
-func open(business_ref, money_format := Callable()) -> bool:
+## `team` (co-op): [name, sales money, customers served, items shelved] per player.
+func open(business_ref, money_format := Callable(), team: Array = []) -> bool:
 	business = business_ref
 	format_money = money_format
 	var report: Dictionary = business.day_report.last
@@ -145,12 +152,16 @@ func open(business_ref, money_format := Callable()) -> bool:
 	if not sale.is_empty(): tomorrow.text += "\nSharma's sale: %s for %s (was %s). Match it to keep customers." % [Catalog.NAMES[sale.id], _money(int(sale.price)), _money(business.rival_price(sale.id))]
 	elif business.rival_open(): tomorrow.text += "  |  Sharma General Store is open nearby"
 	tip.text = _tip(report)
+	team_label.visible = not team.is_empty()
+	team_label.text = "TEAM TODAY
+" + "
+".join(team.map(func(entry): return "%s: sold %s to %d customer%s, shelved %d item%s" % [entry[0], _money(int(entry[1])), int(entry[2]), "" if int(entry[2]) == 1 else "s", int(entry[3]), "" if int(entry[3]) == 1 else "s"]))
 	start_button.text = "START DAY %d" % next_day
 	move_to_front()
 	show()
 	_layout()
 	_layout.call_deferred()
-	get_tree().paused = true
+	if not preload("res://coop.gd").active: get_tree().paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	start_button.grab_focus()
 	return true
@@ -176,7 +187,7 @@ func _layout() -> void:
 	shade.size = screen
 	var width := minf(640.0, screen.x - 32.0)
 	# Wrapped labels need their real width before the panel measures its height.
-	for label in [status_label, tomorrow, tip]:
+	for label in [status_label, team_label, tomorrow, tip]:
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.custom_minimum_size.x = width - 48
 	form.position = Vector2(24, 20)

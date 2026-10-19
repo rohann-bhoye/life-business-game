@@ -26,6 +26,12 @@ func try_sleep() -> bool:
 		next_sleep_msec = Time.get_ticks_msec() + 1000
 		get_tree().current_scene.get_node("Ui").show_feedback("It's too early to sleep. You can sleep after 20:00.", true)
 		return true
+	# Co-op: get into bed; the night passes when every player is in bed (coop_world.gd).
+	var coop_world := get_tree().current_scene.get_node_or_null("CoopWorld")
+	if coop_world != null:
+		next_sleep_msec = Time.get_ticks_msec() + 1000
+		coop_world.request_sleep()
+		return true
 	if not business.sleep_until_morning():
 		get_tree().current_scene.get_node("Ui").show_feedback("Unable to advance to morning.", true)
 		return false

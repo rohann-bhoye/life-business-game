@@ -595,6 +595,13 @@ func _near(point: Vector3, distance := 1.65) -> bool:
 func player_at_counter() -> bool:
 	return _near(cashier_point, 1.25)
 
+## Co-op host: a friend stands at the counter (coop_world.gd), so the hired cashier
+## leaves the checkout to them.
+var coop_friend_at_counter := false
+
+func someone_at_counter() -> bool:
+	return player_at_counter() or coop_friend_at_counter
+
 func available_stock(product := "bottle") -> int:
 	var reserved := 0
 	for child in get_parent().get_children():

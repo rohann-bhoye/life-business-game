@@ -10,7 +10,7 @@ const GRASS_DENSITY := 9.0
 const MASK_STEP := 0.25
 const MASK_SIZE := 256
 var grass_chunks: Array[MultiMeshInstance3D] = []
-var grass_quality := 2
+var grass_level := 3
 
 func _ready() -> void:
 	var grass := Node3D.new()
@@ -132,11 +132,18 @@ func _mark(mask: PackedByteArray, box: AABB, margin: float) -> void:
 		for x in range(first_x, last_x + 1):
 			mask[z * MASK_SIZE + x] = 1
 
-## High draws every blade, Balanced half, Low Fast a quarter and only close by.
+## Settings > Grass: 0 off, 1 light (a quarter of the blades, close by), 2 medium
+## (half), 3 full (every blade, drawn further out).
+func set_grass(level: int) -> void:
+	grass_level = level
+	_apply_grass_quality()
+
 func _apply_grass_quality() -> void:
+	get_node("WindGrass").visible = grass_level > 0
 	for chunk in grass_chunks:
-		chunk.multimesh.visible_instance_count = -1 if grass_quality >= 2 else chunk.multimesh.instance_count / (2 if grass_quality == 1 else 4)
-		chunk.visibility_range_end = 38.0 if grass_quality > 0 else 24.0
+		var count := chunk.multimesh.instance_count
+		chunk.multimesh.visible_instance_count = -1 if grass_level >= 3 else count / (2 if grass_level == 2 else 4)
+		chunk.visibility_range_end = [24.0, 24.0, 38.0, 45.0][grass_level]
 
 func _build_clouds() -> void:
 	cloud_material = StandardMaterial3D.new()
@@ -175,9 +182,9 @@ func _build_ground() -> void:
 	detailed_ground = material
 	get_tree().current_scene.get_node("MeshInstance3D").material_override = material
 
+## Effects tier from the graphics preset (0 Low, 1 Normal, 2 High); the grass has
+## its own setting (set_grass).
 func set_quality(quality: int) -> void:
-	grass_quality = quality
-	_apply_grass_quality()
 	# Low Fast keeps the lawn shader but skips its fine grain and bump.
 	detailed_ground.set_shader_parameter("fine_detail", quality > 0)
 	for cloud in clouds:

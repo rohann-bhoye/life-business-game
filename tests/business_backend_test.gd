@@ -282,7 +282,7 @@ func _run_checks() -> void:
 	day_clock.set_process(false)
 	var initial_minutes: float = shop.business.minutes_of_day
 	day_clock._process(0.5)
-	assert(is_equal_approx(shop.business.minutes_of_day, initial_minutes + 1.0))
+	assert(is_equal_approx(shop.business.minutes_of_day, initial_minutes + 0.5 * day_clock.minutes_per_second))
 	assert(current_scene.get_node("Ui/ClockLabel").text.begins_with("Day 1 | 08:"))
 	var sleep_area = current_scene.get_node("House/Bed/SleepArea")
 	assert(sleep_area.sleep_sign.fixed_size)

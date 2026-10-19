@@ -2,6 +2,8 @@ extends RefCounted
 
 signal changed
 signal clock_changed
+## Items went onto shelves (the co-op team report counts who shelved them).
+signal shelved(amount: int, by_worker: bool)
 const EmployeeRelations := preload("res://employee_relations.gd")
 const CustomerReviews := preload("res://customer_reviews.gd")
 const DemoProgress := preload("res://demo_progress.gd")
@@ -548,7 +550,9 @@ func shelve_box(by_worker := false, rack_id := -1) -> bool:
 		carried_stock -= amount
 	demo.record("worker" if by_worker else "shelve", amount)
 	_activate_next_box()
-	return _commit_shelves(old)
+	if not _commit_shelves(old): return false
+	shelved.emit(amount, by_worker)
+	return true
 
 func shelve_one(rack_id := -1) -> bool:
 	if carried_stock <= 0 or carried_stock > STOCK_AMOUNT:
@@ -560,7 +564,9 @@ func shelve_one(rack_id := -1) -> bool:
 	carried_stock -= 1
 	demo.record("shelve")
 	_activate_next_box()
-	return _commit_shelves(old)
+	if not _commit_shelves(old): return false
+	shelved.emit(1, false)
+	return true
 
 func _commit_shelves(old: Dictionary) -> bool:
 	if not save_progress():
@@ -605,6 +611,74 @@ func pick_up_ground_box(index: int) -> bool:
 	carried_stock = int(box.amount)
 	stock_collection_assigned = false
 	return _commit_logistics(old)
+
+# --- Co-op: every friend carries their own box ---
+# The game has one carried box: carried_stock with pending_product, which is also
+# the delivery bay's active box. In co-op the host keeps every other box in hand in
+# coop_carries (key: a friend's peer id, or "host"/"worker" during a friend's action)
+# as {"product", "amount"}. It is saved as "coop_carried" and counted by the save
+# check, so stock always adds up; loading a save puts those boxes back in the bay.
+# A friend's action runs with their box swapped in (coop_begin/coop_end): the bay's
+# active box waits at the front of the queue, the host's and the stock worker's
+# boxes wait in coop_carries. coop_view() shows a friend the shop laid out the same.
+var coop_carries := {}
+
+func coop_begin(peer: int) -> void:
+	_queue_active_box()
+	if carried_stock > 0: coop_carries["host"] = {"product": pending_product, "amount": carried_stock}
+	if worker_carried_stock > 0: coop_carries["worker"] = {"product": pending_product, "amount": worker_carried_stock}
+	var carry: Dictionary = coop_carries.get(peer, {})
+	coop_carries.erase(peer)
+	carried_stock = int(carry.get("amount", 0))
+	worker_carried_stock = 0
+	if carried_stock > 0: pending_product = carry.product
+
+func coop_end(peer: int) -> void:
+	if carried_stock > 0: coop_carries[peer] = {"product": pending_product, "amount": carried_stock}
+	_queue_active_box()
+	var own: Dictionary = coop_carries.get("host", coop_carries.get("worker", {}))
+	carried_stock = int(coop_carries.get("host", {}).get("amount", 0))
+	worker_carried_stock = int(coop_carries.get("worker", {}).get("amount", 0))
+	coop_carries.erase("host")
+	coop_carries.erase("worker")
+	if not own.is_empty(): pending_product = own.product
+	else: _activate_next_box()
+
+## What `peer` holds in co-op ({} when empty-handed).
+func coop_carry(peer: int) -> Dictionary:
+	return coop_carries.get(peer, {})
+
+func _queue_active_box() -> void:
+	if boxed_stock <= 0: return
+	queued_boxes.push_front({"product": pending_product, "amount": boxed_stock})
+	boxed_stock = 0
+
+## The shop as a friend carrying `carry` sees it (laid out like coop_begin).
+static func coop_view(data: Dictionary, carry: Dictionary) -> Dictionary:
+	var view := data.duplicate()
+	view.erase("coop_carried")
+	view.queued_boxes = data.queued_boxes.duplicate(true)
+	if int(view.boxed_stock) > 0:
+		view.queued_boxes.push_front({"product": view.pending_product, "amount": int(view.boxed_stock)})
+		view.boxed_stock = 0
+	view.carried_stock = int(carry.get("amount", 0))
+	view.worker_carried_stock = 0
+	if view.carried_stock > 0: view.pending_product = carry.product
+	return view
+
+## Friends' boxes go back to the front of the bay (one friend leaving, or all when
+## the host closes the shop).
+func coop_return_boxes(peers: Array = []) -> void:
+	var returned := false
+	for peer in (peers if not peers.is_empty() else coop_carries.keys()):
+		if not coop_carries.has(peer): continue
+		var box: Dictionary = coop_carries[peer]
+		coop_carries.erase(peer)
+		queued_boxes.push_front({"product": box.product, "amount": int(box.amount)})
+		returned = true
+	if not returned: return
+	_activate_next_box()
+	_commit()
 
 func next_upgrade_cost() -> int:
 	return UPGRADE_COSTS[shop_level - 1] if shop_level < CUSTOMER_INTERVALS.size() else 0
@@ -1121,6 +1195,8 @@ func snapshot() -> Dictionary:
 	data["starting_money"] = starting_money
 	data["incoming_boxes"] = incoming_boxes.duplicate(true)
 	data["queued_boxes"] = queued_boxes.duplicate(true)
+	# Co-op: boxes in other players' hands (only while someone carries one).
+	if not coop_carries.is_empty(): data["coop_carried"] = coop_carries.values().duplicate(true)
 	data["demo_progress"] = demo.snapshot()
 	data["rack_layout"] = racks.records.duplicate(true)
 	data["furnishing_expenses"] = furnishing_expenses
@@ -1149,6 +1225,10 @@ func load_progress(path: String) -> void:
 		save_status = "Save: Loaded"
 	if data.is_empty():
 		return
+	restore(data)
+
+## Applies saved shop data (a parsed save file, or the host's snapshot in co-op).
+func restore(data: Dictionary) -> void:
 	for field in INTEGER_FIELDS + DAILY_FIELDS + SUPPLY_FIELDS + STAFF_FIELDS + EMPLOYEE_FIELDS:
 		set(field, int(data[field]))
 	last_visit = data["last_visit"]
@@ -1183,6 +1263,9 @@ func load_progress(path: String) -> void:
 	queued_boxes = data.queued_boxes.duplicate(true)
 	for boxes in [incoming_boxes, queued_boxes]:
 		for box in boxes: box.amount = int(box.amount)
+	# Boxes friends were holding when the co-op shop was saved wait at the bay.
+	coop_carries.clear()
+	for box in data.get("coop_carried", []): queued_boxes.push_front({"product": box.product, "amount": int(box.amount)})
 	demo.restore(data.demo_progress)
 	racks.records = data.get("rack_layout", RackStore.fresh(stock, inventory)).duplicate(true)
 	for item in racks.records:
@@ -1404,6 +1487,15 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 		supply_by_product[box.product] += int(box.amount)
 		stored_supply += int(box.amount)
 		box_count += 1
+	# Co-op: boxes in other players' hands count as stock too.
+	var coop_carried = data.get("coop_carried", [])
+	# At most 3 friends plus the host and the stock worker during a friend's action.
+	if not coop_carried is Array or coop_carried.size() > 5: return false
+	for box in coop_carried:
+		if not box is Dictionary or box.get("product") not in Catalog.IDS: return false
+		if not EmployeeRelations.whole(box.get("amount"), STOCK_AMOUNT) or box.amount < 1: return false
+		supply_by_product[box.product] += int(box.amount)
+		stored_supply += int(box.amount)
 	# Missing manifests are permitted only for the old single-box snapshot format.
 	if not data.has("incoming_boxes") and not data.has("queued_boxes"):
 		incoming_amount = int(data.supply_in_transit)
