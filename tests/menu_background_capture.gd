@@ -19,6 +19,10 @@ func _run() -> void:
 	current_scene.get_node("CustomerSpawner/SpawnTimer").stop()
 	current_scene.get_node("Shop/ShopArea").business.save_path = ""
 	current_scene.get_node("Ui").visible = false
+	# Everyone sees this picture, whatever their own settings: capture it on High.
+	var settings = preload("res://game_settings.gd").new()
+	settings.graphics = 2
+	settings.apply_graphics(current_scene)
 	for node_name in ["Player", "Customer", "Worker", "StockWorker"]:
 		current_scene.get_node(node_name).hide()
 		current_scene.get_node(node_name).set_physics_process(false)

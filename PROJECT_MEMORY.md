@@ -1,6 +1,6 @@
 # LifeBusinessGame - Project Memory and AI Handoff
 
-Last updated: 2026-10-15 (Asia/Calcutta).
+Last updated: 2026-10-19 (Asia/Calcutta). Latest build: Demo v0.8 (Indian town, co-op).
 Current status: playable development prototype, not a release-ready demo.
 Latest demo usability feature: a compact First Day guide appears below the clock
 and points to the next unfinished retail objective. It hides while a tablet or
@@ -13,6 +13,23 @@ baskets, tablet purchasing and mixed-product stocking. See Produce Tables below.
 Latest feature: playable tomato farming, a Farm tablet tab/seed stall, three farm
 expansions, tomato warehouse/shelf/checkout integration, a road-end Coming Next
 board and a local suggestion form. See Farming section below for controls and limits.
+
+## Demo v0.8: Indian Town, Co-op, Graphics Settings (2026-10-19)
+
+- Build: `build/LifeBusinessGame_Demo_v0.8.zip` (44 MB, same layout as v0.7: exe, pck,
+  libterrain release DLL, READ ME with a co-op section). Version v0.8 in the lobby and
+  the exe (export_presets 0.8.0.0); `editor_preview/*` is excluded from the export.
+- Exporting while the Godot editor is open prints "Can't open GDExtension" for
+  Terrain3D (the editor locks the debug DLL). The pack is still correct: an export
+  from an unlocked project copy produced a byte-identical .pck.
+- Lobby background (assets/ui/main_menu_shop_v2.png) recaptured with
+  tests/menu_background_capture.gd `-- --polished`, now on High graphics.
+- In this release, committed by the owner as 53999fe and earlier: the Indian town
+  (indian_house.gd, indian_street.gd), Indian music (tools/make_audio.gd), blade grass
+  and the ground shader, block_path.gd paths, the home yard, lamps on Low, the road
+  horizon (horizon.gd), the editor preview, graphics presets and day length
+  (game_settings.gd, settings_menu.gd), and co-op (coop.gd, coop_world.gd,
+  remote_backend.gd, coop_menu.gd; tests/coop_test.gd runs 2 processes).
 
 ## Full-Screen PC, APNA OS Desktop, Staff Page, Checkout Click Fix (2026-10-18)
 
