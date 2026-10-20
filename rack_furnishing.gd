@@ -11,6 +11,10 @@ var candidate: Dictionary = {}
 var preview: Node3D
 var preview_material: StandardMaterial3D
 var last_error := ""
+## "counter" or "desk" while that fixture is moved instead of a rack.
+var fixture := ""
+var bar: Control
+const FIXTURE_NAMES := {"counter": "Checkout counter", "desk": "PC desk"}
 @onready var world = get_parent()
 @onready var operations = world.get_node("ShopOperations")
 @onready var business = world.get_node("Shop/ShopArea").business
@@ -23,6 +27,8 @@ func _ready() -> void:
 	models[0] = {"node": operations.rack, "items": operations.rack_bottles, "label": operations.rack_label}
 	for id in [1, 2]:
 		var sku: String = Catalog.IDS[id]
+		# Only older games have the built-in snack and soap racks; bought racks get theirs in _sync.
+		if not operations.product_racks.has(sku): continue
 		models[id] = {"node": operations.product_racks[sku], "items": operations.product_items[sku], "label": operations.product_labels[sku]}
 	preview = Node3D.new()
 	preview.name = "PlacementPreview"
@@ -34,6 +40,10 @@ func _ready() -> void:
 	for z in [-1.0, 1.0]: _preview_box(Vector3(0.55, 1.9, 0.07), Vector3(0, 0.95, z))
 	_preview_box(Vector3(0.3, 0.025, 0.3), Vector3(1, 0.02, 0))
 	preview.hide()
+	bar = preload("res://move_mode_bar.gd").new()
+	bar.name = "MoveModeBar"
+	bar.furnishing = self
+	ui.add_child(bar)
 	business.changed.connect(_sync)
 	_sync()
 	call_deferred("refresh_stock")
@@ -95,6 +105,19 @@ func near_rack(sku: String) -> int:
 	var selected := -1
 	for record in business.racks.records:
 		if not Store.supports(record, sku): continue
+		var offset: Vector3 = player.global_position - Store.approach(record)
+		offset.y = 0
+		if offset.length() <= distance:
+			distance = offset.length()
+			selected = record.id
+	return selected
+
+## The rack the player stands at that holds some `sku` (for Q: take one back).
+func near_stocked_rack(sku: String) -> int:
+	var distance := 1.0
+	var selected := -1
+	for record in business.racks.records:
+		if not record.slots.any(func(slot): return slot.product == sku and int(slot.count) > 0): continue
 		var offset: Vector3 = player.global_position - Store.approach(record)
 		offset.y = 0
 		if offset.length() <= distance:
@@ -195,7 +218,7 @@ func pack(id: int) -> bool:
 	return true
 
 func begin_buy(sku: String) -> bool:
-	if sku not in business.logistics.rack_delivered or business.racks.records.size() >= Store.MAX_RACKS: return false
+	if sku not in business.logistics.rack_delivered or business.racks.records.size() >= business.rack_limit(): return false
 	return _begin(sku, -1, 2)
 
 func begin_move(id: int) -> bool:
@@ -205,19 +228,93 @@ func begin_move(id: int) -> bool:
 		return false
 	return _begin(record.product, id, int(record.turn))
 
-func _begin(sku: String, id: int, orientation: int) -> bool:
+## G at the checkout counter or the PC desk.
+func begin_fixture(fixture_name: String) -> bool:
+	if fixture_name == "counter" and operations.counter_busy():
+		ui.show_feedback("Customers are at the counter. Move it when the queue is empty.", true)
+		return false
+	return _begin("", -1, int(business.racks.fixtures[fixture_name].turn), fixture_name)
+
+## What the crosshair points at within reach: a rack id, "counter", "desk" or null.
+func aimed_target():
+	var camera: Camera3D = player.camera
+	var centre := get_viewport().get_visible_rect().size / 2
+	var origin := camera.project_ray_origin(centre)
+	var direction := camera.project_ray_normal(centre)
+	var shapes: Array = []
+	for record in business.racks.records: shapes.append([int(record.id), Store.footprint(record), 1.95])
+	for fixture_name in Store.FIXTURE_SIZE: shapes.append([fixture_name, Store.fixture_body(fixture_name, business.racks.fixtures[fixture_name]), 1.25 if fixture_name == "counter" else 1.5])
+	var best = null
+	var nearest := 4.5
+	for shape in shapes:
+		var area: Rect2 = shape[1]
+		var hit = AABB(Vector3(area.position.x, 0, area.position.y), Vector3(area.size.x, shape[2], area.size.y)).intersects_ray(origin, direction)
+		if hit != null and origin.distance_to(hit) < nearest:
+			nearest = origin.distance_to(hit)
+			best = shape[0]
+	return best
+
+## G: pick up whatever the crosshair is on to move it; G again cancels.
+func move_key() -> bool:
+	if active:
+		cancel()
+		return true
+	if not player.shop_indoors: return false
+	var target = aimed_target()
+	if target == null:
+		ui.show_feedback("Aim at a rack, the counter or the PC desk, then press G.", true)
+	elif business.carried_stock > 0:
+		ui.show_feedback("Put the box down first (Q), then press G to move furniture.", true)
+	elif target is String: begin_fixture(target)
+	else: begin_move(target)
+	return true
+
+func target_name() -> String:
+	if not fixture.is_empty(): return FIXTURE_NAMES[fixture]
+	if selected_id < 0: return "New rack"
+	return "Produce table" if business.racks.find(selected_id).get("display", "shelf") == "produce" else "Rack"
+
+## Q while moving packs an empty bought rack back into its box.
+func can_pack() -> bool:
+	var record: Dictionary = business.racks.find(selected_id) if fixture.is_empty() else {}
+	return not record.is_empty() and selected_id >= business.starting_racks and int(record.amount) == 0 and int(record.get("legacy_overflow", 0)) == 0
+
+func _pack_selected() -> void:
+	if not fixture.is_empty() or selected_id < 0:
+		ui.show_feedback("Only racks pack into a box.", true)
+	elif selected_id < business.starting_racks:
+		ui.show_feedback("The free starting rack%s stay%s in the shop." % ["s" if business.starting_racks > 1 else "", "" if business.starting_racks > 1 else "s"], true)
+	elif not can_pack():
+		ui.show_feedback("Empty the rack first: with its box in hand, Q takes items back.", true)
+	else:
+		var id := selected_id
+		active = false
+		preview.hide()
+		candidate.clear()
+		pack(id)
+
+func _begin(sku: String, id: int, orientation: int, fixture_name := "") -> bool:
 	if active or business.carried_stock > 0: return false
 	for child in preview.get_children():
 		preview.remove_child(child)
 		child.queue_free()
 	var produce: bool = business.racks.find(id).get("display", "shelf") == "produce" if id >= 0 else sku == "tomato"
-	if produce:
+	fixture = fixture_name
+	candidate.clear()
+	if fixture == "counter":
+		_preview_box(Vector3(2.8, 0.9, 0.7), Vector3(0, 0.45, 0))
+		_preview_box(Vector3(2.6, 0.02, 0.5), Vector3(-0.4, 0.02, 0.8))
+		_preview_box(Vector3(0.6, 0.02, 0.4), Vector3(0, 0.02, -1.0))
+	elif fixture == "desk":
+		_preview_box(Vector3(1.3, 0.85, 0.65), Vector3(0, 0.425, 0))
+		_preview_box(Vector3(0.6, 0.02, 0.4), Vector3(0, 0.02, 0.85))
+	elif produce:
 		_preview_box(Vector3(0.65, 0.65, 2.1), Vector3(0, 0.325, 0))
 		for slot in range(12): _preview_box(Vector3(0.2, 0.1, 0.49), operations.basket_position(slot))
 	else:
 		for level in range(3): _preview_box(Vector3(0.65, 0.06, 2.1), Vector3(0, 0.22 + level * 0.55, 0))
 		for z in [-1.0, 1.0]: _preview_box(Vector3(0.55, 1.9, 0.07), Vector3(0, 0.95, z))
-	_preview_box(Vector3(0.3, 0.025, 0.3), Vector3(1, 0.02, 0))
+	if fixture.is_empty(): _preview_box(Vector3(0.3, 0.025, 0.3), Vector3(1, 0.02, 0))
 	product = sku
 	selected_id = id
 	turn = orientation
@@ -228,17 +325,17 @@ func _begin(sku: String, id: int, orientation: int) -> bool:
 
 func cancel() -> void:
 	active = false
+	fixture = ""
 	preview.hide()
 	candidate.clear()
 	ui.show_feedback("Placement cancelled.")
 
-func _actor_error(record: Dictionary) -> String:
-	var area := Store.footprint(record).grow(0.3)
+func _actor_error(area: Rect2, skip: Node3D = null) -> String:
 	var actors: Array = [player, operations.stock_worker, world.get_node("Worker")]
 	for child in world.get_children():
 		if child.get("product_id") != null: actors.append(child)
 	for actor in actors:
-		if not is_instance_valid(actor) or not actor.visible: continue
+		if not is_instance_valid(actor) or not actor.visible or actor == skip: continue
 		if area.has_point(Vector2(actor.global_position.x, actor.global_position.z)): return "Someone is standing there."
 		var route = actor.get("route")
 		if route == null: continue
@@ -249,8 +346,9 @@ func _actor_error(record: Dictionary) -> String:
 
 func confirm() -> bool:
 	if not active or candidate.is_empty(): return false
+	if not fixture.is_empty(): return _confirm_fixture()
 	var error: String = business.racks.placement_error(candidate)
-	if error.is_empty(): error = _actor_error(candidate)
+	if error.is_empty(): error = _actor_error(Store.footprint(candidate).grow(0.3))
 	if selected_id >= 0 and busy(selected_id): error = "Rack is in use."
 	if not error.is_empty():
 		ui.show_feedback(error, true)
@@ -263,6 +361,23 @@ func confirm() -> bool:
 	ui.show_feedback("Rack placed." if selected_id < 0 else "Rack moved.")
 	return true
 
+func _confirm_fixture() -> bool:
+	# Check the spot again: someone may have walked in since it was last checked.
+	var spot := Vector3(candidate.x, 0.1, candidate.z)
+	candidate = {}
+	_fixture_candidate(spot)
+	if not last_error.is_empty():
+		ui.show_feedback(last_error, true)
+		return false
+	if not business.move_fixture(fixture, Vector2(candidate.x, candidate.z), turn):
+		ui.show_feedback("Could not move it there. Check the save status.", true)
+		return false
+	ui.show_feedback("%s moved." % FIXTURE_NAMES[fixture])
+	active = false
+	fixture = ""
+	preview.hide()
+	return true
+
 func _process(_delta: float) -> void:
 	if not active: return
 	var camera: Camera3D = player.camera
@@ -272,18 +387,44 @@ func _process(_delta: float) -> void:
 	var point = Plane(Vector3.UP, 0.1).intersects_ray(origin, direction)
 	if point == null or point.distance_to(player.global_position) > 4.5:
 		point = player.global_position + Vector3(direction.x, 0, direction.z).normalized() * 3
+	if not fixture.is_empty():
+		_fixture_candidate(point)
+		return
 	candidate = {"id": business.racks.records.size() if selected_id < 0 else selected_id, "product": product, "x": snappedf(point.x, 0.25), "z": snappedf(point.z, 0.25), "turn": turn, "amount": 0}
 	preview.position = Store.point(candidate)
 	preview.rotation.y = turn * PI / 2
 	last_error = business.racks.placement_error(candidate)
-	if last_error.is_empty(): last_error = _actor_error(candidate)
+	if last_error.is_empty(): last_error = _actor_error(Store.footprint(candidate).grow(0.3))
+	preview_material.albedo_color = Color(0.1, 0.9, 0.5, 0.5) if last_error.is_empty() else Color(1, 0.2, 0.15, 0.5)
+
+func _fixture_candidate(point: Vector3) -> void:
+	var next := {"x": snappedf(point.x, 0.25), "z": snappedf(point.z, 0.25), "turn": turn}
+	# The aisle check walks the whole shop, so only a new spot is checked again.
+	if next == candidate: return
+	candidate = next
+	preview.position = Vector3(next.x, 0.1, next.z)
+	preview.rotation.y = turn * PI / 2
+	last_error = business.racks.fixture_error(fixture, next)
+	if last_error.is_empty() and fixture == "counter" and operations.counter_busy(): last_error = "Customers are at the counter."
+	# The cashier goes along with the counter, so only others count.
+	if last_error.is_empty(): last_error = _actor_error(Store.fixture_body(fixture, next).grow(0.3), world.get_node("Worker") if fixture == "counter" else null)
 	preview_material.albedo_color = Color(0.1, 0.9, 0.5, 0.5) if last_error.is_empty() else Color(1, 0.2, 0.15, 0.5)
 
 func _input(event: InputEvent) -> void:
-	if not active or not event is InputEventKey or not event.pressed or event.echo: return
-	match event.keycode:
-		KEY_ESCAPE: cancel()
-		KEY_R: turn = (turn + 1) % 4
-		KEY_E, KEY_ENTER: confirm()
-		_: return
+	if not active or not event.is_pressed() or event.is_echo(): return
+	if event is InputEventMouseButton:
+		match event.button_index:
+			MOUSE_BUTTON_LEFT: confirm()
+			MOUSE_BUTTON_RIGHT: cancel()
+			MOUSE_BUTTON_WHEEL_UP: turn = (turn + 1) % 4
+			MOUSE_BUTTON_WHEEL_DOWN: turn = (turn + 3) % 4
+			_: return
+	elif event is InputEventKey:
+		match event.keycode:
+			KEY_ESCAPE, KEY_G: cancel()
+			KEY_R: turn = (turn + 1) % 4
+			KEY_E, KEY_ENTER: confirm()
+			KEY_Q: _pack_selected()
+			_: return
+	else: return
 	get_viewport().set_input_as_handled()

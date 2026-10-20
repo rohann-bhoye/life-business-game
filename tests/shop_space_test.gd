@@ -99,13 +99,17 @@ func _run() -> void:
 			var menu = current_scene.get_node("Ui").supplier_menu
 			menu.open_menu()
 			menu.tabs.current_tab = 2
-			assert(menu.expansion_button.disabled)
+			# Space sells real expansions now (shop_expansion_test.gd); levels do not change the room.
+			assert(menu.expansion_button.text.begins_with("Expand shop") and shop.business.shop_expansion == 0)
 			camera.position = Vector3(-1.1, 1.8, -0.7)
 			camera.look_at(Vector3(-1.1, 1.35, -1.6))
 			await _capture("purchase_%d" % level)
 			assert(shop.business.upgrade_shop())
 			assert(shop.business.shop_level == level)
 			menu.close_menu()
+			# The indoor area notices the moved player on the next physics steps.
+			await physics_frame
+			await physics_frame
 			assert(player.shop_indoors)
 		await _check_room(level)
 		assert(shop.stock == 10 and ops.rack.global_position == Vector3(-5.6, 0.1, -0.5))

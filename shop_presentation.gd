@@ -39,8 +39,14 @@ func _ready() -> void:
 	_exterior(shop)
 	_interior(shop)
 	_shelves()
+	# The look of each business level (shop_style.gd).
+	var style := Node3D.new()
+	style.set_script(preload("res://shop_style.gd"))
+	add_child(style)
 	business.changed.connect(_refresh_prices)
 	_refresh_prices()
+	# The skirting and interior sign above follow an expanded back wall.
+	ops.follow_back_wall()
 
 func _label(parent: Node3D, name: String, text: String, point: Vector3, font_size: int, pixel_size: float, color := Color.WHITE) -> Label3D:
 	var label := Label3D.new()
@@ -93,7 +99,7 @@ func _interior(shop: Node3D) -> void:
 		lamp.omni_range = 5.5
 		lamp.shadow_enabled = false
 		fixture.add_child(lamp)
-	_label(shop, "InteriorCategory", "EVERYDAY ESSENTIALS", Vector3(0, 1.5, -7.42), 40, 0.003)
+	_label(shop, "InteriorCategory", "EVERYDAY ESSENTIALS", Vector3(0, 0.3, -7.42), 40, 0.003)
 
 func _shelves() -> void:
 	for product in Catalog.IDS:

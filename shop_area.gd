@@ -156,10 +156,12 @@ func _unhandled_input(event):
 				get_tree().current_scene.get_node("Ui/BargainMenu").open_for(customer)
 				get_viewport().set_input_as_handled()
 				return
-			house_menu.hide()
-			shop_menu.visible = true
-			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-			get_viewport().set_input_as_handled()
+			# The tablet opens with Tab (player.gd), so E never pulls it out by accident.
+			if not operations.enabled:
+				house_menu.hide()
+				shop_menu.visible = true
+				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+				get_viewport().set_input_as_handled()
 
 func get_bargaining_customer() -> Node3D:
 	var customer = customer_spawner.active_customer

@@ -21,6 +21,8 @@ static func new_game(path: String) -> String:
 	# A new shop starts with beginner money (the bank loan helps if it runs short).
 	state.starting_money = Backend.BEGINNER_MONEY
 	state.money = Backend.BEGINNER_MONEY
+	# One free rack (cold drinks); more racks are bought on the shop PC.
+	state.start_with_one_rack()
 	return "" if state.save_progress() else "Could not create a new save."
 
 static func launch_game(tree: SceneTree, path: String, settings_path: String) -> Error:

@@ -31,14 +31,21 @@ var drop_point := Vector3(-10.8, 0.1, 11.85)
 var rack_point := Vector3(-4.6, 0.1, -0.5)
 var cashier_point := Vector3(-2.5, 0.1, -0.6)
 const ROOM_HEIGHT := 3.8
-const ROOM_DEPTHS := [10.0, 10.0, 10.0]
 const Catalog = preload("res://product_catalog.gd")
+const Store = preload("res://rack_store.gd")
+## Movable furniture (G): each fixture's nodes with their transforms at its home spot.
+var fixture_parts := {}
 var product_racks := {}
 var product_items := {}
 var product_labels := {}
 var furnishing
-var room_level := 0
+## The bought expansions the room is built for (-1 until the first build).
+var room_expansion := -1
+## What the back wall decor, skirting and plot were last moved for.
+var followed := []
 var departures := {}
+## Each leaving employee's walk to the door, worked out once when they set off.
+var departure_paths := {}
 var screen_payment := false
 
 @onready var shop = get_parent().get_node("Shop/ShopArea")
@@ -136,6 +143,8 @@ func build_room(builder: Node3D) -> void:
 	get_parent().get_node("CustomerPurchasePoint").position = Vector3(-2.5, 0.1, 1.2)
 	get_parent().get_node("Worker").position = cashier_point
 	get_parent().get_node("Worker").rotation.y = PI
+	_register_fixture("counter", [counter, get_node("CheckoutCounterBody")])
+	_register_fixture("desk", [desk, get_node("ComputerDeskBody"), get_node("ManagementDeskAsset")])
 	var light := OmniLight3D.new()
 	light.name = "ShopLight"
 	light.position = Vector3(-3, 2.6, 0)
@@ -148,7 +157,11 @@ func build_room(builder: Node3D) -> void:
 	decor.set_script(preload("res://shop_decor.gd"))
 	add_child(decor)
 	decor.build(counter)
+	_build_expansion_plot()
+	# Older games started with snack and soap racks too; new games buy them.
+	var free_racks: int = get_parent().get_node("Shop/ShopArea").business.starting_racks
 	for id in ["snack", "soap"]:
+		if free_racks < 3: break
 		var extra := build_stock_rack(builder, "SnackRack" if id == "snack" else "SoapRack", id, Vector3(-5.6, 0.1, -3.3 if id == "snack" else -6.0))
 		product_racks[id] = extra.node
 		product_items[id] = extra.items
@@ -205,10 +218,10 @@ func _resize_room_box(building: Node3D, node_name: String, size: Vector3, offset
 
 func _update_room_size() -> void:
 	var business = get_parent().get_node("Shop/ShopArea").business
-	if room_level == business.shop_level: return
-	room_level = business.shop_level
+	if room_expansion == business.shop_expansion: return
+	room_expansion = business.shop_expansion
 	var building: Node3D = get_parent().get_node("Shop")
-	var depth: float = ROOM_DEPTHS[room_level - 1]
+	var depth: float = 10.0 + room_expansion * Store.EXPANSION_DEPTH
 	var extension := depth - 5.0
 	var center_z := -extension / 2.0
 	_resize_room_box(building, "BackWall", Vector3(6, ROOM_HEIGHT, 0.12), Vector3(0, 0.5, -2.5 - extension))
@@ -225,10 +238,94 @@ func _update_room_size() -> void:
 	building.get_node("ShopArea/CollisionShape3D").position = Vector3(0, 0.5, center_z)
 	get_node("ShopLight").position.y = 3.3
 	get_node("ShopLight").omni_range = depth + 1
-	# Business levels affect demand, while the full room is available from day one.
+	# Bought expansions (PC: Space) move the back wall; the room keeps its width.
 	if is_instance_valid(player):
 		var point: Vector3 = building.to_local(player.global_position)
 		player.shop_indoors = absf(point.x) < 2.9 and point.z > -2.5 - extension and point.z < 2.4 and point.y < 2.4
+
+## World z of the inside of the back wall.
+func back_z() -> float:
+	return Store.floor_rect(room_expansion).position.y - 0.02
+
+## Keeps everything that belongs to the back wall with it after an expansion: the
+## back-wall decor, side paint and skirting, the interior sign, an extra ceiling
+## light per expansion, and the expansion plot outside.
+func follow_back_wall() -> void:
+	var building: Node3D = get_parent().get_node("Shop")
+	var decor := get_node_or_null("ShopDecor")
+	var key := [room_expansion, decor != null, building.has_node("InteriorCategory")]
+	if key == followed: return
+	followed = key
+	var back := back_z()
+	if decor != null: decor.set_back(back)
+	for skirting in building.find_children("WallSkirting*", "MeshInstance3D", false, false):
+		skirting.mesh.size.z = 2.44 - back - 0.2
+		skirting.position.z = (2.44 + back) / 2.0
+	var sign := building.get_node_or_null("InteriorCategory") as Node3D
+	if sign != null: sign.position.z = back + 0.02
+	for index in range(Store.MAX_EXPANSION):
+		var fixture := get_node_or_null("ExpansionLight%d" % index) as Node3D
+		if fixture == null:
+			fixture = _box(self, "ExpansionLight%d" % index, Vector3(1.7, 0.07, 0.24), Vector3(-3, 3.82, -8.6 - index * Store.EXPANSION_DEPTH), Color(0.94, 0.98, 1))
+			var glow := _material(Color(0.94, 0.98, 1)).duplicate() as StandardMaterial3D
+			glow.emission_enabled = true
+			glow.emission = Color(0.9, 0.96, 1)
+			glow.emission_energy_multiplier = 0.6
+			fixture.material_override = glow
+			var lamp := OmniLight3D.new()
+			lamp.name = "Lamp"
+			lamp.position = Vector3(0, -0.15, 0)
+			lamp.light_color = Color(0.96, 0.97, 1)
+			lamp.light_energy = 0.7
+			lamp.omni_range = 4.5
+			lamp.shadow_enabled = false
+			fixture.add_child(lamp)
+		fixture.visible = index < room_expansion
+	_place_expansion_plot()
+
+## The cement plot behind the shop that expansions build on, with a rope and a
+## sign while some of it is still for sale. It is laid at the start so no grass
+## grows where the room will go (environment_details.gd masks it).
+func _build_expansion_plot() -> void:
+	var plot := Node3D.new()
+	plot.name = "ExpansionPlot"
+	add_child(plot)
+	var far := Store.floor_rect(Store.MAX_EXPANSION).position.y - 0.14
+	# The hidden copy keeps grass off the whole plot for good (environment_details.gd
+	# reads hidden meshes too); the visible slab covers only the part not built on.
+	var keep_clear := _box(plot, "GrassMask", Vector3(6.12, 0.01, -7.56 - far), Vector3(-3, 0.1, (-7.56 + far) / 2.0), Color(0.62, 0.61, 0.58))
+	keep_clear.hide()
+	_box(plot, "Slab", Vector3(6.12, 0.04, 1.0), Vector3(-3, 0.105, -9.0), Color(0.62, 0.61, 0.58))
+	for index in range(4): _box(plot, "Post%d" % index, Vector3(0.06, 0.9, 0.06), Vector3.ZERO, Color(0.95, 0.5, 0.1))
+	for index in range(3): _box(plot, "Rope%d" % index, Vector3(0.02, 0.02, 0.02), Vector3.ZERO, Color(0.95, 0.5, 0.1))
+	var board := _box(plot, "SignBoard", Vector3(1.6, 0.6, 0.05), Vector3(-3, 1.1, far + 0.3), Color(0.97, 0.96, 0.9))
+	var text := _sign(board, "SignText", "SHOP EXPANSION PLOT\nBuy more space on the shop PC: Space", Vector3(0, 0, -0.03))
+	text.rotation.y = PI
+	text.font_size = 28
+	text.modulate = Color(0.12, 0.2, 0.18)
+	_box(plot, "SignLeg", Vector3(0.06, 0.8, 0.06), Vector3(-3, 0.45, far + 0.3), Color(0.3, 0.3, 0.3))
+
+func _place_expansion_plot() -> void:
+	var plot := get_node_or_null("ExpansionPlot")
+	if plot == null: return
+	var far := Store.floor_rect(Store.MAX_EXPANSION).position.y - 0.14
+	var near := back_z() - 0.2
+	var open := room_expansion < Store.MAX_EXPANSION
+	var corners := [Vector3(-6.0, 0.55, near), Vector3(-6.0, 0.55, far), Vector3(0.0, 0.55, far), Vector3(0.0, 0.55, near)]
+	for index in range(4):
+		plot.get_node("Post%d" % index).position = corners[index]
+		plot.get_node("Post%d" % index).visible = open
+	for index in range(3):
+		var rope: MeshInstance3D = plot.get_node("Rope%d" % index)
+		var from: Vector3 = corners[index] + Vector3(0, 0.3, 0)
+		var to: Vector3 = corners[index + 1] + Vector3(0, 0.3, 0)
+		rope.mesh.size = Vector3(maxf(0.02, absf(to.x - from.x)), 0.03, maxf(0.02, absf(to.z - from.z)))
+		rope.position = (from + to) / 2.0
+		rope.visible = open
+	for node_name in ["SignBoard", "SignLeg", "Slab"]: plot.get_node(node_name).visible = open
+	var slab: MeshInstance3D = plot.get_node("Slab")
+	slab.mesh.size.z = maxf(0.1, near + 0.14 - far)
+	slab.position.z = (near + 0.14 + far) / 2.0
 
 func employee_tag(employee: Node3D, text: String) -> Label3D:
 	var label := _sign(employee, "EmployeeNameLabel", text, Vector3(0, 1.85, 0))
@@ -277,6 +374,12 @@ func _ready() -> void:
 	doors.set_script(load("res://sliding_door.gd"))
 	add_child(doors)
 	_build_van()
+	# Twin WET/DRY dustbin against the front wall, right of the door.
+	var bins := Node3D.new()
+	bins.name = "Dustbin"
+	bins.set_script(preload("res://dustbin.gd"))
+	bins.position = Vector3(-1.0, 0.1, 2.86)
+	add_child(bins)
 	shop.business.changed.connect(_sync_state)
 	_sync_state()
 
@@ -428,6 +531,8 @@ func _sync_state() -> void:
 	if not enabled or not is_instance_valid(delivery_box):
 		return
 	_update_room_size()
+	follow_back_wall()
+	apply_fixtures()
 	delivery_box.visible = shop.business.boxed_stock > 0
 	delivery_box.scale = Vector3.ONE * 0.75
 	delivery_box.rotation.y = PI
@@ -456,6 +561,42 @@ func _sync_state() -> void:
 		van.position = Vector3(-26, 0.1, 8.6)
 		van.show()
 	update_rack()
+
+func _register_fixture(fixture: String, nodes: Array) -> void:
+	fixture_parts[fixture] = nodes.map(func(node): return [node, node.transform])
+
+## Moves a point of the shop as built (the fixture at its home spot) to where the
+## fixture stands now, or at `place` ({x, z, turn}).
+func fixture_transform(fixture: String, place := {}) -> Transform3D:
+	var home: Dictionary = Store.FIXTURE_HOME[fixture]
+	if place.is_empty(): place = shop.business.racks.fixtures[fixture]
+	return Transform3D(Basis(Vector3.UP, int(place.turn) * PI / 2), Vector3(place.x, 0, place.z)) * Transform3D(Basis(), Vector3(-home.x, 0, -home.z))
+
+func apply_fixtures() -> void:
+	for fixture in fixture_parts:
+		var moved := fixture_transform(fixture)
+		for part in fixture_parts[fixture]: part[0].transform = moved * part[1]
+	var counter_moved := fixture_transform("counter")
+	var previous := cashier_point
+	cashier_point = counter_moved * Vector3(-2.5, 0.1, -0.6)
+	get_parent().get_node("CustomerPurchasePoint").position = counter_moved * Vector3(-2.5, 0.1, 1.2)
+	# A moved counter takes its cashier along instead of walking them through it.
+	if not previous.is_equal_approx(cashier_point) and not departures.has("cashier"):
+		shop.worker.position = cashier_point
+		shop.worker.rotation.y = counter_moved.basis.get_euler().y + PI
+
+## Where customers join the queue and where they step out after paying.
+func queue_entry() -> Vector3:
+	return fixture_transform("counter") * Vector3(-4.6, 0.1, 1.65)
+
+func counter_at_home() -> bool:
+	return shop.business.racks.fixtures.counter == Store.FIXTURE_HOME.counter
+
+## Customers walking to, waiting in or paying at the queue keep the counter in place.
+func counter_busy() -> bool:
+	for child in get_parent().get_children():
+		if child.get("product_id") != null and child.get("state") in [2, 4, 6, 7, 8, 9, 10]: return true
+	return not queue.is_empty()
 
 func product_delivery_point(slot: int) -> Vector3:
 	return drop_point + Vector3((slot % 5) * 0.7, 0.3, (slot / 5) * 0.7)
@@ -501,6 +642,16 @@ func release_held_item() -> bool:
 		furnishing.cancel()
 		return true
 	if shop.business.carried_stock <= 0: return false
+	# At a rack holding this box's product, Q takes one item back into the box.
+	var product: String = shop.business.pending_product
+	var take_rack: int = furnishing.near_stocked_rack(product) if is_instance_valid(furnishing) else -1
+	if take_rack >= 0:
+		if shop.business.carried_stock >= shop.business.STOCK_AMOUNT:
+			ui.show_feedback("The box is full. Put items on the shelf with E.", true)
+		elif shop.business.unshelve_one(take_rack):
+			play_sound("stock")
+			ui.show_feedback("Took 1 %s back. %d in the box." % [Catalog.NAMES[product], shop.business.carried_stock])
+		return true
 	var point: Vector3 = player.global_position - player.global_basis.z * 1.0
 	var space := get_world_3d().direct_space_state
 	var clearance := PhysicsRayQueryParameters3D.create(player.global_position + Vector3.UP * 0.6, point + Vector3.UP * 0.6)
@@ -565,12 +716,14 @@ func _employee_presence(actor: Node3D, role: String, delta: float) -> void:
 	if on_shift or pending:
 		if departures.has(role):
 			actor.position = cashier_point if role == "cashier" else Vector3(-4.6, 0.1, -1.8)
+			departure_paths.erase(role)
 			departures.erase(role)
 		actor.show()
 		if role == "cashier":
-			var target := Vector3(-3.7, 0.1, -1.0) if player_at_counter() else cashier_point
+			var counter_moved := fixture_transform("counter")
+			var target := counter_moved * Vector3(-3.7, 0.1, -1.0) if player_at_counter() else cashier_point
 			actor.position = actor.position.move_toward(target, delta * 1.5)
-			actor.rotation.y = PI
+			actor.rotation.y = counter_moved.basis.get_euler().y + PI
 		return
 	if not business.staff.hired(business, role): actor.hide(); return
 	if not departures.has(role):
@@ -579,13 +732,25 @@ func _employee_presence(actor: Node3D, role: String, delta: float) -> void:
 			if record.state != "done" and record.quit_day == 0: return
 			actor.route.clear()
 		departures[role] = 0
-	var path: Array[Vector3] = [Vector3(-4.6, 0.1, -0.6), Vector3(-4.6, 0.1, 1.65), Vector3(-3, 0.1, 1.65), Vector3(-3, 0.1, 3.3), Vector3(-3, 0.1, 5)]
+		departure_paths[role] = _departure_path(actor, role)
+	if not departure_paths.has(role): departure_paths[role] = _departure_path(actor, role)
+	var path: Array[Vector3] = departure_paths[role]
 	var index: int = departures[role]
 	if index >= path.size(): actor.hide(); return
 	actor.show()
 	if actor.global_position.distance_squared_to(path[index]) > 0.0001: actor.look_at(path[index], Vector3.UP)
 	actor.position = actor.position.move_toward(path[index], delta * 1.8)
 	if actor.position.is_equal_approx(path[index]): departures[role] = index + 1
+
+func _departure_path(actor: Node3D, role: String) -> Array[Vector3]:
+	var path: Array[Vector3] = [Vector3(-4.6, 0.1, -0.6), Vector3(-4.6, 0.1, 1.65), Vector3(-3, 0.1, 1.65), Vector3(-3, 0.1, 3.3), Vector3(-3, 0.1, 5)]
+	# From a moved counter the cashier finds a way round the racks to the door.
+	if role == "cashier" and not counter_at_home():
+		var walk: Array[Vector3] = shop.business.racks.route(actor.position, Store.ENTRY)
+		if not walk.is_empty():
+			walk.append_array([Vector3(-3, 0.1, 3.3), Vector3(-3, 0.1, 5)])
+			return walk
+	return path
 
 func _near(point: Vector3, distance := 1.65) -> bool:
 	var offset: Vector3 = player.global_position - point
@@ -746,7 +911,7 @@ func checkout_customer() -> Node3D:
 	return queue[0] if not queue.is_empty() else null
 
 func queue_position(customer: Node3D) -> Vector3:
-	return Vector3(-2.5 - max(0, queue.find(customer)) * 0.85, 0.1, 1.2)
+	return fixture_transform("counter") * Vector3(-2.5 - max(0, queue.find(customer)) * 0.85, 0.1, 1.2)
 
 func customer_entry_route(product := "bottle", rack_id := -1) -> Array[Vector3]:
 	var points: Array[Vector3] = [Vector3(-3, 0.1, 3.3), Vector3(-3, 0.1, 1.65)]
@@ -754,7 +919,13 @@ func customer_entry_route(product := "bottle", rack_id := -1) -> Array[Vector3]:
 	return points
 
 func customer_exit_route() -> Array[Vector3]:
-	return [Vector3(-2.5, 0.1, 1.6), Vector3(-3, 0.1, 1.7), Vector3(-3, 0.1, 3.3), get_parent().get_node("CustomerExitPoint").global_position]
+	var exit: Vector3 = get_parent().get_node("CustomerExitPoint").global_position
+	if counter_at_home(): return [Vector3(-2.5, 0.1, 1.6), Vector3(-3, 0.1, 1.7), Vector3(-3, 0.1, 3.3), exit]
+	var front: Vector3 = fixture_transform("counter") * Vector3(-2.5, 0.1, 1.6)
+	var points: Array[Vector3] = [front]
+	points.append_array(shop.business.racks.route(front, Store.ENTRY))
+	points.append_array([Vector3(-3, 0.1, 3.3), exit])
+	return points
 
 func open_supplier() -> void:
 	if player.shop_indoors and _near(pc.global_position):
@@ -778,7 +949,7 @@ func delivery_box_target() -> int:
 	return best
 
 func interaction_hint() -> String:
-	if is_instance_valid(furnishing) and furnishing.active: return "Place rack"
+	if is_instance_valid(furnishing) and furnishing.active: return "Place %s" % furnishing.target_name().to_lower()
 	if shop.business.carried_stock == 0 and ground_box_target() >= 0: return "Pick up ground box"
 	var warehouse = get_parent().get_node_or_null("Warehouse")
 	if is_instance_valid(warehouse):
@@ -788,6 +959,11 @@ func interaction_hint() -> String:
 		return ""
 	if shop.business.carried_stock > 0:
 		var amount: int = shop.business.carried_stock
+		var product_name: String = Catalog.NAMES[shop.business.pending_product]
+		var can_place: bool = furnishing.near_rack(shop.business.pending_product) >= 0 if is_instance_valid(furnishing) else false
+		var can_take: bool = furnishing.near_stocked_rack(shop.business.pending_product) >= 0 if is_instance_valid(furnishing) else false
+		if can_place and can_take: return "E: place 1 %s   |   Q: take 1 back   (%d in box)" % [product_name, amount]
+		if can_take: return "Q: take 1 %s back (%d in box)" % [product_name, amount]
 		return "Place 1 %s (%d left)" % [Catalog.NAMES[shop.business.pending_product], amount] if (furnishing.near_rack(shop.business.pending_product) >= 0 if is_instance_valid(furnishing) else _near(rack_target(shop.business.pending_product))) else ("Return box (%d left)" % amount if _near(drop_point) else "Carrying: %d %s" % [amount, Catalog.NAMES[shop.business.pending_product]])
 	var box_index := delivery_box_target()
 	if box_index >= -1:
@@ -800,7 +976,9 @@ func interaction_hint() -> String:
 		if customer.state == customer.State.NEGOTIATING: return "Customer wants a discount"
 		if customer.state == customer.State.PAYING: return "Payment: %s" % customer.payment_method
 	var employee := employee_target()
-	if not employee.is_empty(): return "%s | %s" % [shop.business.staff.name_for(employee), "Cashier" if employee == "cashier" else "Stock assistant"]
+	if not employee.is_empty(): return "Talk to %s | %s" % [shop.business.staff.name_for(employee), "Cashier" if employee == "cashier" else "Stock assistant"]
+	var shopper := shopper_target() if shop.business.carried_stock == 0 else null
+	if shopper != null: return "Talk to %s" % shopper.customer_name.get_slice(" - ", 0)
 	if player.shop_indoors and _near(pc.global_position, 1.0): return "Shop PC"
 	if player.shop_indoors and player_at_counter(): return "Checkout PC"
 	return ""
@@ -854,7 +1032,11 @@ func try_interact() -> bool:
 	if shop.business.carried_stock == 0:
 		var employee := employee_target()
 		if not employee.is_empty():
-			ui.open_employee(employee)
+			ui.staff_dialog.open_for(employee)
+			return true
+		var shopper := shopper_target()
+		if shopper != null:
+			ui.customer_chat.open_for(shopper)
 			return true
 	if player.shop_indoors and _near(pc.global_position, 1.0):
 		open_supplier()
@@ -863,6 +1045,23 @@ func try_interact() -> bool:
 		ui.checkout_menu.open_menu()
 		return true
 	return false
+
+## The shopper the crosshair is on while they shop or queue (not at the till,
+## where E scans and takes payment), or null.
+func shopper_target() -> Node3D:
+	if not player.shop_indoors: return null
+	var result: Node3D = null
+	var best := 0.94
+	var camera: Camera3D = player.camera
+	for child in get_parent().get_children():
+		if child.get("customer_name") == null or not child.visible or child.coop_mirror: continue
+		if child.state not in [child.State.ARRIVING, child.State.TAKING, child.State.SHOPPING_MORE, child.State.TO_COUNTER, child.State.QUEUING] or child == checkout_customer(): continue
+		if not _near(child.global_position, 2.2): continue
+		var alignment := (-camera.global_basis.z).dot(camera.global_position.direction_to(child.global_position + Vector3(0, 1.1, 0)))
+		if alignment > best:
+			best = alignment
+			result = child
+	return result
 
 func employee_target() -> String:
 	if not player.shop_indoors: return ""
@@ -884,3 +1083,5 @@ func _unhandled_input(event: InputEvent) -> void:
 		if release_held_item(): get_viewport().set_input_as_handled()
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		if try_interact(): get_viewport().set_input_as_handled()
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_G:
+		if is_instance_valid(furnishing) and furnishing.move_key(): get_viewport().set_input_as_handled()

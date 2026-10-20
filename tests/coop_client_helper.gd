@@ -47,6 +47,8 @@ func _run() -> void:
 	assert(shared, "The host's shop never arrived")
 	assert(not current_scene.get_node("DayClock").is_processing(), "A friend's clock must follow the host")
 	assert(business.set_product_price("soap", 190))
+	# A quick chat line shows over this friend's head in the host's game.
+	current_scene.get_node("CoopWorld").send_quick_line(1)
 	# The host holds one soap box; this friend takes the other from the bay, puts it
 	# down, picks it up again and leaves still carrying it.
 	var box_ready: bool = await _wait_for(func(): return business.queued_boxes.size() >= 1 and business.carried_stock == 0, 30.0)

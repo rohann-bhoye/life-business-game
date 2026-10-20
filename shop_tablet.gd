@@ -92,7 +92,8 @@ func _build_device() -> void:
 		add_child(grip)
 		_box(grip, "Palm", Vector3(0.09, 0.19, 0.075), Color(0.72, 0.48, 0.32), 114)
 		var thumb := _box(grip, "Thumb", Vector3(0.045, 0.085, 0.035), Color(0.78, 0.54, 0.37), 115)
-		thumb.position = Vector3(-side * 0.035, 0.012, 0.055)
+		# The thumb rests on the bezel, not on the screen.
+		thumb.position = Vector3(-side * 0.02, 0.012, 0.055)
 		var sleeve := _box(grip, "Sleeve", Vector3(0.12, 0.23, 0.09), Color(0.18, 0.48, 0.78), 113)
 		sleeve.position = Vector3(side * 0.035, -0.18, -0.015)
 		sleeve.rotation.z = side * 0.16
@@ -114,7 +115,7 @@ func _resize() -> void:
 	screen_mesh.mesh.size = screen_size
 	for index in range(grips.size()):
 		grips[index].scale = Vector3(0.4, 0.7, 0.7) if portrait else Vector3.ONE
-		grips[index].position = Vector3((-1 if index == 0 else 1) * (screen_size.x / 2 + rim / 2 + 0.015), -screen_size.y * 0.3, 0.02)
+		grips[index].position = Vector3((-1 if index == 0 else 1) * (screen_size.x / 2 + rim / 2 + 0.05), -screen_size.y * 0.36, 0.02)
 	rotation.x = deg_to_rad(-4)
 	scale = Vector3.ONE
 	position = Vector3(0, 0, -DISTANCE)
@@ -196,6 +197,7 @@ func sync_controls() -> void:
 			copy.add_theme_font_size_override("font_size", original.get_theme_font_size("font_size"))
 		elif original is Button:
 			copy.text = original.text
+			copy.clip_text = original.clip_text
 			copy.icon = original.icon
 			copy.disabled = original.disabled
 			if original.toggle_mode: copy.set_pressed_no_signal(original.button_pressed)
@@ -237,6 +239,21 @@ func _draw_chrome() -> void:
 			var rect := Rect2(label.position - Vector2(12, 12), Vector2(label.size.x + 16, 56))
 			screen_menu.draw_style_box(_rounded(Color.WHITE, 10, Color("dbe3e7")), rect)
 			screen_menu.draw_rect(Rect2(rect.position + Vector2(0, 8), Vector2(5, rect.size.y - 16)), STAT_ACCENTS[index])
+	elif wide:
+		# Every other tab: white cards with a coloured edge; goals get a progress bar
+		# and a tick once done (game_ui.gd tablet_tiles).
+		for tile in ui.tablet_tiles(tab):
+			var rect: Rect2 = tile.rect
+			screen_menu.draw_style_box(_rounded(Color.WHITE, 10, Color("dbe3e7")), rect)
+			screen_menu.draw_rect(Rect2(rect.position + Vector2(0, 8), Vector2(5, rect.size.y - 16)), tile.accent)
+			var progress: float = tile.progress
+			if progress < 0.0: continue
+			var track := Rect2(rect.position + Vector2(18, rect.size.y - 16), Vector2(rect.size.x - 96, 7))
+			screen_menu.draw_style_box(_rounded(Color("e5e7eb"), 3), track)
+			if progress > 0.0: screen_menu.draw_style_box(_rounded(Color("16a34a"), 3), Rect2(track.position, Vector2(maxf(7.0, track.size.x * progress), track.size.y)))
+			var centre := Vector2(rect.end.x - 34, rect.get_center().y)
+			screen_menu.draw_circle(centre, 15, Color("16a34a") if progress >= 1.0 else Color("e5e7eb"))
+			if progress >= 1.0: screen_menu.draw_polyline(PackedVector2Array([centre + Vector2(-7, 0), centre + Vector2(-2, 6), centre + Vector2(8, -6)]), Color.WHITE, 3.0)
 	else:
 		screen_menu.draw_style_box(_rounded(Color.WHITE, 12, Color("dbe3e7")), Rect2(12, 180, size.x - 24, 362))
 
@@ -280,7 +297,7 @@ func screen_point(pointer: Vector2) -> Vector2:
 func _input(event: InputEvent) -> void:
 	if not visible: return
 	if event is InputEventKey:
-		if event.pressed and event.keycode in [KEY_E, KEY_ESCAPE, KEY_ENTER, KEY_KP_ENTER]:
+		if event.pressed and event.keycode in [KEY_TAB, KEY_E, KEY_ESCAPE, KEY_ENTER, KEY_KP_ENTER]:
 			if not event.echo: close_menu()
 			get_viewport().set_input_as_handled()
 			return

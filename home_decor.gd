@@ -7,6 +7,8 @@ extends Node3D
 # FrontDoor and HouseSign. Old block walls/roof are hidden and their colliders off.
 const Kenney = preload("res://kenney_assets.gd")
 const FURNITURE := "res://assets/furniture/kenney/%s.glb"
+## "kk:" pieces are KayKit Furniture Bits models (CC0).
+const KAYKIT := "res://assets/furniture/kaykit/%s.gltf"
 const HALF_WIDTH := 3.2
 const FRONT := 1.9
 const BACK := -3.6
@@ -23,13 +25,16 @@ const PIECES := [
 	["sideTable", Vector3(0.42, 0.5, 0.4), Vector3(-2.85, 0.0, -3.2), 0.0, true],
 	["lampRoundTable", Vector3(0.25, 0.42, 0.25), Vector3(-2.85, 0.5, -3.2), 0.0, false],
 	["bookcaseClosedDoors", Vector3(1.0, 1.9, 0.5), Vector3(-2.85, 0.0, -0.95), PI / 2, true],
-	["rugRectangle", Vector3(1.9, 0.02, 1.5), Vector3(1.9, 0.004, -1.7), 0.0, false],
+	["kk:rug_rectangle_stripes_A", Vector3(1.9, 0.02, 1.5), Vector3(1.9, 0.004, -1.7), 0.0, false],
 	["cabinetTelevision", Vector3(1.2, 0.55, 0.45), Vector3(2.85, 0.0, -1.7), -PI / 2, true],
 	["televisionModern", Vector3(1.0, 0.65, 0.25), Vector3(2.9, 0.55, -1.7), -PI / 2, false],
 	["tableCoffee", Vector3(0.8, 0.4, 0.5), Vector3(1.85, 0.0, -1.7), PI / 2, true],
-	["loungeSofa", Vector3(1.6, 0.85, 0.8), Vector3(0.75, 0.0, -1.7), PI / 2, true],
+	["kk:couch_pillows", Vector3(1.6, 0.85, 0.8), Vector3(0.75, 0.0, -1.7), PI / 2, true],
+	["kk:armchair_pillows", Vector3(0.8, 0.85, 0.8), Vector3(0.85, 0.0, -3.05), PI / 2, true],
+	["kk:lamp_standing", Vector3(0.35, 1.6, 0.35), Vector3(0.15, 0.0, -3.25), 0.0, false],
+	["kk:pictureframe_large_A", Vector3(0.8, 0.6, 0.08), Vector3(0.75, 1.45, -3.44), 0.0, false],
 	["bookcaseOpen", Vector3(1.2, 1.6, 0.4), Vector3(1.8, 0.0, -3.35), 0.0, true],
-	["pottedPlant", Vector3(0.45, 1.0, 0.45), Vector3(2.85, 0.0, -3.25), 0.0, false],
+	["kk:cactus_medium_A", Vector3(0.45, 1.0, 0.45), Vector3(2.85, 0.0, -3.25), 0.0, false],
 	["kitchenFridge", Vector3(0.6, 1.7, 0.6), Vector3(-2.85, 0.0, 1.45), PI / 2, true],
 	["kitchenStove", Vector3(0.6, 0.9, 0.6), Vector3(-2.85, 0.0, 0.82), PI / 2, true],
 	["kitchenSink", Vector3(0.6, 0.9, 0.6), Vector3(-2.85, 0.0, 0.2), PI / 2, true],
@@ -55,7 +60,9 @@ func _ready() -> void:
 	_refit_gameplay_nodes(house)
 	for index in range(PIECES.size()):
 		var piece: Array = PIECES[index]
-		var holder := Kenney.fit(self, "%s%d" % [piece[0], index], FURNITURE % piece[0], piece[1], piece[2], piece[3])
+		var model: String = piece[0]
+		var path := KAYKIT % model.trim_prefix("kk:") if model.begins_with("kk:") else FURNITURE % model
+		var holder := Kenney.fit(self, "%s%d" % [model.trim_prefix("kk:"), index], path, piece[1], piece[2], piece[3])
 		if piece[4]: _collider(holder.name + "Body", piece[1], piece[2], piece[3])
 	Kenney.fit(self, "PorchLamp", FURNITURE % "lampWall", Vector3(0.25, 0.35, 0.2), Vector3(1.05, 2.05, FRONT + 0.12))
 	_build_yard()

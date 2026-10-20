@@ -84,5 +84,20 @@ func _run() -> void:
 		assert(absf(asphalt.r - asphalt.g) < 0.08 and asphalt.r < 0.6, "Road rendered green or failed to draw")
 		business.advance_clock(780)
 		await _capture(camera, "front_night", Vector3(-8, 2.8, 8), Vector3(-3, 1.8, 0))
-	print("PASS: material atlas, readable storefront, live shelf prices, product labels, ceiling fixtures, unchanged ground/economy and desktop shop captures")
+	# Each upgrade gives the shop a new look (shop_style.gd); the floor rules stay.
+	var style = current_scene.get_node("ShopPresentation/ShopStyle")
+	var floor_before: Material = shop.get_node("Floor").material_override
+	var paint: MeshInstance3D = current_scene.get_node("ShopOperations/ShopDecor/WallPaint")
+	var layout: Array = business.racks.records.duplicate(true)
+	assert(style.level == 1 and not style.extras.has_node("IceCreamFreezer"))
+	assert(business.upgrade_shop())
+	assert(style.level == 2 and shop.get_node("StoreName").text == "APNA SUPER MART")
+	assert(style.extras.has_node("IceCreamFreezer") and style.extras.has_node("BladeSign") and not style.extras.has_node("OfferScreen"))
+	assert(shop.get_node("Floor").material_override != floor_before and paint.material_override.albedo_color == style.PAINT[1])
+	assert(business.upgrade_shop())
+	await process_frame
+	assert(style.level == 3 and shop.get_node("StoreName").text == "APNA MEGA MART")
+	assert(style.extras.name == "Level3Look" and style.extras.has_node("OfferScreen") and style.extras.has_node("Bunting") and style.extras.has_node("IceCreamFreezer"))
+	assert(style.get_children().size() == 1 and business.racks.records == layout)
+	print("PASS: material atlas, readable storefront, live shelf prices, product labels, ceiling fixtures, unchanged ground/economy and desktop shop captures, per-level shop looks")
 	quit()

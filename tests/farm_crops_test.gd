@@ -86,7 +86,7 @@ func _run() -> void:
 	assert(crop_button.visible and crop_button.text == "Crop: Tomato >")
 	crop_button.pressed.emit()
 	assert(business.farm.crop == "carrot" and crop_button.text == "Crop: Carrot >")
-	assert(ui.shop_menu.get_node("BuySeedsButton").text == "Buy carrot seeds - Rs80")
+	assert(ui.shop_menu.get_node("BuySeedsButton").text == "Buy carrot seeds - %s80" % String.chr(8377))
 	ui.shop_menu.get_node("BuySeedsButton").pressed.emit()
 	assert(business.farm.crop_seeds.carrot == 1)
 	ui.shop_menu.hide()

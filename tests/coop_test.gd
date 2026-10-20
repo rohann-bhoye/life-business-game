@@ -87,6 +87,8 @@ func _run() -> void:
 	# The friend got the host's shop (snack at 180), then changed the soap price.
 	var priced: bool = await _wait_for(func(): return business.product_price("soap") == 190 or not OS.is_process_running(friend), 60.0)
 	assert(priced and business.product_price("soap") == 190, "The friend's action never reached the host's shop")
+	var chatted: bool = await _wait_for(func(): return peer.avatar.has_node("Speech") and peer.avatar.get_node("Speech").visible, 30.0)
+	assert(chatted and peer.avatar.get_node("Speech").text == coop.QUICK_LINES[1], "The friend's quick chat line never showed")
 	# Night: once the friend has served the customer, both players get into bed; the
 	# night passes only then, and both see the day report with the team's work.
 	var served: bool = await _wait_for(func(): return visitor.deal_sold, 60.0)

@@ -149,6 +149,7 @@ func _player_state(position: Vector3, yaw: float, carrying: bool) -> void:
 	peer.box.visible = carrying
 
 func _process(delta: float) -> void:
+	_fade_speech(delta)
 	send_wait -= delta
 	if send_wait <= 0.0 and _connected():
 		send_wait = SEND_INTERVAL
@@ -458,6 +459,67 @@ func _show_toast(text: String) -> void:
 	toast.text = text
 	toast_time = 3.0
 	toast.modulate.a = 1.0
+
+# --- Quick chat: E on a friend opens friend_chat.gd; the picked line shows over the
+# sender's head on every other screen for a few seconds. ---
+const QUICK_LINES := ["Namaste!", "Help me at the counter!", "I'll restock the shelves.", "Shabash, good job!"]
+const SPEECH_SECONDS := 4.0
+
+## The friend the crosshair is on within 3 m (their id), or 0.
+func aimed_friend() -> int:
+	var camera: Camera3D = player.camera
+	var best := 0
+	var alignment := 0.95
+	for id in peers:
+		var avatar: Node3D = peers[id].avatar
+		if avatar.global_position.distance_to(player.global_position) > 3.0: continue
+		var dot := (-camera.global_basis.z).dot(camera.global_position.direction_to(avatar.global_position + Vector3(0, 0.2, 0)))
+		if dot > alignment:
+			alignment = dot
+			best = id
+	return best
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not event is InputEventKey or not event.pressed or event.echo or event.keycode != KEY_E: return
+	if player._menu_is_open() or business.carried_stock > 0: return
+	var id := aimed_friend()
+	if id == 0: return
+	world.get_node("Ui").friend_chat.open_for(id, peers[id].name)
+	get_viewport().set_input_as_handled()
+
+func send_quick_line(index: int) -> void:
+	if index < 0 or index >= QUICK_LINES.size() or not _connected(): return
+	_quick_line.rpc(index)
+	_show_toast("You: %s" % QUICK_LINES[index])
+
+@rpc("any_peer", "call_remote", "reliable")
+func _quick_line(index: int) -> void:
+	var id := multiplayer.get_remote_sender_id()
+	if not peers.has(id) or index < 0 or index >= QUICK_LINES.size(): return
+	var avatar: Node3D = peers[id].avatar
+	var bubble := avatar.get_node_or_null("Speech") as Label3D
+	if bubble == null:
+		bubble = Label3D.new()
+		bubble.name = "Speech"
+		bubble.position.y = 1.5
+		bubble.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		bubble.fixed_size = true
+		bubble.pixel_size = 0.0022
+		bubble.font_size = 32
+		bubble.outline_size = 8
+		bubble.modulate = Color(1, 0.9, 0.55)
+		bubble.no_depth_test = true
+		avatar.add_child(bubble)
+	bubble.text = QUICK_LINES[index]
+	bubble.show()
+	peers[id]["speech"] = SPEECH_SECONDS
+	_show_toast("%s: %s" % [peers[id].name, QUICK_LINES[index]])
+
+func _fade_speech(delta: float) -> void:
+	for id in peers:
+		if peers[id].get("speech", 0.0) <= 0.0: continue
+		peers[id].speech -= delta
+		if peers[id].speech <= 0.0: peers[id].avatar.get_node("Speech").hide()
 
 # --- Sleeping together ---
 

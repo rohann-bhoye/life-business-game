@@ -71,6 +71,11 @@ var speech_seconds := 0.0
 ## through coop_forward.call(method, args).
 var coop_mirror := false
 var coop_forward := Callable()
+## Talking with the player (customer_chat.gd): they stand still meanwhile. Each
+## kind of reply works once (chat_done); a friendly one adds queue patience.
+var chatting := false
+var chat_done := {}
+var chat_patience := 0.0
 
 @onready var shop_area: Area3D = get_node(shop_area_path)
 @onready var purchase_point: Marker3D = get_node(purchase_point_path)
@@ -132,7 +137,7 @@ func say(text: String, seconds := 4.0) -> void:
 	speech_seconds = seconds
 
 func _physics_process(delta: float) -> void:
-	if coop_mirror: return
+	if coop_mirror or chatting: return
 	if speech_seconds > 0.0:
 		speech_seconds -= delta
 		if speech_seconds <= 0.0: speech_label.hide()
@@ -296,7 +301,7 @@ func _next_stop() -> void:
 				state = State.SHOPPING_MORE
 				return
 		line_index += 1
-	_set_route(shop_area.business.racks.route(global_position, Vector3(-4.6, 0.1, 1.65)))
+	_set_route(shop_area.business.racks.route(global_position, operations.queue_entry()))
 	state = State.TO_COUNTER
 
 ## Extra products actually in the basket, priced at retail.
@@ -333,7 +338,7 @@ func physical_shop() -> bool:
 	return is_instance_valid(operations) and operations.enabled
 
 func queue_patience_limit() -> float:
-	return [90.0, 120.0, 60.0][clampi(personality, 0, 2)]
+	return [90.0, 120.0, 60.0][clampi(personality, 0, 2)] + chat_patience
 
 func queue_is_impatient() -> bool:
 	return physical_shop() and state == State.QUEUING and queue_wait_seconds >= queue_patience_limit() * 0.75
@@ -375,7 +380,9 @@ func leave_shop() -> void:
 	patience_label.hide()
 	if not review_recorded and (deal_sold or not review_outcome.is_empty()):
 		review_recorded = true
-		shop_area.business.record_customer_review("sold" if deal_sold else review_outcome, service_wait_seconds, agreed_unit_price < quoted_price)
+		# Friendly service (a chat) makes the wait feel 10 s shorter.
+		var felt_wait := maxf(0.0, service_wait_seconds - (10.0 if chat_done.has("help") else 0.0))
+		shop_area.business.record_customer_review("sold" if deal_sold else review_outcome, felt_wait, agreed_unit_price < quoted_price)
 	state = State.LEAVING
 	if not physical_shop():
 		return
@@ -388,7 +395,7 @@ func leave_shop() -> void:
 	operations.remove_customer(self)
 	var points: Array[Vector3] = []
 	if global_position.z <= 2.6:
-		points = shop_area.business.racks.route(global_position, Vector3(-4.6, 0.1, 1.65))
+		points = shop_area.business.racks.route(global_position, operations.queue_entry())
 		points.append_array(operations.customer_exit_route())
 	if town_customers():
 		# Out of the door, onto the pavement and on down the street (most keep going

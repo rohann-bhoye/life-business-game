@@ -48,7 +48,10 @@ func _run() -> void:
 	assert(current_scene.get_node("Shop/ShopSign").position.z > current_scene.get_node("Shop/SignBoard").position.z + 0.06)
 	assert(current_scene.get_node("Ground/CollisionShape3D").shape.size == Vector3(150, 0.2, 120))
 	assert(current_scene.get_node("Shop/ShopSign").rotation.is_zero_approx())
-	assert(current_scene.get_node("DirectionalLight3D").shadow_enabled == (preload("res://game_settings.gd").new().detected_quality() > 0))
+	# Follows this PC's saved graphics (Auto picks by GPU; a Custom mix sets its own shadows).
+	var graphics = preload("res://game_settings.gd").new()
+	graphics.load_file()
+	assert(current_scene.get_node("DirectionalLight3D").shadow_enabled == (graphics.options().shadows > 0))
 	assert(current_scene.get_node("WorldEnvironment").environment.sky != null)
 	await physics_frame
 	await physics_frame
@@ -79,10 +82,18 @@ func _run() -> void:
 	await _walk_forward(0.5)
 	assert(player.global_position.z >= 2.49 and player.global_position.z < 3.0)
 	assert(shop.player_inside)
+	# This old non-physical shop still opens its menu with E; Tab opens the tablet too.
 	var interaction := InputEventKey.new()
 	interaction.keycode = KEY_E
 	interaction.pressed = true
 	shop._unhandled_input(interaction)
+	assert(shop.shop_menu.visible)
+	shop.close_button.pressed.emit()
+	assert(not shop.shop_menu.visible)
+	var tab_key := InputEventKey.new()
+	tab_key.keycode = KEY_TAB
+	tab_key.pressed = true
+	player._unhandled_input(tab_key)
 	assert(shop.shop_menu.visible)
 	shop.close_button.pressed.emit()
 	assert(not shop.shop_menu.visible)

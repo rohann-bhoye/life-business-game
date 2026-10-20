@@ -89,7 +89,7 @@ func _run() -> void:
 	var tablet = ui.tablet
 	assert(tablet != null and not tablet.visible)
 	assert(tablet.get_parent() == player.camera)
-	await _key(KEY_E)
+	await _key(KEY_TAB)
 	assert(tablet.visible and shop.shop_menu.visible and player._menu_is_open())
 	assert(shop.shop_menu.modulate.a == 0 and tablet.screen_menu.modulate.a == 1)
 	assert(tablet.screen_mesh.material_override.albedo_texture == tablet.screen_viewport.get_texture())
@@ -163,17 +163,17 @@ func _run() -> void:
 	price.get_line_edit().grab_focus()
 	await _key(KEY_ENTER)
 	assert(not tablet.visible and not player._menu_is_open() and shop.selling_price == 160, "visible=%s menu=%s price=%s copy=%s source=%s" % [tablet.visible, player._menu_is_open(), shop.selling_price, price.get_line_edit().text, shop.sale_price_input.get_line_edit().text])
-	for code in [KEY_E, KEY_ESCAPE, KEY_KP_ENTER]:
-		await _key(KEY_E)
+	for code in [KEY_TAB, KEY_E, KEY_ESCAPE, KEY_KP_ENTER]:
+		await _key(KEY_TAB)
 		assert(tablet.visible)
 		await _key(code)
 		assert(not tablet.visible and not shop.shop_menu.visible and not player._menu_is_open())
-	await _key(KEY_E)
+	await _key(KEY_TAB)
 	tablet._process(1)
 	var close := tablet.screen_menu.get_node("CloseButton") as Button
 	await _click(tablet, close.get_rect().get_center())
 	assert(not tablet.visible)
-	await _key(KEY_E)
+	await _key(KEY_TAB)
 	ui.supplier_menu.open_menu()
 	assert(not tablet.visible and ui.supplier_menu.visible)
 	ui.supplier_menu.close_menu()

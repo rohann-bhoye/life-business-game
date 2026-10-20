@@ -82,6 +82,21 @@ func _run() -> void:
 	assert(terminal.bank.visible and terminal.app == "bank")
 	await _click(terminal, terminal.desktop.get_node("Task_store"))
 	assert(terminal.store.visible and not terminal.bank.visible)
+	# APNA Builders: picture cards for the two expansions and two makeovers.
+	await _click(terminal, terminal.desktop.get_node("Task_home"))
+	await _click(terminal, terminal.desktop.get_node("App_builders"))
+	assert(terminal.builders.visible and terminal.app == "builders" and not terminal.store.visible)
+	var back_room: Button = terminal.builders.get_node("Offer_BackRoom/BuyButton")
+	var grand_hall: Button = terminal.builders.get_node("Offer_GrandHall/BuyButton")
+	assert(not back_room.disabled and grand_hall.disabled and grand_hall.text == "Locked")
+	var before_expansion: int = business.money
+	await _click(terminal, back_room)
+	assert(business.shop_expansion == 1 and business.money == before_expansion - 6000)
+	assert(back_room.disabled and back_room.text == "Built" and not grand_hall.disabled)
+	assert(terminal.builders.summary.text.contains("74 m2") and terminal.builders.summary.text.contains("Racks 3 / 10"))
+	for card in terminal.builders.cards:
+		assert(card.picture.texture != null)
+		assert(Rect2(Vector2.ZERO, card.button.get_parent().size).encloses(card.button.get_rect()), card.offer.title)
 	await _click(terminal, terminal.desktop.get_node("ExitButton"))
 	assert(not terminal.active and not terminal.overlay.visible and root.get_camera_3d() == camera)
 	# Esc also leaves, and the PC opens on the desktop again.

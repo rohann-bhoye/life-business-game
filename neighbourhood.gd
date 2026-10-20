@@ -12,7 +12,7 @@ func _ready() -> void:
 	_update_shop_upgrade()
 	_build_streets()
 	_build_garden()
-	for point in [Vector3(-11, 0.1, -8), Vector3(-18, 0.1, 12), Vector3(11, 0.1, -11), Vector3(12, 0.1, 0), Vector3(17.8, 0.1, 13.4), Vector3(-17, 0.1, 0), Vector3(-21, 0.1, -14), Vector3(23, 0.1, -18), Vector3(25, 0.1, 3), Vector3(-24, 0.1, 16)]:
+	for point in [Vector3(-11, 0.1, -8), Vector3(-18, 0.1, 12), Vector3(11, 0.1, -11), Vector3(12, 0.1, 0), Vector3(17.8, 0.1, 13.4), Vector3(-17, 0.1, 0), Vector3(-21, 0.1, -14), Vector3(25.5, 0.1, -9.5), Vector3(25, 0.1, 3), Vector3(-24, 0.1, 16)]:
 		_tree(point)
 	for x in [-18.0, -8.0, 8.0, 18.0]:
 		_streetlight(Vector3(x, 0.1, 3.3))
@@ -342,6 +342,11 @@ func _build_background() -> void:
 			_box("SouthShopWindow%d_%d" % [index, side], self, Vector3(2, 1.6, 0.06), Vector3(x + side * 2.1, 1.7, depth - 2.54), Color(0.36, 0.65, 0.72))
 	_dress_buildings()
 	_build_lanes()
+	# New houses, lanes and the west park in the empty north of town (town_fill.gd).
+	var fill := Node3D.new()
+	fill.set_script(preload("res://town_fill.gd"))
+	add_child(fill)
+	fill.build(self)
 	_build_rival_store()
 	var expansion := Node3D.new()
 	expansion.set_script(preload("res://town_expansion.gd"))

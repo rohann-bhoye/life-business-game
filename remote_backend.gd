@@ -82,6 +82,12 @@ func upgrade_shop() -> bool:
 	depth -= 1
 	return result
 
+func expand_shop() -> bool:
+	_send("expand_shop", [])
+	var result := super()
+	depth -= 1
+	return result
+
 func order_racks(product: String, quantity := 1) -> bool:
 	_send("order_racks", [product, quantity])
 	var result := super(product, quantity)
@@ -137,6 +143,12 @@ func pack_rack(id: int) -> bool:
 func place_rack(product: String, position: Vector2, turn: int, id := -1, from_delivery := false) -> bool:
 	_send("place_rack", [product, position, turn, id, from_delivery])
 	var result := super(product, position, turn, id, from_delivery)
+	depth -= 1
+	return result
+
+func move_fixture(fixture: String, position: Vector2, turn: int) -> bool:
+	_send("move_fixture", [fixture, position, turn])
+	var result := super(fixture, position, turn)
 	depth -= 1
 	return result
 
@@ -242,6 +254,12 @@ func shelve_box(by_worker := false, rack_id := -1) -> bool:
 	depth -= 1
 	return result
 
+func unshelve_one(rack_id: int) -> bool:
+	_send("unshelve_one", [rack_id])
+	var result := super(rack_id)
+	depth -= 1
+	return result
+
 func store_product_box(slot: int) -> bool:
 	_send("store_product_box", [slot])
 	var result := super(slot)
@@ -290,4 +308,4 @@ func _activate_next_box() -> void:
 	pass
 
 ## Actions a friend may send; the host checks every request against this list.
-const ACTIONS := ["take_loan", "repay_loan", "plant_crop", "water_crop", "harvest_crop", "buy_seeds", "hire_farm_worker", "set_farm_crop", "upgrade_farm", "upgrade_shop", "order_racks", "set_assistant_auto_collect", "set_employee_work", "mark_demo_seen", "buy_house", "order_cart", "order_stock", "purchase_stock", "pack_rack", "place_rack", "hire_worker", "hire_stock_worker", "hire_warehouse_worker", "pay_bills", "set_selling_price", "set_product_price", "set_staff_shift", "set_stock_rack", "assign_shelf_slot", "start_marketing", "sell_one_stock", "drop_box", "pick_up_box", "pick_up_ground_box", "put_down_box", "shelve_one", "shelve_box", "store_product_box", "retrieve_product_box", "retrieve_receiver_box", "warehouse_pick_up_box", "warehouse_store_carried"]
+const ACTIONS := ["take_loan", "repay_loan", "plant_crop", "water_crop", "harvest_crop", "buy_seeds", "hire_farm_worker", "set_farm_crop", "upgrade_farm", "upgrade_shop", "expand_shop", "order_racks", "set_assistant_auto_collect", "set_employee_work", "mark_demo_seen", "buy_house", "order_cart", "order_stock", "purchase_stock", "pack_rack", "place_rack", "move_fixture", "hire_worker", "hire_stock_worker", "hire_warehouse_worker", "pay_bills", "set_selling_price", "set_product_price", "set_staff_shift", "set_stock_rack", "assign_shelf_slot", "start_marketing", "sell_one_stock", "drop_box", "pick_up_box", "pick_up_ground_box", "put_down_box", "shelve_one", "shelve_box", "unshelve_one", "store_product_box", "retrieve_product_box", "retrieve_receiver_box", "warehouse_pick_up_box", "warehouse_store_carried"]

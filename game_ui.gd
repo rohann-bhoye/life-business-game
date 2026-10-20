@@ -4,6 +4,8 @@ const BargainMenu := preload("res://bargain_menu.gd")
 const SupplierMenu := preload("res://supplier_menu.gd")
 const CheckoutMenu := preload("res://checkout_menu.gd")
 const StaffDialog := preload("res://staff_dialog.gd")
+const CustomerChat := preload("res://customer_chat.gd")
+const FriendChat := preload("res://friend_chat.gd")
 const ShopTablet := preload("res://shop_tablet.gd")
 const NotificationFeed := preload("res://notification_feed.gd")
 const MenuSkin := preload("res://menu_skin.gd")
@@ -11,6 +13,8 @@ const PauseMenu := preload("res://pause_menu.gd")
 var notifications: Control
 var tablet: Node3D
 var staff_dialog: Panel
+var customer_chat: Panel
+var friend_chat: Panel
 var employee_role := "cashier"
 const EMPLOYEE_CONTROLS := ["CashierSelectButton", "StockSelectButton", "WorkSwitch", "AutoCollectSwitch", "CollectDeliveryButton", "TalkEmployeeButton"]
 
@@ -28,6 +32,7 @@ var hud_money: Label
 var interaction_label: Label
 var feedback_label: Label
 var controls_panel: Panel
+var crosshair: Control
 var first_day_panel: Panel
 var first_day_label: Label
 var first_day_step: Label
@@ -62,7 +67,14 @@ func _ready() -> void:
 		for state in ["normal", "hover", "pressed"]:
 			button.remove_theme_stylebox_override(state)
 	hud_money = _label("HudMoneyLabel", self)
+	crosshair = preload("res://crosshair.gd").new()
+	crosshair.name = "Crosshair"
+	add_child(crosshair)
 	interaction_label = _label("InteractionLabel", self)
+	# What the crosshair is on (product, box, rack, PC...) reads right under it.
+	interaction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	interaction_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	interaction_label.add_theme_constant_override("outline_size", 6)
 	feedback_label = _label("FeedbackLabel", self)
 	_build_first_day_guide(theme)
 	_build_day_report(theme)
@@ -86,7 +98,7 @@ func _ready() -> void:
 	seed_quantity.value = 1
 	shop_menu.add_child(seed_quantity)
 	seed_quantity.value_changed.connect(func(_value): _refresh_farm())
-	for item in [["BuySeedsButton", "Buy tomato seed - Rs100"], ["FarmUpgradeButton", "Expand farm"], ["BuyProduceTableButton", "Order produce table - Rs1000"], ["HireFarmerButton", "Hire farmer Kiran - Rs1500"]]:
+	for item in [["BuySeedsButton", "Buy tomato seed - %s100" % String.chr(8377)], ["FarmUpgradeButton", "Expand farm"], ["BuyProduceTableButton", "Order produce table - %s1,000" % String.chr(8377)], ["HireFarmerButton", "Hire farmer Kiran - %s1,500" % String.chr(8377)]]:
 		var button := Button.new()
 		button.name = item[0]
 		button.text = item[1]
@@ -156,6 +168,16 @@ func _ready() -> void:
 	staff_dialog.set_script(StaffDialog)
 	staff_dialog.theme = theme
 	add_child(staff_dialog)
+	customer_chat = Panel.new()
+	customer_chat.name = "CustomerChat"
+	customer_chat.set_script(CustomerChat)
+	customer_chat.theme = theme
+	add_child(customer_chat)
+	friend_chat = Panel.new()
+	friend_chat.name = "FriendChat"
+	friend_chat.set_script(FriendChat)
+	friend_chat.theme = theme
+	add_child(friend_chat)
 	notifications = NotificationFeed.new()
 	notifications.name = "NotificationFeed"
 	add_child(notifications)
@@ -216,6 +238,18 @@ func _build_controls_hint() -> void:
 	drop.text = "DROP"
 	_place(drop, 154, 84, 42, 24)
 	drop.add_theme_font_size_override("font_size", 12)
+	_keycap("G", Vector2(8, 116))
+	var move := _label("MoveText", controls_panel)
+	move.text = "MOVE"
+	_place(move, 42, 118, 68, 24)
+	move.add_theme_font_size_override("font_size", 12)
+	_keycap("TAB", Vector2(112, 116))
+	controls_panel.get_node("KeyTAB").add_theme_font_size_override("font_size", 10)
+	controls_panel.get_node("KeyTAB").size.x = 38
+	var tablet_text := _label("TabletText", controls_panel)
+	tablet_text.text = "TABLET"
+	_place(tablet_text, 154, 118, 48, 24)
+	tablet_text.add_theme_font_size_override("font_size", 11)
 
 func _keycap(text: String, at: Vector2) -> void:
 	var key := Label.new()
@@ -422,9 +456,9 @@ func _layout() -> void:
 	_place(first_day_panel.get_node("Title"), 12, 8, 236, 20)
 	_place(first_day_label, 12, 30, 236, 64)
 	_place(first_day_step, 12, 98, 236, 52)
-	_place(interaction_label, 16, viewport_size.y - 46, maxf(120, viewport_size.x - 250), 24)
+	_place(interaction_label, (viewport_size.x - minf(520, viewport_size.x - 32)) / 2.0, viewport_size.y / 2.0 + 18, minf(520, viewport_size.x - 32), 24)
 	_place(feedback_label, 16, viewport_size.y - 80, viewport_size.x - 32, 28)
-	_place(controls_panel, viewport_size.x - 218, viewport_size.y - 132, 202, 116)
+	_place(controls_panel, viewport_size.x - 218, viewport_size.y - 166, 202, 150)
 	feedback_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	feedback_label.clip_text = true
 	if is_instance_valid(tablet): _layout_tablet()
@@ -552,10 +586,78 @@ func _layout_tablet() -> void:
 	_place(shop_menu.get_node("HireFarmerButton"), 24 + width * 0.52, 434, width * 0.48, 38)
 	_place(shop_menu.get_node("FarmUpgradeButton"), 24, 478, width * 0.48, 42)
 	_place(shop_menu.get_node("BuyProduceTableButton"), 24 + width * 0.52, 478, width * 0.48, 42)
+	if not compact: _layout_tablet_cards(width)
 	_place(shop.save_status_label, 24, 560, width, 24)
 	shop.save_status_label.add_theme_font_size_override("font_size", 14)
 	shop.profit_label.modulate = Color(0.04, 0.42, 0.3) if shop.business.net_profit() >= 0 else Color(0.75, 0.18, 0.14)
 	shop.unpaid_bills_label.modulate = Color(0.65, 0.35, 0.04) if shop.business.unpaid_bills() > 0 else Color.WHITE
+
+## Landscape tablet: each tab's text sits on white cards (drawn by shop_tablet.gd
+## from tablet_tiles) with room between them; the Farm tab uses two columns.
+func _layout_tablet_cards(width: float) -> void:
+	var half := width * 0.5
+	# Stock: price card, PC button, status and hours side by side, level, upgrade.
+	_place(shop_menu.get_node("SalePriceLabel"), 40, 238, half - 40, 40)
+	_place(shop.sale_price_input, 24 + half, 238, half - 16, 40)
+	_place(shop.buy_stock_button, 24, 300, width, 42)
+	_place(shop_status, 40, 370, half - 44, 28)
+	_place(shop_menu.get_node("ShopHoursLabel"), 40 + half, 370, half - 44, 28)
+	_place(shop_level_label, 40, 430, width - 32, 28)
+	_place(upgrade_button, 24, 490, width, 42)
+	# Marketing: status card, button, two small cards, reputation card.
+	_place(shop_menu.get_node("MarketingLabel"), 40, 238, width - 32, 30)
+	_place(shop.marketing_button, 24, 292, width, 42)
+	_place(shop.missed_sales_label, 40, 366, half - 44, 30)
+	_place(shop.last_visit_label, 40 + half, 366, half - 44, 30)
+	shop.last_visit_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	shop.last_visit_label.clip_text = true
+	_place(shop_menu.get_node("ReputationLabel"), 40, 436, width - 32, 64)
+	# Goals: the count, then one card per goal with a progress bar.
+	_place(shop_menu.get_node("DemoStatusLabel"), 28, 230, width - 8, 30)
+	for index in range(5): _place(shop_menu.get_node("DemoGoal%d" % index), 40, 272 + index * 54, width - 96, 28)
+	# Farm: summary card on the left, actions stacked on the right.
+	_place(shop_menu.get_node("FarmSummary"), 40, 238, half - 52, 216)
+	shop_menu.get_node("FarmSummary").add_theme_font_size_override("font_size", 17)
+	# Clip first, so long prices never widen the buttons past the column.
+	for node_name in ["FarmCropButton", "BuySeedsButton", "HireFarmerButton", "FarmUpgradeButton", "BuyProduceTableButton"]:
+		shop_menu.get_node(node_name).add_theme_font_size_override("font_size", 14)
+		shop_menu.get_node(node_name).clip_text = true
+	var right := 24 + half + 8
+	var column := half - 8
+	_place(shop_menu.get_node("FarmCropButton"), right, 232, column, 40)
+	_place(shop_menu.get_node("SeedQuantityLabel"), right, 232, column, 40)
+	_place(shop_menu.get_node("SeedQuantityInput"), right, 280, column, 40)
+	_place(shop_menu.get_node("BuySeedsButton"), right, 328, column, 40)
+	_place(shop_menu.get_node("HireFarmerButton"), right, 376, column, 40)
+	_place(shop_menu.get_node("FarmUpgradeButton"), right, 424, column, 40)
+	_place(shop_menu.get_node("BuyProduceTableButton"), right, 472, column, 40)
+
+## Cards the tablet draws behind the text of tab `tab` (shop_tablet.gd _draw_chrome):
+## {rect, accent, progress}; progress is 0..1 on goal cards, -1 elsewhere.
+func tablet_tiles(tab: int) -> Array:
+	var groups: Array = [[], [["SalePriceLabel", "SalePriceInput"], ["ShopStatusLabel"], ["ShopHoursLabel"], ["ShopLevelLabel"]], [["WorkerLabel", "WorkerStatusLabel", "WorkSwitch", "WageLabel"], ["AutoCollectSwitch", "CollectDeliveryButton"]], [["MarketingLabel"], ["MissedSalesLabel"], ["LastVisitLabel"], ["ReputationLabel"]], [["DemoGoal0"], ["DemoGoal1"], ["DemoGoal2"], ["DemoGoal3"], ["DemoGoal4"]], [["FarmSummary"]]][clampi(tab, 0, 5)]
+	var accents := [Color("2563eb"), Color("16a34a"), Color("ea580c"), Color("7c3aed"), Color("0891b2"), Color("dc2626")]
+	var tiles: Array = []
+	for index in range(groups.size()):
+		var area := Rect2()
+		var found := false
+		for node_name in groups[index]:
+			var control: Control = shop_menu.get_node(node_name)
+			if not control.visible: continue
+			area = Rect2(control.position, control.size) if not found else area.merge(Rect2(control.position, control.size))
+			found = true
+		if not found: continue
+		var progress := _goal_progress(shop_menu.get_node(groups[index][0]).text) if tab == 4 else -1.0
+		var grown := area.grow_individual(16, 8, 14 + (56 if tab == 4 else 0), 8 + (12 if tab == 4 else 0))
+		tiles.append({"rect": grown, "accent": accents[index % accents.size()], "progress": progress})
+	return tiles
+
+## "Order products: 0/1" or "Sales: Rs0 / Rs2,000" -> 0..1 (-1 without a count).
+func _goal_progress(text: String) -> float:
+	var parts := text.get_slice(":", 1).replace(String.chr(8377), "").replace(",", "").split("/")
+	if parts.size() != 2 or not parts[1].strip_edges().is_valid_float(): return -1.0
+	var total := float(parts[1].strip_edges())
+	return clampf(float(parts[0].strip_edges()) / total, 0.0, 1.0) if total > 0 else -1.0
 
 func select_tab(index: int) -> void:
 	if index != 1 and selected_tab == 1:
@@ -671,10 +773,10 @@ func _update_upgrade_controls() -> void:
 	upgrade_button.text = "Maximum level" if cost == 0 else "Upgrade to level %d - %s%s" % [shop.business.shop_level + 1, String.chr(8377), shop._format_money(cost)]
 	upgrade_button.tooltip_text = "Maximum shop level reached" if cost == 0 else ("Not enough money" if upgrade_button.disabled else "Visit wait: %ss" % str(shop.business.CUSTOMER_INTERVALS[shop.business.shop_level] * (0.85 if shop.marketing_active else 1.0)))
 	if get_tree().current_scene.get_node("ShopOperations").enabled:
-		shop_level_label.text = "Level %d | 60 m2 | Ceiling: 3.8 m" % shop.business.shop_level
+		shop_level_label.text = "Level %d %s | %d m2 | Ceiling: 3.8 m" % [shop.business.shop_level, ["Kirana", "Super Store", "Mega Mart"][shop.business.shop_level - 1], shop.business.shop_floor_area()]
 		if cost > 0:
-			upgrade_button.text = "Upgrade business - %s%s" % [String.chr(8377), shop._format_money(cost)]
-			upgrade_button.tooltip_text = "Increase customer arrivals; current stock is unchanged."
+			upgrade_button.text = "%s - %s%s" % [["Super Store", "Mega Mart"][shop.business.shop_level - 1], String.chr(8377), shop._format_money(cost)]
+			upgrade_button.tooltip_text = "New shop design inside and out, and more customers; current stock is unchanged."
 
 func _on_upgrade_pressed() -> void:
 	var cost: int = shop.business.next_upgrade_cost()
@@ -699,13 +801,13 @@ func _refresh_farm() -> void:
 	shop_menu.get_node("FarmCropButton").text = "Crop: %s >" % crop_name
 	var seed_cost: int = int(shop_menu.get_node("SeedQuantityInput").value) * farm.SEED_COSTS[farm.crop]
 	shop_menu.get_node("BuySeedsButton").disabled = shop.business.money < seed_cost
-	shop_menu.get_node("BuySeedsButton").text = "Buy %s seeds - Rs%d" % [crop_name.to_lower(), seed_cost]
+	shop_menu.get_node("BuySeedsButton").text = "Buy %s seeds - %s%s" % [crop_name.to_lower(), String.chr(8377), shop._format_money(seed_cost)]
 	var hire: Button = shop_menu.get_node("HireFarmerButton")
-	hire.text = "Kiran works the farm" if farm.worker_hired else "Hire farmer - Rs%d" % farm.WORKER_COST
+	hire.text = "Kiran works the farm" if farm.worker_hired else "Hire farmer - %s%s" % [String.chr(8377), shop._format_money(farm.WORKER_COST)]
 	hire.disabled = farm.worker_hired or shop.business.money < farm.WORKER_COST
-	hire.tooltip_text = "Rs%d per harvest; harvests go to warehouse storage" % farm.HARVEST_FEE
+	hire.tooltip_text = "%s%d per harvest; harvests go to warehouse storage" % [String.chr(8377), farm.HARVEST_FEE]
 	var button: Button = shop_menu.get_node("FarmUpgradeButton")
-	button.text = "Maximum farm size" if farm.level == 3 else "Expand to %d beds - Rs%d" % [farm.PLOTS[farm.level], farm.UPGRADE_COSTS[farm.level - 1]]
+	button.text = "Maximum farm size" if farm.level == 3 else "Expand to %d beds - %s%s" % [farm.PLOTS[farm.level], String.chr(8377), shop._format_money(farm.UPGRADE_COSTS[farm.level - 1])]
 	button.disabled = farm.level == 3 or shop.business.shop_level <= farm.level or shop.business.money < farm.UPGRADE_COSTS[mini(farm.level - 1, 1)]
 
 func show_feedback(message: String, failed := false) -> void:
@@ -730,6 +832,7 @@ func _process(delta: float) -> void:
 		_refresh_employee()
 	interaction_label.text = ""
 	controls_panel.visible = not player._menu_is_open()
+	crosshair.visible = Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and not player._menu_is_open()
 	_update_first_day_guide()
 	if player._menu_is_open():
 		return
@@ -743,3 +846,7 @@ func _process(delta: float) -> void:
 	if operations != null and operations.enabled:
 		var hint: String = operations.interaction_hint()
 		if not hint.is_empty(): interaction_label.text = hint
+	var coop_world = get_tree().current_scene.get_node_or_null("CoopWorld")
+	if coop_world != null and shop.business.carried_stock == 0:
+		var friend: int = coop_world.aimed_friend()
+		if friend != 0: interaction_label.text = "Talk to %s" % coop_world.peers[friend].name

@@ -1,6 +1,6 @@
 # LifeBusinessGame - Project Memory and AI Handoff
 
-Last updated: 2026-10-19 (Asia/Calcutta). Latest build: Demo v0.8 (Indian town, co-op).
+Last updated: 2026-10-20 (Asia/Calcutta). Latest build: Demo v0.8 (Indian town, co-op); newer work below is not built yet.
 Current status: playable development prototype, not a release-ready demo.
 Latest demo usability feature: a compact First Day guide appears below the clock
 and points to the next unfinished retail objective. It hides while a tablet or
@@ -13,6 +13,85 @@ baskets, tablet purchasing and mixed-product stocking. See Produce Tables below.
 Latest feature: playable tomato farming, a Farm tablet tab/seed stall, three farm
 expansions, tomato warehouse/shelf/checkout integration, a road-end Coming Next
 board and a local suggestion form. See Farming section below for controls and limits.
+
+## Controls, G-Move Furniture, Talk Boxes, Shop Levels (2026-10-20)
+
+- Keys: Tab opens/closes the tablet (E no longer opens it in the physical shop; the
+  old non-physical shop keeps E). Right mouse button leaves the PC. A "+" crosshair
+  (crosshair.gd) shows while the mouse looks around; the hint sits under it.
+- Carrying a box at a rack: E puts 1 item on the shelf, Q takes 1 back into the box
+  (business_backend.gd `unshelve_one`, forwarded in co-op).
+- G (shop_operations.gd -> rack_furnishing.gd `move_key`): aims with a ray at racks,
+  the checkout counter or the PC desk. Move mode: LMB/E place, R/wheel rotate,
+  Q packs an empty bought rack into its box, RMB/G/Esc cancel; move_mode_bar.gd shows
+  the buttons and a green/red reason line.
+- Counter and desk are "fixtures" in rack_store.gd (`fixtures`, FIXTURE_HOME, saved as
+  `shop_fixtures`, validated). The counter carries QUEUE_ZONE (in front) and
+  CASHIER_ZONE (behind) in its own frame; racks avoid them. shop_operations.gd moves
+  the counter/desk nodes with `fixture_transform()` and derives cashier_point,
+  queue_position, queue_entry (customers' path to the queue), customer_exit_route and
+  CustomerPurchasePoint from the counter. The counter can't move while customers are
+  heading to, waiting at or paying at it. At the home spot everything is exactly as
+  before (old saves stay valid). `move_fixture` is forwarded in co-op.
+- dustbin.gd: green WET / blue DRY twin bins on a stand right of the shop door.
+- conversation_box.gd: bottom talk box (portrait initial, name, tag, typed line,
+  replies by click or keys 1-4, Esc leaves). staff_dialog.gd (E on Ramesh/Sunil,
+  replies include "Open staff page") and customer_chat.gd (E on a shopper in the
+  aisles/queue: help or sorry +30 s patience and -10 s felt wait, suggest one more
+  shelved product that some add to the basket, ask about prices vs Sharma). Each works
+  once per shopper; shoppers stand still while talking (customer.gd `chatting`).
+- shop_style.gd (under ShopPresentation): each business level has its own look.
+  1 Apna Mart; 2 Apna Super Mart (blue fascia, LED frame, blade sign, ice-cream
+  freezer, grey tiles, LED panels, banners); 3 Apna Mega Mart (maroon/gold, stone
+  pillars, bunting, AC unit, marble floor, offer screen, CCTV). Only walls, ceiling and
+  outside props, so floor rules are unchanged. Tablet upgrade button names the level.
+- Shop expansions (PC Supplier menu, Space tab): business_backend.gd `expand_shop()`
+  (EXPANSION_COSTS 6,000 and 12,000; `shop_expansion`, `expansion_expenses`, saved and
+  validated, part of total_expenses and the money check). Each moves the back wall
+  2.25 m onto the cement ExpansionPlot behind the shop (60 -> 74 -> 87 m2) and allows
+  2 more racks (rack_store.gd rack_limit 8/10/12; MAX_RACKS 12 is the save cap).
+  rack_store.gd floor_rect(expansion) replaces the fixed FLOOR for racks, fixtures
+  and the route grid (region now reaches z -12.5). shop_operations.gd
+  `_update_room_size` sizes the room from the expansion; `follow_back_wall()` moves
+  ShopDecor's BackWallDecor, stretches side paint and skirting, moves the interior
+  sign, shows one extra ceiling light per expansion and shrinks the roped plot. A
+  hidden GrassMask keeps grass off the whole plot. `expand_shop` is forwarded in co-op.
+- One free rack: new games from the menu (game_session.gd new_game ->
+  business_backend.gd `start_with_one_rack()`) keep only the cold drink rack;
+  `starting_racks` (saved, default 3 for older saves) replaces the fixed "3 starting
+  racks" in RackStore.valid (base param), the furnishing expense check, pack_rack and
+  the pack buttons. With 1 free rack, shop_operations.gd skips the built-in snack/soap
+  racks and rack_furnishing.gd maps only rack 0; bought racks are PurchasedRack nodes.
+  Test fixtures (Backend.new()/main.tscn) still start with 3 racks.
+- PC Wholesale has a Furniture category (pc_store.gd): Shelf rack and Produce table
+  cards with pictures (assets/ui/products/rack_*.png from tools/rack_thumbnails.gd)
+  and an Order button (order_racks; a shelf gets the first product without a restock
+  rack). The package arrives at the warehouse and is unpacked there with E.
+- KayKit (CC0) packs from the official GitHub repos: assets/furniture/kaykit (Furniture
+  Bits) and assets/restaurant/kaykit (Restaurant Bits, meat/burger items removed),
+  each with LICENSE.txt, pruned to the models in use (home: couch, armchair, lamp,
+  rug, picture, cactus; town_fill.gd: chai stall, crates, porch chairs/tables/plants).
+  The full packs are on GitHub (KayKit-Game-Assets). Load with kenney_assets.gd `fit()`.
+- town_fill.gd (built by neighbourhood.gd after the lanes): 8 new houses (back row
+  x -15/-6/3/12 at z -26.5 and an east colony x 19.5/27.5 at z -18 and -26.5), Back
+  Street (z -22.2) with 3 link lanes to the back lane, door steps, 5 glow-only lamps,
+  and a West Park (x -30..-19, z -30..-14) with a chai stall (KayKit pot, fridge,
+  round tables, chairs), a sabzi stall with KayKit vegetable crates, benches, trees.
+  Tree (23,-18) moved to (25.5,-9.5) for the east colony.
+- PC: APNA Builders site (builders_page.gd; desktop tile "Builders", taskbar "Build"):
+  picture cards for Back Room (6,000) and Grand Hall (12,000) expansions and the
+  Super Store (2,500) / Mega Mart (5,000) makeovers; Built/Done badges, Locked until
+  the one before. Pictures in assets/ui/pc/ are rendered by tools/pc_builder_pictures.gd
+  (run with a window, then `--import`). Desktop tiles are now 80% size to fit five.
+- PC open flicker fixed (computer_terminal.gd `_show_full_screen`): the flat screen
+  shows at full alpha when the zoom ends and only the dark border fades in (the old
+  fade from black flashed once).
+- Owner asked (2026-10-20) not to run tests routinely; tests were updated but the last
+  changes (Builders site, test edits in pc_desktop/shop_space) were not run.
+- Co-op quick chat: E on a friend opens friend_chat.gd (4 set lines); the line shows
+  over the sender's head for others (coop_world.gd `_quick_line`).
+- Tests: fixture_move_test, conversation_test, shop_expansion_test; shop_presentation_test
+  checks the levels; coop_test checks a quick chat line.
 
 ## Demo v0.8: Indian Town, Co-op, Graphics Settings (2026-10-19)
 

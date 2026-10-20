@@ -52,6 +52,13 @@ func _on_interior_exited(body: Node3D) -> void:
 	if body == self:
 		indoors = false
 
+## The tablet (shop menu) comes out with Tab, wherever the player is.
+func open_tablet() -> void:
+	if _menu_is_open(): return
+	house_menu.hide()
+	shop_menu.visible = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
 func _menu_is_open() -> bool:
 	var roadmap := get_tree().current_scene.get_node_or_null("Ui/RoadmapMenu")
 	if is_instance_valid(roadmap) and roadmap.visible: return true
@@ -59,8 +66,9 @@ func _menu_is_open() -> bool:
 	if is_instance_valid(pause) and pause.is_open(): return true
 	var report := get_tree().current_scene.get_node_or_null("Ui/DayReportScreen")
 	if is_instance_valid(report) and report.visible: return true
-	var dialog := get_tree().current_scene.get_node_or_null("Ui/StaffDialog")
-	if is_instance_valid(dialog) and dialog.visible: return true
+	for talk in ["Ui/StaffDialog", "Ui/CustomerChat", "Ui/FriendChat"]:
+		var dialog := get_tree().current_scene.get_node_or_null(talk)
+		if is_instance_valid(dialog) and dialog.visible: return true
 	return shop_menu.visible or house_menu.visible or (is_instance_valid(bargain_menu) and bargain_menu.visible) or (is_instance_valid(supplier_menu) and supplier_menu.visible) or (is_instance_valid(checkout_menu) and checkout_menu.visible)
 
 func _process(_delta: float) -> void:
@@ -92,6 +100,12 @@ func _unhandled_input(event):
 			var pause := get_tree().current_scene.get_node_or_null("Ui/PauseMenu")
 			if is_instance_valid(pause): pause.open_menu()
 			else: Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		get_viewport().set_input_as_handled()
+		return
+
+	# Tab takes out the tablet anywhere (the open tablet puts itself away on Tab).
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_TAB:
+		open_tablet()
 		get_viewport().set_input_as_handled()
 		return
 

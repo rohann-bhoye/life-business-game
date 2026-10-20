@@ -15,6 +15,7 @@ var clock: Label
 var desktop_theme: Theme
 var store: Panel
 var bank: Panel
+var builders: Panel
 var staff: Panel
 var desktop: Control
 ## Which desktop app fills the screen: home, store, staff, manager or bank.
@@ -29,6 +30,7 @@ var widget_seconds := 0.0
 # screen covers the window exactly where the monitor is drawn.
 var overlay: CanvasLayer
 var overlay_image: TextureRect
+var overlay_back: ColorRect
 var fitted_size := Vector2.ZERO
 const Catalog := preload("res://product_catalog.gd")
 const KenneyTheme := preload("res://kenney_theme.gd")
@@ -215,13 +217,16 @@ func _build_desktop() -> void:
 		["staff", "Staff", Color("7c3aed"), "res://assets/ui/staff/cashier.png"],
 		["manager", "Shop Manager", Color("d97706"), ""],
 		["bank", "Bank", Color("2563eb"), ""],
+		["builders", "Builders", Color("c2410c"), ""],
 	]
 	for index in range(apps.size()):
 		var entry: Array = apps[index]
 		var tile := Button.new()
 		tile.name = "App_" + entry[0]
-		tile.position = Vector2(40 + index * 134, 108)
+		# Five tiles fit beside the Today card at 80% size.
+		tile.position = Vector2(40 + index * 104, 108)
 		tile.size = Vector2(116, 116)
+		tile.scale = Vector2.ONE * 0.8
 		tile.focus_mode = Control.FOCUS_NONE
 		tile.clip_contents = true
 		tile.tooltip_text = "Open " + entry[1]
@@ -239,6 +244,17 @@ func _build_desktop() -> void:
 			for item in [["milk", Rect2(-2, 6, 76, 96)], ["bottle", Rect2(44, 4, 76, 96)], ["snack", Rect2(16, 26, 84, 90)]]:
 				_picture(tile, "res://assets/ui/products/%s.png" % item[0], item[1])
 		elif entry[0] == "bank": _text(tile, String.chr(8377), Vector2(0, 14), 116, 56, Color.WHITE).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		elif entry[0] == "builders":
+			# The shop front from the site, framed like a photo.
+			var photo_frame := Panel.new()
+			photo_frame.position = Vector2(12, 22)
+			photo_frame.size = Vector2(92, 72)
+			photo_frame.clip_contents = true
+			photo_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			photo_frame.add_theme_stylebox_override("panel", _round(Color.WHITE, 8))
+			tile.add_child(photo_frame)
+			var photo := _picture(photo_frame, "res://assets/ui/pc/look_2.jpg", Rect2(3, 3, 86, 66))
+			photo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		else:
 			# A little shelf with boxes for the Shop Manager.
 			for row in range(3):
@@ -255,7 +271,7 @@ func _build_desktop() -> void:
 					box.size = Vector2(16, 14)
 					box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 					tile.add_child(box)
-		var label := _text(desktop, entry[1], Vector2(tile.position.x - 10, 230), 136, 15, Color.WHITE)
+		var label := _text(desktop, entry[1], Vector2(tile.position.x - 12, 204), 117, 14, Color.WHITE)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		tile.pressed.connect(show_app.bind(entry[0]))
 	# Shelf stock card: the products on the racks with the fewest items left.
@@ -318,7 +334,7 @@ func _build_desktop() -> void:
 	taskbar.position = Vector2(0, 500)
 	taskbar.size = Vector2(SCREEN.x, 40)
 	desktop.add_child(taskbar)
-	var buttons := [["home", "APNA", 90], ["store", "Wholesale", 140], ["staff", "Staff", 92], ["manager", "Shop", 92], ["bank", "Bank", 92]]
+	var buttons := [["home", "APNA", 90], ["store", "Wholesale", 140], ["staff", "Staff", 92], ["manager", "Shop", 92], ["bank", "Bank", 92], ["builders", "Build", 92]]
 	var x := 8.0
 	for entry in buttons:
 		var button := Button.new()
@@ -378,6 +394,13 @@ func _build_store(_desktop: Control) -> void:
 	bank.setup(ui.shop.business, ui.shop._format_money)
 	bank.hide()
 	bank.back_requested.connect(show_home)
+	builders = Panel.new()
+	builders.set_script(preload("res://builders_page.gd"))
+	builders.position = Vector2(24, 12)
+	screen_viewport.add_child(builders)
+	builders.setup(ui.shop.business, ui.shop._format_money)
+	builders.hide()
+	builders.back_requested.connect(show_home)
 	staff = Panel.new()
 	staff.set_script(preload("res://staff_page.gd"))
 	staff.position = Vector2(24, 12)
@@ -402,6 +425,9 @@ func show_app(target: String) -> void:
 	if is_instance_valid(bank):
 		bank.visible = target == "bank"
 		if bank.visible: bank.refresh()
+	if is_instance_valid(builders):
+		builders.visible = target == "builders"
+		if builders.visible: builders.refresh()
 	if is_instance_valid(staff):
 		staff.visible = target == "staff"
 		if staff.visible: staff.select_role(staff.selected)
@@ -412,6 +438,9 @@ func show_app(target: String) -> void:
 
 func open_bank() -> void:
 	show_app("bank")
+
+func open_builders() -> void:
+	show_app("builders")
 
 func open_store() -> void:
 	show_app("store")
@@ -463,11 +492,12 @@ func _build_overlay() -> void:
 	overlay.layer = 2
 	overlay.visible = false
 	add_child(overlay)
-	var back := ColorRect.new()
-	back.color = Color(0.02, 0.025, 0.035)
-	back.set_anchors_preset(Control.PRESET_FULL_RECT)
-	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay.add_child(back)
+	overlay_back = ColorRect.new()
+	overlay_back.name = "Back"
+	overlay_back.color = Color(0.02, 0.025, 0.035)
+	overlay_back.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(overlay_back)
 	overlay_image = TextureRect.new()
 	overlay_image.name = "Screen"
 	overlay_image.texture = screen_viewport.get_texture()
@@ -498,9 +528,12 @@ func _fit_overlay() -> void:
 func _show_full_screen() -> void:
 	if not active: return
 	_fit_overlay()
+	# The zoom ends with the monitor exactly where the flat screen goes, so the screen
+	# shows at once (a fade from black flashed); only the dark border fades in.
 	overlay.visible = true
-	overlay_image.modulate.a = 0.0
-	create_tween().tween_property(overlay_image, "modulate:a", 1.0, 0.12)
+	overlay_image.modulate.a = 1.0
+	overlay_back.modulate.a = 0.0
+	create_tween().tween_property(overlay_back, "modulate:a", 1.0, 0.15)
 
 func _bind(original: Control, copy: Control) -> void:
 	pairs.append([original, copy])
@@ -691,6 +724,11 @@ func screen_point(pixel: Vector2) -> Vector2:
 
 func _input(event: InputEvent) -> void:
 	if not active: return
+	# Right mouse button leaves the PC (like E or Esc).
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		close()
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey:
 		if event.pressed and not event.echo and event.keycode in [KEY_E, KEY_ESCAPE]: close()
 		else:

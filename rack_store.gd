@@ -2,14 +2,38 @@ extends RefCounted
 
 const Catalog = preload("res://product_catalog.gd")
 const COST := 1000
-const MAX_RACKS := 8
+## Racks a save may hold; how many fit today is rack_limit() (more after expansions).
+const MAX_RACKS := 12
+const BASE_RACKS := 8
+const RACKS_PER_EXPANSION := 2
 const SHELVES := 3
 const SHELF_CAPACITY := 10
+## The shop floor before any expansion; each bought expansion (PC: Space) moves the
+## back wall EXPANSION_DEPTH further back.
 const FLOOR := Rect2(-5.97, -7.42, 5.91, 9.84)
+const EXPANSION_DEPTH := 2.25
+const MAX_EXPANSION := 2
 const ENTRY := Vector3(-3, 0.1, 1.65)
-const FURNITURE := [Rect2(-3.95, -0.02, 2.9, 0.84), Rect2(-1.8, -1.97, 1.4, 0.8)]
-const RESERVED := [Rect2(-5.04, -7.42, 0.88, 9.84), Rect2(-4.95, 0.9, 4.4, 1.5)]
+## The stock worker's back aisle and the doorway: nothing is ever built there.
+const RESERVED := [Rect2(-5.04, -7.42, 0.88, 9.84), Rect2(-3.9, 1.2, 1.8, 1.25)]
+## Shop furniture the player can move with G: where each starts and its floor size.
+const FIXTURE_HOME := {"counter": {"x": -2.5, "z": 0.4, "turn": 0}, "desk": {"x": -1.1, "z": -1.57, "turn": 0}}
+const FIXTURE_SIZE := {"counter": Vector2(2.9, 0.84), "desk": Vector2(1.4, 0.8)}
+## In the counter's own frame (+z is the customer side): the queue in front and
+## the cashier's space behind it stay clear.
+const QUEUE_ZONE := Rect2(-2.45, 0.5, 4.4, 1.5)
+const CASHIER_ZONE := Rect2(-1.5, -1.55, 2.7, 1.13)
 var records: Array = fresh()
+var fixtures: Dictionary = FIXTURE_HOME.duplicate(true)
+## Bought shop expansions (business_backend.gd shop_expansion keeps this in step).
+var expansion := 0
+
+static func floor_rect(expansion_level: int) -> Rect2:
+	var extra := clampi(expansion_level, 0, MAX_EXPANSION) * EXPANSION_DEPTH
+	return Rect2(FLOOR.position.x, FLOOR.position.y - extra, FLOOR.size.x, FLOOR.size.y + extra)
+
+static func rack_limit(expansion_level: int) -> int:
+	return BASE_RACKS + clampi(expansion_level, 0, MAX_EXPANSION) * RACKS_PER_EXPANSION
 var grid: AStarGrid2D
 var grid_key := ""
 var last_added_slot := -1
@@ -94,44 +118,71 @@ static func footprint(record: Dictionary) -> Rect2:
 	var size := Vector2(0.7, 2.16) if int(record.turn) % 2 == 0 else Vector2(2.16, 0.7)
 	return Rect2(Vector2(record.x, record.z) - size / 2, size)
 
-static func geometry_error(layout: Array) -> String:
+## A point given in a fixture's own frame, on the shop floor.
+static func fixture_point(fixture: Dictionary, local: Vector2) -> Vector2:
+	var angle := int(fixture.turn) * PI / 2
+	return Vector2(fixture.x, fixture.z) + Vector2(local.x * cos(angle) + local.y * sin(angle), -local.x * sin(angle) + local.y * cos(angle))
+
+static func fixture_rect(fixture: Dictionary, local: Rect2) -> Rect2:
+	return Rect2(fixture_point(fixture, local.position), Vector2.ZERO).expand(fixture_point(fixture, local.end))
+
+static func fixture_body(fixture_name: String, fixture: Dictionary) -> Rect2:
+	var size: Vector2 = FIXTURE_SIZE[fixture_name]
+	return fixture_rect(fixture, Rect2(-size / 2, size))
+
+## Floor racks must keep clear of: the aisles, both fixtures and the queue (and,
+## for a rack being placed now, the cashier's space too).
+static func blocked_areas(fx: Dictionary, strict := false) -> Array:
+	var areas: Array = RESERVED.duplicate()
+	for fixture_name in FIXTURE_SIZE: areas.append(fixture_body(fixture_name, fx[fixture_name]))
+	areas.append(fixture_rect(fx.counter, QUEUE_ZONE))
+	if strict: areas.append(fixture_rect(fx.counter, CASHIER_ZONE))
+	return areas
+
+static func geometry_error(layout: Array, fx: Dictionary = {}, strict_id := -1, expansion_level := 0) -> String:
+	if fx.is_empty(): fx = FIXTURE_HOME
+	var floor_area := floor_rect(expansion_level)
 	for record in layout:
 		var area := footprint(record)
-		if not FLOOR.encloses(area): return "Keep the rack inside the shop."
+		if not floor_area.encloses(area): return "Keep the rack inside the shop."
 		var service := approach(record)
-		if not FLOOR.grow(-0.3).has_point(Vector2(service.x, service.z)): return "Turn the rack toward a clear aisle."
-		for reserved in RESERVED + FURNITURE:
+		if not floor_area.grow(-0.3).has_point(Vector2(service.x, service.z)): return "Turn the rack toward a clear aisle."
+		for reserved in blocked_areas(fx, int(record.id) == strict_id):
 			if area.intersects(reserved.grow(0.08)): return "Keep doors, queues and working aisles clear."
 		for other in layout:
 			if other.id != record.id and area.grow(0.12).intersects(footprint(other)): return "Too close to another rack."
 	return ""
 
-func _navigation(layout: Array) -> AStarGrid2D:
-	var key := ""
+func _navigation(layout: Array, fx: Dictionary) -> AStarGrid2D:
+	var key := str(fx) + str(expansion)
 	for item in layout: key += str([item.id, item.x, item.z, item.turn])
 	if grid != null and key == grid_key: return grid
 	grid_key = key
 	grid = AStarGrid2D.new()
-	grid.region = Rect2i(-23, -28, 23, 37)
+	# 0.25 m cells over the largest shop (two expansions) and the doorway.
+	grid.region = Rect2i(-23, -50, 23, 59)
 	grid.cell_size = Vector2.ONE * 0.25
 	grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
 	grid.default_compute_heuristic = AStarGrid2D.HEURISTIC_OCTILE
 	grid.default_estimate_heuristic = AStarGrid2D.HEURISTIC_OCTILE
 	grid.update()
-	var obstacles: Array = FURNITURE.duplicate()
+	var obstacles: Array = []
+	for fixture_name in FIXTURE_SIZE: obstacles.append(fixture_body(fixture_name, fx[fixture_name]))
 	for item in layout: obstacles.append(footprint(item))
-	for y in range(-28, 9):
+	var floor_area := floor_rect(expansion)
+	for y in range(-50, 9):
 		for x in range(-23, 0):
 			var position := Vector2(x, y) * 0.25
-			var blocked := not FLOOR.grow(-0.28).has_point(position)
+			var blocked := not floor_area.grow(-0.28).has_point(position)
 			for area in obstacles:
 				if area.grow(0.3).has_point(position): blocked = true
 			grid.set_point_solid(Vector2i(x, y), blocked)
 	return grid
 
-func route(from: Vector3, to: Vector3, layout: Array = []) -> Array[Vector3]:
+func route(from: Vector3, to: Vector3, layout: Array = [], fx: Dictionary = {}) -> Array[Vector3]:
 	if layout.is_empty(): layout = records
-	var navigation := _navigation(layout)
+	if fx.is_empty(): fx = fixtures
+	var navigation := _navigation(layout, fx)
 	var start := Vector2i(roundi(from.x * 4), roundi(from.z * 4))
 	var finish := Vector2i(roundi(to.x * 4), roundi(to.z * 4))
 	var result: Array[Vector3] = []
@@ -149,11 +200,60 @@ func placement_error(candidate: Dictionary) -> String:
 			layout[index] = candidate
 			found = true
 	if not found: layout.append(candidate)
-	var error := geometry_error(layout)
+	var error := geometry_error(layout, fixtures, int(candidate.id), expansion)
 	if not error.is_empty(): return error
 	for item in layout:
 		if route(ENTRY, approach(item), layout).is_empty(): return "Leave a reachable aisle in front of every rack."
+	for point in service_points(fixtures):
+		if route(ENTRY, point, layout).is_empty(): return "Leave a way to the counter and the PC."
 	return ""
+
+## Where people stand to use the fixtures: the front and the end of the queue,
+## the cashier's spot and the PC.
+static func service_points(fx: Dictionary) -> Array[Vector3]:
+	var points: Array[Vector3] = []
+	for spot in [[fx.counter, Vector2(0, 0.8)], [fx.counter, Vector2(-2.1, 1.25)], [fx.counter, Vector2(0, -1.0)], [fx.desk, Vector2(0, 0.85)]]:
+		var floor_point := fixture_point(spot[0], spot[1])
+		points.append(Vector3(floor_point.x, 0.1, floor_point.y))
+	return points
+
+## Why a fixture can't stand at `candidate` ({x, z, turn}); "" when it can.
+func fixture_error(fixture_name: String, candidate: Dictionary) -> String:
+	var fx: Dictionary = fixtures.duplicate(true)
+	fx[fixture_name] = candidate
+	var bodies := {}
+	for key in FIXTURE_SIZE: bodies[key] = fixture_body(key, fx[key])
+	var floor_area := floor_rect(expansion)
+	for key in bodies:
+		if not floor_area.encloses(bodies[key]): return "Keep it inside the shop."
+		for reserved in RESERVED:
+			if bodies[key].intersects(reserved.grow(0.08)): return "Keep the door and the back aisle clear."
+	if bodies.counter.intersects(bodies.desk.grow(0.12)): return "Too close to the other furniture."
+	for zone in [fixture_rect(fx.counter, QUEUE_ZONE), fixture_rect(fx.counter, CASHIER_ZONE)]:
+		if not floor_area.encloses(zone): return "Turn the counter so customers can queue in front."
+		if zone.intersects(bodies.desk): return "Keep the queue and the cashier's space clear."
+	var moved: Array = [bodies[fixture_name]]
+	if fixture_name == "counter": moved.append_array([fixture_rect(fx.counter, QUEUE_ZONE), fixture_rect(fx.counter, CASHIER_ZONE)])
+	for record in records:
+		for area in moved:
+			if footprint(record).intersects(area.grow(0.08)): return "A rack is in the way."
+	for item in records:
+		if route(ENTRY, approach(item), records, fx).is_empty(): return "Leave an aisle to every rack."
+	for point in service_points(fx):
+		if route(ENTRY, point, records, fx).is_empty(): return "Leave a way to the counter and the PC."
+	return ""
+
+## Saved fixture places: known names, finite numbers and quarter turns.
+static func fixtures_valid(fx) -> bool:
+	if not fx is Dictionary or fx.size() != FIXTURE_HOME.size(): return false
+	for fixture_name in FIXTURE_HOME:
+		var item = fx.get(fixture_name)
+		if not item is Dictionary: return false
+		for field in ["x", "z", "turn"]:
+			var value = item.get(field)
+			if not (value is int or value is float) or not is_finite(float(value)) or absf(float(value)) > 16: return false
+		if item.turn < 0 or item.turn > 3 or item.turn != int(item.turn): return false
+	return true
 
 func add_stock(product: String, amount: int, id := -1) -> bool:
 	if amount <= 0: return false
@@ -203,8 +303,11 @@ func remove_stock(product: String, amount: int, id := -1) -> bool:
 				item.legacy_overflow -= refill
 	return true
 
-static func valid(layout, stock: int, inventory: Dictionary) -> bool:
-	if not layout is Array or layout.size() < 3 or layout.size() > MAX_RACKS: return false
+## `base`: the free starting racks (3 in older games, 1 in games started from the
+## menu now); they stay in the shop and keep their first products.
+static func valid(layout, stock: int, inventory: Dictionary, fx = FIXTURE_HOME, expansion_level := 0, base := 3) -> bool:
+	if not fixtures_valid(fx): return false
+	if not layout is Array or layout.size() < base or layout.size() > rack_limit(expansion_level): return false
 	var totals := {}
 	for id in Catalog.IDS: totals[id] = 0
 	var destinations := {"bottle": 0, "snack": 0, "soap": 0}
@@ -216,15 +319,15 @@ static func valid(layout, stock: int, inventory: Dictionary) -> bool:
 			if not value is int and not value is float: return false
 			if not is_finite(float(value)) or value < 0 or value != int(value): return false
 		if item.id != index or item.turn > 3 or item.amount > 1000000000: return false
-		if index < 3 and item.product != Catalog.IDS[index]: return false
+		if index < base and item.product != Catalog.IDS[index]: return false
 		if item.get("display", "shelf") not in ["shelf", "produce"]: return false
-		if index < 3 and item.get("display", "shelf") != "shelf": return false
-		if not item.get("restock", index < 3) is bool: return false
-		if item.get("restock", index < 3) and destinations.has(item.product): destinations[item.product] += 1
+		if index < base and item.get("display", "shelf") != "shelf": return false
+		if not item.get("restock", index < base) is bool: return false
+		if item.get("restock", index < base) and destinations.has(item.product): destinations[item.product] += 1
 		for field in ["x", "z"]:
 			var value = item.get(field)
 			if not value is int and not value is float: return false
-			if not is_finite(float(value)) or absf(float(value)) > 10: return false
+			if not is_finite(float(value)) or absf(float(value)) > 16: return false
 		if item.has("slots"):
 			if not item.slots is Array or item.slots.size() != slot_count(item): return false
 			var overflow = item.get("legacy_overflow", 0)
@@ -241,7 +344,10 @@ static func valid(layout, stock: int, inventory: Dictionary) -> bool:
 				if slot.product != "": totals[slot.product] += int(count)
 			if total != int(item.amount): return false
 		else: totals[item.product] += int(item.amount)
-	if not geometry_error(layout).is_empty() or destinations.values().any(func(count): return count != 1): return false
+	if not geometry_error(layout, fx, -1, expansion_level).is_empty(): return false
+	# One restock rack per product at most; the starting racks' products always have one.
+	for product in destinations:
+		if destinations[product] > 1 or Catalog.IDS.find(product) < base and destinations[product] != 1: return false
 	var extras := 0
 	for id in Catalog.EXTRA:
 		if totals[id] != int(inventory.get(id, {}).get("stock", 0)): return false

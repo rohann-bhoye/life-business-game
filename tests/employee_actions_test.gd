@@ -69,6 +69,11 @@ func _run() -> void:
 	assert(ops.employee_target() == "stock")
 	assert(ops.interaction_hint().contains("Sunil"))
 	await _key(KEY_E)
+	# E starts a talk; its "Open staff page" reply opens the tablet's staff tab.
+	assert(ui.staff_dialog.visible and ui.staff_dialog.role == "stock" and not ui.tablet.visible)
+	assert(ui.staff_dialog.actions[2] == "manage")
+	ui.staff_dialog.choices[2].pressed.emit()
+	assert(not ui.staff_dialog.visible)
 	assert(ui.tablet.visible and ui.selected_tab == 2 and ui.employee_role == "stock")
 	assert(ui.shop_menu.get_node("WorkerLabel").text.contains("Sunil"))
 	assert(ui.shop_menu.get_node("WorkerStatusLabel").text == "Waiting for delivery")
@@ -153,6 +158,8 @@ func _run() -> void:
 	player.camera.look_at(shop.worker.global_position + Vector3(0, 1.5, 0))
 	assert(ops.player_at_counter() and ops.employee_target() == "cashier")
 	await _key(KEY_E)
+	assert(ui.staff_dialog.visible and ui.staff_dialog.role == "cashier" and not ui.checkout_menu.visible)
+	ui.staff_dialog.choices[2].pressed.emit()
 	assert(ui.tablet.visible and ui.employee_role == "cashier" and not ui.checkout_menu.visible)
 	for role in ["cashier", "stock"]:
 		ui.employee_role = role

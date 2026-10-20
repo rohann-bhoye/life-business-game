@@ -3,6 +3,8 @@ extends Panel
 # "APNA Wholesale" — a shopping-website style order screen on the management PC.
 # Category filters, product cards with pictures, and a cart so several different
 # products can be ordered in one go (business.order_cart). Kenney UI Pack styling.
+# Furniture shows racks the same way: a picture card with an Order button (the
+# furniture truck brings the package to the warehouse; unpack it there with E).
 signal back_requested
 
 const Catalog = preload("res://product_catalog.gd")
@@ -12,7 +14,10 @@ const CATEGORIES := [
 	["Groceries", ["snack", "oil", "milk", "bread", "chocolate", "honey"]],
 	["Fresh produce", ["tomato", "carrot", "cabbage", "corn", "apple"]],
 	["Household", ["bottle", "soap"]],
+	["Furniture", ["rack_shelf", "rack_produce"]],
 ]
+## Furniture cards: [id, name, what it holds].
+const FURNITURE := [["rack_shelf", "Shelf rack", "3 rows, any product"], ["rack_produce", "Produce table", "12 veg baskets"]]
 const SIZE := Vector2(912, 468)
 
 var business
@@ -29,6 +34,7 @@ var status_label: Label
 var order_button: Button
 var clear_button: Button
 var cards := {}
+var furniture_cards := {}
 
 func setup(business_ref, money_formatter: Callable) -> void:
 	business = business_ref
@@ -101,8 +107,8 @@ func _build_sidebar() -> void:
 		button.pressed.connect(select_category.bind(index))
 		category_buttons.append(button)
 	var deal := Panel.new()
-	deal.position = Vector2(14, 296)
-	deal.size = Vector2(152, 150)
+	deal.position = Vector2(14, 336)
+	deal.size = Vector2(152, 116)
 	deal.add_theme_stylebox_override("panel", KenneyTheme.button_box("yellow"))
 	add_child(deal)
 	var title := _label("BULK DEAL", Vector2(10, 10), 132, 18, Color("713f12"), deal)
@@ -113,8 +119,8 @@ func _build_sidebar() -> void:
 	text.add_theme_font_size_override("font_size", 13)
 	text.add_theme_color_override("font_color", Color("713f12"))
 	deal.add_child(text)
-	text.position = Vector2(10, 40)
-	text.size = Vector2(132, 96)
+	text.position = Vector2(10, 36)
+	text.size = Vector2(132, 76)
 
 func _build_products() -> void:
 	var scroll := ScrollContainer.new()
@@ -151,6 +157,30 @@ func _build_products() -> void:
 		add.name = "AddButton"
 		add.pressed.connect(add_to_cart.bind(id))
 		cards[id] = {"card": card, "price": price, "stock": stock, "add": add}
+	for entry in FURNITURE:
+		var card := Panel.new()
+		card.name = "Card_" + entry[0]
+		card.custom_minimum_size = Vector2(150, 196)
+		grid.add_child(card)
+		var image := TextureRect.new()
+		image.texture = load("res://assets/ui/products/%s.png" % entry[0])
+		image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		image.position = Vector2(25, 6)
+		image.size = Vector2(100, 84)
+		card.add_child(image)
+		var title := _label(entry[1], Vector2(8, 88), 134, 15, KenneyTheme.TEXT, card)
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var about := _label(entry[2], Vector2(8, 108), 134, 11, KenneyTheme.MUTED, card)
+		about.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var price := _label("", Vector2(8, 124), 134, 14, KenneyTheme.GREEN, card)
+		price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var stock := _label("", Vector2(8, 142), 134, 11, KenneyTheme.MUTED, card)
+		stock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var order := _button("Order", Rect2(12, 158, 126, 32), "PrimaryButton", card)
+		order.name = "OrderButton"
+		order.pressed.connect(order_furniture.bind(entry[0]))
+		furniture_cards[entry[0]] = {"card": card, "price": price, "stock": stock, "order": order}
 
 func _build_cart() -> void:
 	var panel := Panel.new()
@@ -192,7 +222,23 @@ func select_category(index: int) -> void:
 		category_buttons[button_index].theme_type_variation = "PrimaryButton" if button_index == index else ""
 	var allowed: Array = CATEGORIES[index][1]
 	for id in cards: cards[id].card.visible = allowed.is_empty() or id in allowed
+	for id in furniture_cards: furniture_cards[id].card.visible = id in allowed
 	refresh()
+
+## A shelf rack is for the first product without its own restock rack yet, so the
+## stock helper (Sunil) knows where new boxes go; a produce table holds tomatoes.
+func _shelf_product() -> String:
+	for id in Catalog.IDS:
+		if id == "tomato": continue
+		if not business.racks.records.any(func(record): return record.product == id and record.get("restock", false)): return id
+	return "bottle"
+
+func order_furniture(kind: String) -> bool:
+	var success: bool = business.order_racks("tomato" if kind == "rack_produce" else _shelf_product(), 1)
+	status_label.text = "Rack ordered: the furniture truck brings it to your warehouse. Unpack it there with E." if success else "Cannot order: check money and the rack limit (%d)." % business.rack_limit()
+	status_label.add_theme_color_override("font_color", KenneyTheme.GREEN if success else Color("b91c1c"))
+	refresh()
+	return success
 
 func add_to_cart(id: String, boxes := 1) -> void:
 	cart[id] = clampi(int(cart.get(id, 0)) + boxes, 0, 10)
@@ -235,6 +281,13 @@ func refresh() -> void:
 		entry.price.text = "%s / box of 10" % _money(Catalog.COSTS[id])
 		entry.stock.text = "Shelf %d  |  Warehouse %d" % [business.product_stock(id), business.logistics.stored_units(id)]
 		entry.add.text = "In cart: %d  +1" % cart[id] if cart.has(id) else "Add to cart"
+	var owned: int = business.racks.records.size() + business.logistics.rack_count()
+	for id in furniture_cards:
+		var entry: Dictionary = furniture_cards[id]
+		entry.price.text = "%s each" % _money(business.RackStore.COST)
+		entry.stock.text = "Racks %d / %d  |  Coming %d" % [owned, business.rack_limit(), business.logistics.rack_count()]
+		entry.order.disabled = not business.can_order_racks("tomato" if id == "rack_produce" else _shelf_product(), 1)
+		entry.order.text = "Rack limit" if owned >= business.rack_limit() else "Order"
 	for child in cart_list.get_children():
 		cart_list.remove_child(child)
 		child.queue_free()

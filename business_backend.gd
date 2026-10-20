@@ -10,6 +10,13 @@ const DemoProgress := preload("res://demo_progress.gd")
 const RackStore := preload("res://rack_store.gd")
 var racks = RackStore.new()
 var furnishing_expenses := 0
+## Bought shop expansions (PC: Space): each moves the back wall back and fits two
+## more racks (rack_store.gd). What they cost so far.
+var shop_expansion := 0
+## Racks the shop started with for free (they can't be packed away): 3 in older
+## games, 1 in new games from the menu (game_session.gd new_game); buy the rest.
+var starting_racks := 3
+var expansion_expenses := 0
 const FarmStore := preload("res://farm_store.gd")
 var farm := FarmStore.new()
 
@@ -225,7 +232,7 @@ func retrieve_receiver_box() -> bool:
 	return _commit_logistics(old)
 
 func can_order_racks(product: String, quantity: int) -> bool:
-	return product in Catalog.IDS and quantity > 0 and racks.records.size() + logistics.rack_count() + quantity <= RackStore.MAX_RACKS and money >= quantity * RackStore.COST
+	return product in Catalog.IDS and quantity > 0 and racks.records.size() + logistics.rack_count() + quantity <= rack_limit() and money >= quantity * RackStore.COST
 
 func order_racks(product: String, quantity := 1) -> bool:
 	if not can_order_racks(product, quantity): return false
@@ -370,6 +377,7 @@ const DAILY_WORKER_WAGE := 200
 const SHOP_OPEN_MINUTE := 480
 const SHOP_CLOSE_MINUTE := 1200
 const UPGRADE_COSTS := [2500, 5000]
+const EXPANSION_COSTS := [6000, 12000]
 const CUSTOMER_INTERVALS := [10.0, 8.0, 6.0]
 const SUPPLY_FIELDS := ["supply_in_transit", "boxed_stock", "carried_stock", "worker_carried_stock"]
 const STAFF_FIELDS := ["stock_worker_hired_day"]
@@ -582,6 +590,17 @@ func _commit_shelves(old: Dictionary) -> bool:
 	changed.emit()
 	return true
 
+## Q at a rack: takes one item of the carried box's product back off the rack into
+## the box (the box must not be full).
+func unshelve_one(rack_id: int) -> bool:
+	if carried_stock <= 0 or carried_stock >= STOCK_AMOUNT: return false
+	var old := snapshot()
+	if not racks.remove_stock(pending_product, 1, rack_id): return false
+	stock -= 1
+	if inventory.has(pending_product): inventory[pending_product].stock -= 1
+	carried_stock += 1
+	return _commit_shelves(old)
+
 func drop_box() -> bool:
 	if carried_stock <= 0 or carried_stock > STOCK_AMOUNT or boxed_stock != 0:
 		return false
@@ -679,6 +698,37 @@ func coop_return_boxes(peers: Array = []) -> void:
 	if not returned: return
 	_activate_next_box()
 	_commit()
+
+## How many racks fit in the shop now (8, then 2 more per expansion).
+func rack_limit() -> int:
+	return RackStore.rack_limit(shop_expansion)
+
+## Floor area in m2 for the Space tab: 60 m2, then about 13 m2 more per expansion.
+func shop_floor_area() -> int:
+	return roundi(6.0 * (10.0 + shop_expansion * RackStore.EXPANSION_DEPTH))
+
+func next_expansion_cost() -> int:
+	return EXPANSION_COSTS[shop_expansion] if shop_expansion < EXPANSION_COSTS.size() else 0
+
+func can_expand_shop() -> bool:
+	return next_expansion_cost() > 0 and money >= next_expansion_cost()
+
+## PC Space tab: buys the next expansion; the room grows at once.
+func expand_shop() -> bool:
+	if not can_expand_shop(): return false
+	var cost := next_expansion_cost()
+	money -= cost
+	expansion_expenses += cost
+	shop_expansion += 1
+	racks.expansion = shop_expansion
+	if not save_progress():
+		money += cost
+		expansion_expenses -= cost
+		shop_expansion -= 1
+		racks.expansion = shop_expansion
+		return false
+	changed.emit()
+	return true
 
 func next_upgrade_cost() -> int:
 	return UPGRADE_COSTS[shop_level - 1] if shop_level < CUSTOMER_INTERVALS.size() else 0
@@ -1088,13 +1138,13 @@ func finish_marketing() -> void:
 	_commit()
 
 func total_expenses() -> int:
-	return restocking_expenses + marketing_expenses + hiring_expenses + operating_expenses + wage_expenses + upgrade_expenses + overtime_expenses + furnishing_expenses + farm.expenses() + loan_interest_paid
+	return restocking_expenses + marketing_expenses + hiring_expenses + operating_expenses + wage_expenses + upgrade_expenses + overtime_expenses + furnishing_expenses + expansion_expenses + farm.expenses() + loan_interest_paid
 
 func place_rack(product: String, position: Vector2, turn: int, id := -1, from_delivery := false) -> bool:
 	if product not in Catalog.IDS or not position.is_finite() or turn < 0 or turn > 3: return false
 	var buying := id < 0
-	if buying and racks.records.size() >= RackStore.MAX_RACKS: return false
-	if buying and (product not in logistics.rack_delivered if from_delivery else money < RackStore.COST or racks.records.size() + logistics.rack_count() >= RackStore.MAX_RACKS): return false
+	if buying and racks.records.size() >= rack_limit(): return false
+	if buying and (product not in logistics.rack_delivered if from_delivery else money < RackStore.COST or racks.records.size() + logistics.rack_count() >= rack_limit()): return false
 	var previous := racks.find(id)
 	if not buying and (previous.is_empty() or previous.product != product): return false
 	var candidate := {"id": racks.records.size() if buying else id, "product": product, "x": position.x, "z": position.y, "turn": turn, "amount": 0 if buying else int(previous.amount), "restock": true if buying else previous.get("restock", id < 3)}
@@ -1128,11 +1178,35 @@ func place_rack(product: String, position: Vector2, turn: int, id := -1, from_de
 	changed.emit()
 	return true
 
+## New games from the menu: only the cold drink rack is free; the snack and soap
+## racks of older games are bought like any other rack (PC: Wholesale > Furniture).
+func start_with_one_rack() -> bool:
+	if starting_racks != 3 or racks.records.size() != 3: return false
+	for index in [1, 2]:
+		if int(racks.records[index].amount) != 0: return false
+	racks.records = [racks.records[0]]
+	racks.records[0].restock = true
+	starting_racks = 1
+	return true
+
+## G in the shop: moves the checkout counter or the PC desk (rack_store.gd fixtures).
+func move_fixture(fixture: String, position: Vector2, turn: int) -> bool:
+	if fixture not in RackStore.FIXTURE_HOME or not position.is_finite() or turn < 0 or turn > 3: return false
+	var candidate := {"x": snappedf(position.x, 0.01), "z": snappedf(position.y, 0.01), "turn": turn}
+	if not racks.fixture_error(fixture, candidate).is_empty(): return false
+	var old: Dictionary = racks.fixtures.duplicate(true)
+	racks.fixtures[fixture] = candidate
+	if not save_progress():
+		racks.fixtures = old
+		return false
+	changed.emit()
+	return true
+
 ## Packs an empty purchased rack back into a warehouse furniture package; it can be
 ## unpacked and placed again later. The three starting racks always stay in the shop.
 func pack_rack(id: int) -> bool:
 	var record := racks.find(id)
-	if record.is_empty() or id < 3 or int(record.amount) != 0 or int(record.get("legacy_overflow", 0)) != 0: return false
+	if record.is_empty() or id < starting_racks or int(record.amount) != 0 or int(record.get("legacy_overflow", 0)) != 0: return false
 	var old_layout: Array = racks.records.duplicate(true)
 	var old_delivered: Array = logistics.rack_delivered.duplicate()
 	racks.records.erase(record)
@@ -1199,7 +1273,11 @@ func snapshot() -> Dictionary:
 	if not coop_carries.is_empty(): data["coop_carried"] = coop_carries.values().duplicate(true)
 	data["demo_progress"] = demo.snapshot()
 	data["rack_layout"] = racks.records.duplicate(true)
+	data["shop_fixtures"] = racks.fixtures.duplicate(true)
 	data["furnishing_expenses"] = furnishing_expenses
+	data["shop_expansion"] = shop_expansion
+	data["starting_racks"] = starting_racks
+	data["expansion_expenses"] = expansion_expenses
 	data["stock_collection_assigned"] = stock_collection_assigned
 	data["logistics"] = logistics.snapshot()
 	for field in ["warehouse_worker_hired", "warehouse_worker_hired_day", "warehouse_shift_start", "warehouse_shift_end"]: data[field] = get(field)
@@ -1275,7 +1353,15 @@ func restore(data: Dictionary) -> void:
 		RackStore.migrate_record(item)
 		item.legacy_overflow = int(item.get("legacy_overflow", 0))
 		for slot in item.slots: slot.count = int(slot.count)
+	racks.fixtures = RackStore.FIXTURE_HOME.duplicate(true)
+	for fixture in data.get("shop_fixtures", {}):
+		var place: Dictionary = data.shop_fixtures[fixture]
+		racks.fixtures[fixture] = {"x": float(place.x), "z": float(place.z), "turn": int(place.turn)}
 	furnishing_expenses = int(data.get("furnishing_expenses", 0))
+	shop_expansion = int(data.get("shop_expansion", 0))
+	starting_racks = int(data.get("starting_racks", 3))
+	expansion_expenses = int(data.get("expansion_expenses", 0))
+	racks.expansion = shop_expansion
 
 func save_progress() -> bool:
 	if save_path.is_empty():
@@ -1444,13 +1530,21 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 			return false
 	if data.get("stock_collection_assigned", false) and (not data.get("stock_worker_hired", false) or data.boxed_stock <= 0): return false
 	var furnishing = data.get("furnishing_expenses", 0)
+	# Expansions: whole count up to the last one, paid in full.
+	var expansion = data.get("shop_expansion", 0)
+	var base = data.get("starting_racks", 3)
+	if not EmployeeRelations.whole(base, 3) or base < 1: return false
+	if not EmployeeRelations.whole(expansion, EXPANSION_COSTS.size()): return false
+	var expected_expansion := 0
+	for index in range(int(expansion)): expected_expansion += EXPANSION_COSTS[index]
+	if not EmployeeRelations.whole(data.get("expansion_expenses", 0), MAX_SAVED_VALUE) or int(data.get("expansion_expenses", 0)) != expected_expansion: return false
 	if not EmployeeRelations.whole(furnishing, MAX_SAVED_VALUE): return false
 	var layout = data.get("rack_layout", RackStore.fresh(int(data.stock), data.inventory))
-	if not RackStore.valid(layout, int(data.stock), data.inventory): return false
+	if not RackStore.valid(layout, int(data.stock), data.inventory, data.get("shop_fixtures", RackStore.FIXTURE_HOME), int(expansion), int(base)): return false
 	var delivery_data = data.get("logistics", {})
-	if not Logistics.valid(delivery_data, RackStore.MAX_RACKS - layout.size()): return false
+	if not Logistics.valid(delivery_data, RackStore.rack_limit(int(expansion)) - layout.size()): return false
 	var pending_racks: int = delivery_data.get("rack_incoming", []).size() + delivery_data.get("rack_delivered", []).size()
-	if furnishing != (layout.size() - 3 + pending_racks) * RackStore.COST: return false
+	if furnishing != (layout.size() - int(base) + pending_racks) * RackStore.COST: return false
 	if not data.get("warehouse_worker_hired", false) is bool: return false
 	for field in ["warehouse_worker_hired_day", "warehouse_shift_start", "warehouse_shift_end"]:
 		if not EmployeeRelations.whole(data.get(field, 0 if field == "warehouse_worker_hired_day" else (480 if field == "warehouse_shift_start" else 1080)), MAX_SAVED_VALUE): return false
@@ -1614,7 +1708,7 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	if extra_sold > sold or extra_stock > data.stock: return false
 	if revenue % 10 != 0 or revenue < sold * 50 or revenue > sold * 200:
 		return false
-	var expenses := int(data["restocking_expenses"]) + int(data["marketing_expenses"]) + int(data["hiring_expenses"]) + int(data["operating_expenses"]) + int(data["wage_expenses"]) + int(data["upgrade_expenses"]) + int(data.overtime_expenses) + int(furnishing) + farm_state.expenses() + int(data.get("loan_interest_paid", 0))
+	var expenses := int(data["restocking_expenses"]) + int(data["marketing_expenses"]) + int(data["hiring_expenses"]) + int(data["operating_expenses"]) + int(data["wage_expenses"]) + int(data["upgrade_expenses"]) + int(data.overtime_expenses) + int(furnishing) + expected_expansion + farm_state.expenses() + int(data.get("loan_interest_paid", 0))
 	# Loans: money received minus principal paid back.
 	if not _valid_loan(data): return false
 	expenses -= int(data.get("loan_received", 0)) - int(data.get("loan_principal_repaid", 0))

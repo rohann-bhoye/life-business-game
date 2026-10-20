@@ -134,7 +134,7 @@ func _ready() -> void:
 	ui._label("SpaceLevelLabel", self)
 	ui._label("SpaceDimensionsLabel", self)
 	ui._label("SpaceQuoteLabel", self)
-	expansion_button = _button("ExpandSpaceButton", ui._on_upgrade_pressed)
+	expansion_button = _button("ExpandSpaceButton", _expand_shop)
 	ui._label("HappinessLabel", self)
 	ui._label("EmployeeMessageLabel", self).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	happiness_bar = ProgressBar.new()
@@ -361,11 +361,14 @@ func _refresh() -> void:
 	order_button.disabled = not business.can_order_stock(product, quantity)
 	order_button.tooltip_text = "Supply limit: 20 boxes" if business.supply_box_count() + quantity > business.MAX_SUPPLY_BOXES else ("Not enough money" if order_button.disabled else Catalog.NAMES[product])
 	auto_collect.set_pressed_no_signal(business.assistant_auto_collect)
-	get_node("SpaceLevelLabel").text = "Shop level %d" % business.shop_level
-	get_node("SpaceDimensionsLabel").text = "Floor: 60 m2 | Ceiling: 3.8 m"
-	get_node("SpaceQuoteLabel").text = "Full room available"
-	expansion_button.text = "Room ready"
-	expansion_button.disabled = true
+	# Space: buy expansions that move the back wall onto the plot behind the shop.
+	var expansion_cost: int = business.next_expansion_cost()
+	get_node("SpaceLevelLabel").text = "Shop expansions: %d / %d" % [business.shop_expansion, business.EXPANSION_COSTS.size()]
+	get_node("SpaceDimensionsLabel").text = "Floor: %d m2 | Racks: up to %d | Ceiling: 3.8 m" % [business.shop_floor_area(), business.rack_limit()]
+	get_node("SpaceQuoteLabel").text = "Fully expanded" if expansion_cost == 0 else "Next: +%d m2, 2 more racks" % (roundi(6.0 * business.racks.EXPANSION_DEPTH))
+	expansion_button.text = "Shop fully expanded" if expansion_cost == 0 else "Expand shop - %s%s" % [String.chr(8377), shop._format_money(expansion_cost)]
+	expansion_button.disabled = not business.can_expand_shop()
+	expansion_button.tooltip_text = "" if expansion_cost == 0 else ("Not enough money" if expansion_button.disabled else "The back wall moves back at once.")
 	cashier_label.text = ("Ramesh - Cashier: " if business.worker_hired else "Cashier: ") + _duty_status("cashier", business.worker_hired, business.cashier_on_shift())
 	stock_worker_label.text = ("Sunil - Stock: " if business.stock_worker_hired else "Stock assistant: ") + _duty_status("stock", business.stock_worker_hired, business.stock_worker_on_shift())
 	get_node("SavedShiftLabel").text = "Scheduled: %02d:00 - %02d:00" % [business.stock_shift_start / 60, business.stock_shift_end / 60]
@@ -482,8 +485,8 @@ func _refresh_racks() -> void:
 	get_node("BuyRackButton").disabled = not business.can_order_racks(Catalog.IDS[rack_product.selected], quantity)
 	get_node("MoveRackButton").disabled = business.carried_stock > 0
 	get_node("SetRestockRackButton").disabled = record.get("restock", false) or business.worker_carried_stock > 0
-	get_node("PackRackButton").disabled = int(record.id) < 3 or int(record.amount) > 0 or business.carried_stock > 0
-	get_node("PackRackButton").tooltip_text = "Starting racks stay in the shop." if int(record.id) < 3 else ("Empty the rack first." if int(record.amount) > 0 else "Send this rack to the warehouse as a package.")
+	get_node("PackRackButton").disabled = int(record.id) < business.starting_racks or int(record.amount) > 0 or business.carried_stock > 0
+	get_node("PackRackButton").tooltip_text = "Starting racks stay in the shop." if int(record.id) < business.starting_racks else ("Empty the rack first." if int(record.amount) > 0 else "Send this rack to the warehouse as a package.")
 	if not is_instance_valid(shelf_selector): return
 	var slots: int = business.RackStore.slot_count(record)
 	if shelf_selector.item_count != slots:
@@ -521,6 +524,12 @@ func _buy_rack() -> void:
 	rack_quantity.apply()
 	var success: bool = shop.business.order_racks(Catalog.IDS[rack_product.selected], int(rack_quantity.value))
 	ui.show_feedback("Rack order placed. Furniture truck on the way." if success else "Cannot order racks: check funds, rack limit and save status.", not success)
+
+func _expand_shop() -> void:
+	var cost: int = shop.business.next_expansion_cost()
+	var success: bool = shop.business.expand_shop()
+	ui.show_feedback("Shop expanded: %d m2, room for %d racks (-%s%s)." % [shop.business.shop_floor_area(), shop.business.rack_limit(), String.chr(8377), shop._format_money(cost)] if success else ("Shop is fully expanded." if cost == 0 else "Not enough money to expand, or check save status."), not success)
+	_refresh()
 
 func _move_rack() -> void:
 	var furnishing = get_tree().current_scene.get_node("RackFurnishing")

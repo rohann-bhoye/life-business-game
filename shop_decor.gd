@@ -7,7 +7,13 @@ extends Node3D
 const Kenney = preload("res://kenney_assets.gd")
 const FOOD := "res://assets/products/kenney/%s.glb"
 const FURNITURE := "res://assets/furniture/kenney/%s.glb"
-const GROCERIES := ["bottle-oil", "carton", "honey", "can", "peanut-butter", "bottle-ketchup", "carton-small", "can-small", "soda-can", "loaf"]
+## The wall shelves show the shop's own catalogue (product_catalog.gd), grouped in
+## blocks of four like a real kirana: the same models as on the racks.
+const WALL_PRODUCTS := ["bottle", "snack", "oil", "milk", "honey", "bread", "soap", "chocolate"]
+const WALL_HEIGHTS := {"bottle": 0.27, "snack": 0.23, "oil": 0.27, "milk": 0.21, "honey": 0.15, "bread": 0.12, "soap": 0.1, "chocolate": 0.05}
+## Flat packs are stacked.
+const WALL_STACKS := {"soap": 2, "chocolate": 3}
+const ProductAssets = preload("res://product_assets.gd")
 const ROOM_MIN_X := -5.94
 const ROOM_MAX_X := -0.06
 const BACK_Z := -7.44
@@ -21,6 +27,9 @@ const DOOR_X := -3.0
 const DOOR_TOP := 2.44
 
 var fans: Array[Node3D] = []
+## Shelves, paint and the welcome board on the back wall: they move back together
+## when the shop is expanded (set_back).
+var back_wall: Node3D
 var diya_light: OmniLight3D
 var flicker := 0.0
 
@@ -29,23 +38,40 @@ func build(counter: Node3D) -> void:
 	var board := _material(Color(0.55, 0.36, 0.2))
 	var bracket := _material(Color(0.2, 0.22, 0.24))
 	var placements := {}
-	for id in GROCERIES: placements[id] = [] as Array[Transform3D]
+	for id in WALL_PRODUCTS: placements[id] = [] as Array[Transform3D]
 	# Right wall shelves (behind the management desk, above head height).
 	_wall_shelf(Vector3(ROOM_MAX_X - 0.16, 0, -4.9), Vector3(0.3, 0.04, 4.6), board, bracket, placements, 0)
-	# Back wall shelves.
-	_wall_shelf(Vector3(-3.0, 0, BACK_Z + 0.16), Vector3(5.6, 0.04, 0.3), board, bracket, placements, 5)
+	# Back wall shelves, with their own product batches so they can move with the wall.
+	back_wall = Node3D.new()
+	back_wall.name = "BackWallDecor"
+	add_child(back_wall)
+	var back_placements := {}
+	for id in WALL_PRODUCTS: back_placements[id] = [] as Array[Transform3D]
+	_wall_shelf(Vector3(-3.0, 0, BACK_Z + 0.16), Vector3(5.6, 0.04, 0.3), board, bracket, back_placements, 5)
 	for id in placements:
-		if not placements[id].is_empty(): Kenney.batch(self, "Shelf_" + id, FOOD % id, placements[id])
+		if not placements[id].is_empty(): _wall_batch(self, "Shelf_" + id, id, placements[id])
+		if not back_placements[id].is_empty(): _wall_batch(back_wall, "BackShelf_" + id, id, back_placements[id])
 	_paint_band()
-	for z in [-1.4, -5.2]:
-		var fan := Kenney.fit(self, "CeilingFan%d" % fans.size(), FURNITURE % "ceilingFan", Vector3(1.3, 0.5, 1.3), Vector3(-3.0, 3.25, z))
-		fans.append(fan)
+	# Between the two ceiling lights (z -1.3 and -5.2), hanging from the 3.9 m ceiling.
+	for z in [-3.25, 0.45]: fans.append(_ceiling_fan(Vector3(-3.0, 3.9, z)))
 	Kenney.fit(self, "EntranceMat", FURNITURE % "rugDoormat", Vector3(1.4, 0.02, 0.8), Vector3(-3.0, 0.005, 1.9))
 	_sign_panel("OfferBoard", "AAJ KA OFFER\nFresh stock every day!", Vector3(ROOM_MAX_X - 0.02, 1.75, 1.3), -PI / 2, Vector2(1.1, 0.55), Color(0.85, 0.2, 0.18))
 	_sign_panel("PaymentBoard", "CASH  |  CARD  |  UPI\nAll payments accepted", Vector3(ROOM_MAX_X - 0.02, 1.75, -0.1), -PI / 2, Vector2(1.1, 0.5), Color(0.1, 0.42, 0.36))
 	_sign_panel("WelcomeBoard", "APNA MART\nDaily needs - Fresh - Sasta", Vector3(-3.0, 3.48, BACK_Z + 0.02), 0.0, Vector2(2.6, 0.5), Color(0.12, 0.3, 0.26))
 	_counter_sweets(counter)
 	_indian_touches()
+	# Everything built against the back wall joins back_wall.
+	for child in get_children():
+		if child is Node3D and child != back_wall and child.position.z < BACK_Z + 0.3:
+			child.reparent(back_wall)
+
+## Moves the back-wall decor to a wall at `back_z` and stretches the side paint bands.
+func set_back(back_z: float) -> void:
+	back_wall.position.z = back_z - BACK_Z
+	for child in get_children():
+		if child is MeshInstance3D and (child.name.begins_with("WallPaint") or child.name.begins_with("WallStripe")):
+			child.mesh.size.z = FRONT_Z - back_z
+			child.position.z = (FRONT_Z + back_z) / 2
 
 func _indian_touches() -> void:
 	for z in [FRONT_Z - 0.05, 2.62]: _toran("Toran", Vector3(DOOR_X, DOOR_TOP, z), 1.9)
@@ -231,12 +257,47 @@ func _wall_shelf(center: Vector3, size: Vector3, board: Material, bracket: Mater
 			var offset := Vector3(0, -0.08, end * (length / 2 - 0.15)) if along_z else Vector3(end * (length / 2 - 0.15), -0.08, 0)
 			_box("ShelfBracket", Vector3(center.x, y, center.z) + offset, Vector3(0.04, 0.14, 0.24) if not along_z else Vector3(0.24, 0.14, 0.04), bracket)
 		for index in range(count):
-			var id: String = GROCERIES[(index / 3 + level * 4 + seed) % GROCERIES.size()]
+			var id: String = WALL_PRODUCTS[(index / 4 + level * 3 + seed) % WALL_PRODUCTS.size()]
 			var t := -length / 2 + 0.14 + index * (length - 0.28) / maxf(count - 1, 1)
 			var spot := Vector3(center.x, y + 0.02, center.z + t) if along_z else Vector3(center.x + t, y + 0.02, center.z)
-			var factor := Kenney.height_factor(FOOD % id, 0.22 if id != "loaf" else 0.14)
-			var yaw := -PI / 2 if along_z else 0.0
-			placements[id].append(Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * factor), spot))
+			# Rack products show their label on +x: turn it to face the room.
+			var yaw := PI if along_z else -PI / 2
+			var factor: float = WALL_HEIGHTS[id] / maxf(0.01, _baked(id).get_aabb().size.y)
+			for layer in range(WALL_STACKS.get(id, 1)):
+				placements[id].append(Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * factor), spot + Vector3(0, layer * WALL_HEIGHTS[id], 0)))
+
+var baked := {}
+
+## The product exactly as on the racks (shop_operations.gd make_product: model,
+## label band, cap), merged into one mesh so a whole shelf is one batch.
+func _baked(id: String) -> ArrayMesh:
+	if baked.has(id): return baked[id]
+	var holder := Node3D.new()
+	add_child(holder)
+	var item: Node3D = get_parent().make_product(holder, "Bake", Vector3.ZERO, id)
+	var mesh := ArrayMesh.new()
+	for node in item.find_children("*", "MeshInstance3D", true, false):
+		if not node.is_visible_in_tree() or node.mesh == null: continue
+		var to_item: Transform3D = item.global_transform.affine_inverse() * node.global_transform
+		for surface in range(node.mesh.get_surface_count()):
+			var tool := SurfaceTool.new()
+			tool.append_from(node.mesh, surface, to_item)
+			tool.set_material(node.material_override if node.material_override != null else node.get_active_material(surface))
+			tool.commit(mesh)
+	holder.free()
+	baked[id] = mesh
+	return mesh
+
+func _wall_batch(parent: Node3D, node_name: String, id: String, transforms: Array[Transform3D]) -> void:
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = _baked(id)
+	multimesh.instance_count = transforms.size()
+	for index in range(transforms.size()): multimesh.set_instance_transform(index, transforms[index])
+	var node := MultiMeshInstance3D.new()
+	node.name = node_name
+	node.multimesh = multimesh
+	parent.add_child(node, true)
 
 func _paint_band() -> void:
 	var paint := _material(Color(0.93, 0.74, 0.38))
@@ -308,8 +369,60 @@ func _material(color: Color) -> StandardMaterial3D:
 	material.roughness = 0.85
 	return material
 
+## An Indian ceiling fan: canopy and down-rod fixed to the ceiling at `top`; the
+## rotor (motor and three long blades) is returned and spins around the rod.
+func _ceiling_fan(top: Vector3) -> Node3D:
+	var fan := Node3D.new()
+	fan.name = "CeilingFan%d" % fans.size()
+	fan.position = top
+	add_child(fan)
+	var white := _material(Color(0.94, 0.93, 0.89))
+	var metal := _material(Color(0.55, 0.56, 0.57))
+	_fan_part(fan, _cylinder(0.09, 0.06, 0.06), Vector3(0, -0.03, 0), white)
+	_fan_part(fan, _cylinder(0.018, 0.018, 0.42), Vector3(0, -0.27, 0), metal)
+	var rotor := Node3D.new()
+	rotor.name = "Rotor"
+	rotor.position.y = -0.53
+	fan.add_child(rotor)
+	_fan_part(rotor, _cylinder(0.11, 0.15, 0.11), Vector3.ZERO, white)
+	_fan_part(rotor, _cylinder(0.05, 0.07, 0.05), Vector3(0, -0.08, 0), white)
+	for blade in range(3):
+		var arm := Node3D.new()
+		arm.rotation.y = blade * TAU / 3.0
+		rotor.add_child(arm)
+		var bracket := BoxMesh.new()
+		bracket.size = Vector3(0.14, 0.02, 0.04)
+		_fan_part(arm, bracket, Vector3(0.19, -0.01, 0), metal)
+		var wing := BoxMesh.new()
+		wing.size = Vector3(0.6, 0.012, 0.12)
+		var part := _fan_part(arm, wing, Vector3(0.52, -0.015, 0), white)
+		part.rotation.x = 0.12
+	return rotor
+
+func _cylinder(top_radius: float, bottom_radius: float, height: float) -> CylinderMesh:
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = top_radius
+	mesh.bottom_radius = bottom_radius
+	mesh.height = height
+	mesh.radial_segments = 16
+	mesh.rings = 1
+	return mesh
+
+func _fan_part(parent: Node3D, mesh: Mesh, position: Vector3, material: Material) -> MeshInstance3D:
+	var node := MeshInstance3D.new()
+	node.mesh = mesh
+	node.material_override = material
+	node.position = position
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(node)
+	return node
+
+var fan_speed := 0.0
+
 func _process(delta: float) -> void:
-	for fan in fans: fan.rotate_y(delta * 4.0)
+	# Fans speed up smoothly to a steady low setting (about 70 turns a minute).
+	fan_speed = move_toward(fan_speed, 7.5, delta * 2.5)
+	for fan in fans: fan.rotate_y(fan_speed * delta)
 	if is_instance_valid(diya_light):
 		flicker += delta
 		diya_light.light_energy = 0.62 + 0.08 * sin(flicker * 13.0) + 0.05 * sin(flicker * 7.3)
