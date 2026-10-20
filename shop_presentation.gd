@@ -3,6 +3,7 @@ extends Node
 const SURFACE_SHADER = preload("res://assets/materials/shop_surface.gdshader")
 const ATLAS = preload("res://assets/materials/shop_surfaces.png")
 const Catalog = preload("res://product_catalog.gd")
+const Bricks = preload("res://brick_works.gd")
 var price_labels: Dictionary = {}
 var surfaces: Dictionary = {}
 
@@ -34,7 +35,7 @@ func _ready() -> void:
 	for x in [-3.0, 3.0]: walls.append(("SideWall%s" % x).validate_node_name())
 	for x in [-2.0, 2.0]: walls.append(("FrontWall%s" % x).validate_node_name())
 	for name in walls:
-		shop.get_node(name).material_override = surface(Vector2.ZERO, 2.5)
+		shop.get_node(name).material_override = Bricks.brick_material()
 	shop.get_node("Floor").material_override = surface(Vector2(0.5, 0), 2.0)
 	_exterior(shop)
 	_interior(shop)
@@ -69,12 +70,17 @@ func _exterior(shop: Node3D) -> void:
 	sign.position = Vector3(-2.3, 1.92, 2.78)
 	sign.font_size = 24
 	sign.pixel_size = 0.003
+	# Brick shop front (brick_works.gd): pink-framed glass windows and doorway, a
+	# blue goods shutter on the left wall and steel I-beams under the ceiling.
 	for x in [-1.03, 1.03]:
-		builder._box("EntranceTrim%s" % x, shop, Vector3(0.06, 2.3, 0.08), Vector3(x, -0.25, 2.57), Color(0.15, 0.19, 0.2))
+		builder._box("EntranceTrim%s" % x, shop, Vector3(0.14, 2.48, 0.12), Vector3(x, -0.18, 2.58), Bricks.FRAME)
+	builder._box("EntranceTop", shop, Vector3(2.2, 0.14, 0.12), Vector3(0, 1.03, 2.58), Bricks.FRAME)
 	for x in [-2.0, 2.0]:
-		builder._box("WindowSill%s" % x, shop, Vector3(1.64, 0.08, 0.13), Vector3(x, -0.78, 2.61), Color(0.16, 0.25, 0.28))
-	for x in [-2.0, 2.0]:
+		shop.get_node(("WindowGlass%s" % x).validate_node_name()).hide()
+		Bricks.framed_window(shop, "ShopWindow%d" % int(x), Vector3(x, -0.75, 2.575), 0.0, 1.5, 1.4, Bricks.FRAME, 1)
 		builder._box("WindowDecal%s" % x, shop, Vector3(1.12, 0.45, 0.008), Vector3(x, -0.05, 2.636), Color(0.08, 0.17, 0.2))
+	Bricks.shutter(shop, "GoodsShutter", Vector3(-3.06, -1.4, -3.5), -PI / 2, 2.2, 2.4)
+	Bricks.i_beams(shop, "CeilingBeams", -2.94, 2.94, [1.9, -0.4, -4.2, -6.5], 2.41)
 	_label(shop, "WindowHours", "OPEN\n08:00 - 20:00", Vector3(2, -0.05, 2.65), 28, 0.0035)
 	_label(shop, "WindowPayments", "CASH  /  CARD\nUPI ACCEPTED", Vector3(-2, -0.05, 2.65), 24, 0.0035)
 

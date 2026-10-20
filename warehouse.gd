@@ -3,6 +3,7 @@ extends Node3D
 const Logistics = preload("res://shop_logistics.gd")
 const Catalog = preload("res://product_catalog.gd")
 const Office = preload("res://office_assets.gd")
+const Bricks = preload("res://brick_works.gd")
 var office_idle := Vector3(-12.4, 0.1, 19)
 var entry := Vector3(-3, 0.1, 15.1)
 var receiver: Node3D
@@ -57,21 +58,24 @@ func _build_room() -> void:
 	var shell := Node3D.new()
 	shell.name = "StorageBuilding"
 	add_child(shell)
+	# Red-brick walls, a dark steel roof and fascia (brick_works.gd style).
 	var wall := Color(0.68, 0.73, 0.76)
-	var blue := Color(0.13, 0.35, 0.48)
-	for x in [-16.5, 6.4]: builder._box("SideWall%s" % x, shell, Vector3(0.18, 5.2, 16), Vector3(x, 2.7, 22.5), wall, true)
-	builder._box("BackWall", shell, Vector3(22.9, 5.2, 0.18), Vector3(-5.05, 2.7, BACK), wall, true)
+	var dark := Color(0.13, 0.14, 0.16)
+	var walls: Array[MeshInstance3D] = []
+	for x in [-16.5, 6.4]: walls.append(builder._box("SideWall%s" % x, shell, Vector3(0.18, 5.2, 16), Vector3(x, 2.7, 22.5), wall, true))
+	walls.append(builder._box("BackWall", shell, Vector3(22.9, 5.2, 0.18), Vector3(-5.05, 2.7, BACK), wall, true))
 	# Front wall: small office exit behind the management monitor, main warehouse entrance at x -3.
-	builder._box("OfficeFrontWallLeft", shell, Vector3(1.675, 5.2, 0.18), Vector3(-15.6625, 2.7, FRONT), wall, true)
-	builder._box("OfficeFrontWallRight", shell, Vector3(8.575, 5.2, 0.18), Vector3(-9.2875, 2.7, FRONT), wall, true)
-	builder._box("OfficeDoorHeader", shell, Vector3(1.25, 2.85, 0.18), Vector3(-14.2, 3.875, FRONT), wall, true)
-	builder._box("FrontWall2.7", shell, Vector3(7.4, 5.2, 0.18), Vector3(2.7, 2.7, FRONT), wall, true)
-	builder._box("DoorLintel", shell, Vector3(4, 1.5, 0.18), Vector3(-3, 4.55, FRONT), blue, true)
-	builder._box("Roof", shell, Vector3(23.3, 0.2, 16.4), Vector3(-5.05, 5.4, 22.5), blue, true)
+	walls.append(builder._box("OfficeFrontWallLeft", shell, Vector3(1.675, 5.2, 0.18), Vector3(-15.6625, 2.7, FRONT), wall, true))
+	walls.append(builder._box("OfficeFrontWallRight", shell, Vector3(8.575, 5.2, 0.18), Vector3(-9.2875, 2.7, FRONT), wall, true))
+	walls.append(builder._box("OfficeDoorHeader", shell, Vector3(1.25, 2.85, 0.18), Vector3(-14.2, 3.875, FRONT), wall, true))
+	walls.append(builder._box("FrontWall2.7", shell, Vector3(7.4, 5.2, 0.18), Vector3(2.7, 2.7, FRONT), wall, true))
+	for part in walls: part.material_override = Bricks.brick_material()
+	builder._box("DoorLintel", shell, Vector3(4, 1.5, 0.18), Vector3(-3, 4.55, FRONT), dark, true)
+	builder._box("Roof", shell, Vector3(23.3, 0.2, 16.4), Vector3(-5.05, 5.4, 22.5), Color(0.24, 0.26, 0.28), true)
 	var floor = builder._box("Floor", shell, Vector3(22.7, 0.012, 15.8), Vector3(-5.05, 0.106, 22.5), Color(0.6, 0.65, 0.66))
 	floor.material_override = world.get_node("ShopPresentation").surface(Vector2(0.5, 0.5), 2)
 	builder._box("Forecourt", shell, Vector3(22.9, 0.016, 3.1), Vector3(-5.05, 0.108, 12.95), Color(0.67, 0.7, 0.72))
-	builder._box("Fascia", shell, Vector3(22.7, 0.7, 0.1), Vector3(-5.05, 4.6, FRONT - 0.13), blue)
+	builder._box("Fascia", shell, Vector3(22.7, 0.7, 0.1), Vector3(-5.05, 4.6, FRONT - 0.13), dark)
 	var sign: Label3D = operations._sign(shell, "StorageSign", "APNA STORAGE", Vector3(-3, 4.6, FRONT - 0.21))
 	sign.rotation.y = PI
 	sign.font_size = 90
@@ -138,6 +142,31 @@ func _build_room() -> void:
 		if body == player: player.warehouse_indoors = true)
 	area.body_exited.connect(func(body):
 		if body == player: player.warehouse_indoors = false)
+	_brick_details(shell)
+
+## The brick building's details (brick_works.gd): an orange stripe under the
+## fascia, a pink-framed office window, two blue roller shutters, downpipes,
+## hedge planters clear of the delivery bays and doors, roof skylights (pale
+## panels under the roof show them inside) and two steel roof trusses.
+func _brick_details(shell: Node3D) -> void:
+	builder._box("FasciaStripe", shell, Vector3(22.7, 0.08, 0.06), Vector3(-5.05, 4.21, FRONT - 0.2), Color(0.95, 0.55, 0.12))
+	Bricks.framed_window(shell, "OfficeWindow", Vector3(-9.3, 1.1, FRONT - 0.1), PI, 6.0, 2.3)
+	Bricks.framed_window(shell, "OfficeWindowInside", Vector3(-9.3, 1.1, FRONT + 0.1), 0.0, 6.0, 2.3, Bricks.FRAME, 3, Color(0.66, 0.8, 0.9))
+	for x in [0.9, 3.7]: Bricks.shutter(shell, "LoadingShutter%d" % roundi(x * 10), Vector3(x, 0.1, FRONT - 0.1), PI, 2.4, 3.1)
+	for x in [-16.35, 6.25]: builder._box("Downpipe%d" % roundi(x), shell, Vector3(0.12, 5.2, 0.12), Vector3(x, 2.7, FRONT - 0.17), Bricks.STEEL)
+	for spot in [Vector2(-12.35, 1.5), Vector2(-6.25, 2.0), Vector2(5.65, 1.2)]:
+		Bricks.planter(shell, "Planter%d" % roundi(spot.x), Vector3(spot.x, 0.1, FRONT - 0.45), 0.0, spot.y)
+		builder._collider("Planter%dBody" % roundi(spot.x), shell, Vector3(spot.y, 1.16, 0.6), Vector3(spot.x, 0.68, FRONT - 0.45))
+	var daylight := StandardMaterial3D.new()
+	daylight.albedo_color = Color(0.8, 0.9, 1.0)
+	daylight.emission_enabled = true
+	daylight.emission = Color(0.75, 0.86, 1.0)
+	daylight.emission_energy_multiplier = 0.35
+	for x in [-7.8, -3.0, 1.8]:
+		for z in [20.5, 26.5]:
+			Bricks.skylight(shell, "Skylight%d_%d" % [roundi(x), roundi(z)], Vector3(x, 5.5, z), Vector2(2.0, 1.4))
+			builder._box("SkylightPanel%d_%d" % [roundi(x), roundi(z)], shell, Vector3(2.0, 0.02, 1.4), Vector3(x, 5.29, z), Color.WHITE).material_override = daylight
+	for z in [19, 25]: Bricks.truss(shell, "RoofTruss%d" % z, -16.41, 6.31, z, 5.3)
 
 func _build_racks() -> void:
 	for id in range(Logistics.STORAGE_RACKS):
@@ -154,6 +183,7 @@ func _build_racks() -> void:
 		label.rotation.y = PI
 		label.pixel_size = 0.0035
 		rack_labels.append(label)
+		Bricks.bay_number(self, "BayBoard%d" % id, rack.position + Vector3(0, 4.85, 0), PI, "%s%d" % [String.chr(65 + id / 4), id % 4 + 1])
 
 func _build_computer() -> void:
 	var setup := Node3D.new()

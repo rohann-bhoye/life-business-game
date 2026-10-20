@@ -63,6 +63,14 @@ board and a local suggestion form. See Farming section below for controls and li
   the pack buttons. With 1 free rack, shop_operations.gd skips the built-in snack/soap
   racks and rack_furnishing.gd maps only rack 0; bought racks are PurchasedRack nodes.
   Test fixtures (Backend.new()/main.tscn) still start with 3 racks.
+- Brick buildings (brick_works.gd, press-kit style): procedural world-mapped brick
+  material, steel truss / I-beams, blue roller shutter, pink-framed glass window,
+  skylight, hedge planter, hanging bay board. Warehouse (warehouse.gd _brick_details):
+  brick walls, dark roof/fascia + orange stripe, office window, 2 shutters, 3 planters
+  (with colliders, clear of both bays and doors), 6 skylights, trusses at z 19/25 and
+  A1-D4 bay boards above the storage racks. Shop (shop_presentation.gd): brick walls,
+  pink window/door frames (old WindowGlass hidden, WindowSill removed), goods shutter
+  on the left outer wall, I-beams at z 1.9/-0.4/-4.2/-6.5 (clear of fans and lights).
 - Farm detailing (farm_details.gd, built by town_fill.gd): tube-well pump room with a
   cement tank and water, scarecrow, two hay stacks, gunny sacks, a charpai and a red
   tractor (vehicle_models.gd tractor), merged into one mesh plus water and tractor.
