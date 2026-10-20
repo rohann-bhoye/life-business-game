@@ -6,6 +6,7 @@ const CheckoutMenu := preload("res://checkout_menu.gd")
 const StaffDialog := preload("res://staff_dialog.gd")
 const CustomerChat := preload("res://customer_chat.gd")
 const FriendChat := preload("res://friend_chat.gd")
+const HowToPlay := preload("res://how_to_play.gd")
 const ShopTablet := preload("res://shop_tablet.gd")
 const NotificationFeed := preload("res://notification_feed.gd")
 const MenuSkin := preload("res://menu_skin.gd")
@@ -15,6 +16,7 @@ var tablet: Node3D
 var staff_dialog: Panel
 var customer_chat: Panel
 var friend_chat: Panel
+var how_to_play: Control
 var employee_role := "cashier"
 const EMPLOYEE_CONTROLS := ["CashierSelectButton", "StockSelectButton", "WorkSwitch", "AutoCollectSwitch", "CollectDeliveryButton", "TalkEmployeeButton"]
 
@@ -178,6 +180,16 @@ func _ready() -> void:
 	friend_chat.set_script(FriendChat)
 	friend_chat.theme = theme
 	add_child(friend_chat)
+	shop.business.khata_news.connect(func(message: String, good: bool): show_feedback(message, not good))
+	how_to_play = HowToPlay.new()
+	add_child(how_to_play)
+	how_to_play.closed.connect(func():
+		if not player._menu_is_open(): Input.mouse_mode = Input.MOUSE_MODE_CAPTURED)
+	# A player's first new game from the menu shows the guide once by itself.
+	var scene := get_tree().current_scene
+	if scene.has_meta("session_save_path") and not HowToPlay.seen() and shop.business.day == 1 and shop.business.items_sold == 0:
+		get_tree().create_timer(1.0).timeout.connect(func():
+			if not player._menu_is_open(): how_to_play.open())
 	notifications = NotificationFeed.new()
 	notifications.name = "NotificationFeed"
 	add_child(notifications)

@@ -45,8 +45,12 @@ func _run() -> void:
 	camera.fov = 30
 	studio.add_child(camera)
 	camera.current = true
-	for entry in [["rack_shelf", false], ["rack_produce", true]]:
-		var model: Dictionary = ops.build_produce_table(builder, "ThumbTable", Vector3.ZERO) if entry[1] else ops.build_stock_rack(builder, "ThumbRack", "snack", Vector3.ZERO)
+	for entry in [["rack_shelf", "shelf"], ["rack_produce", "produce"], ["rack_fridge", "fridge"]]:
+		var model: Dictionary
+		match entry[1]:
+			"shelf": model = ops.build_stock_rack(builder, "ThumbRack", "snack", Vector3.ZERO)
+			"produce": model = ops.build_produce_table(builder, "ThumbTable", Vector3.ZERO)
+			_: model = ops.build_fridge(builder, "ThumbFridge", Vector3.ZERO)
 		var node: Node3D = model.node
 		node.get_node("StockSign").hide()
 		var holder := Node3D.new()

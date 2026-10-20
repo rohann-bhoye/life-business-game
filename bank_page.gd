@@ -13,6 +13,7 @@ var loan_label: Label
 var status_label: Label
 var take_button: Button
 var repay_button: Button
+var khata_label: Label
 
 func setup(business_ref, money_formatter: Callable) -> void:
 	business = business_ref
@@ -72,11 +73,11 @@ func setup(business_ref, money_formatter: Callable) -> void:
 		_show_status("Loan fully repaid." if business.repay_loan() else "Not enough money to repay everything.", business.loan_left() == 0)
 		refresh())
 	offer.add_child(repay_button)
-	var tips := _card(Vector2(20, 262), Vector2(420, 184), "TIP")
-	var tip := _label("A loan helps you buy more stock, racks or a farm expansion early. Keep enough money each morning for the instalment, staff wages and the shop bill.", Vector2(16, 44), 388, 14, KenneyTheme.MUTED, tips)
-	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tip.clip_text = false
-	tip.size = Vector2(388, 120)
+	# Udhaar khata: who owes the shop money, and what came back or was lost.
+	var book := _card(Vector2(20, 262), Vector2(420, 184), "UDHAAR KHATA")
+	khata_label = _label("", Vector2(16, 40), 388, 13, KenneyTheme.TEXT, book)
+	khata_label.size.y = 136
+	khata_label.clip_text = false
 	status_label = _label("", Vector2(20, 440), 420, 13, KenneyTheme.GREEN)
 	business.changed.connect(refresh)
 	refresh()
@@ -126,3 +127,10 @@ func refresh() -> void:
 	take_button.disabled = left > 0
 	repay_button.text = "Repay all now - %s" % _money(business.loan_payoff_amount()) if left > 0 else "Nothing to repay"
 	repay_button.disabled = left <= 0 or business.money < business.loan_payoff_amount()
+	var lines: Array[String] = []
+	for entry in business.khata.slice(0, 4):
+		lines.append("%s - %s  (due day %d)" % [entry.name, _money(int(entry.amount)), int(entry.due)])
+	if business.khata.size() > 4: lines.append("... and %d more" % (business.khata.size() - 4))
+	if lines.is_empty(): lines.append("Nobody owes you money.")
+	lines.append("Owed: %s / %s | Paid back: %s | Lost: %s" % [_money(business.udhaar_outstanding()), _money(business.UDHAAR_LIMIT), _money(business.udhaar_collected), _money(business.udhaar_lost())])
+	khata_label.text = "\n".join(lines)

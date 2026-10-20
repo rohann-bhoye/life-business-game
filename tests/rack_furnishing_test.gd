@@ -33,7 +33,8 @@ func _run() -> void:
 	assert(state.sell_basket(2, 100, 100, "bottle", 3))
 	assert(state.racks.find(3).amount == 8)
 	assert(not state.sell_basket(9, 100, 100, "bottle", 3))
-	assert(state.racks.free_space(3, "soap") == 20)
+	# A bought cold-drink rack is a fridge: drinks only.
+	assert(state.racks.free_space(3, "soap") == 0 and state.racks.find(3).display == "fridge")
 	var money: int = state.money
 	assert(state.place_rack("bottle", Vector2(-1, -4), 2, 3))
 	assert(state.money == money and state.racks.find(3).amount == 8)

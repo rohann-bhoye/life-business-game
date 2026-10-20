@@ -63,6 +63,40 @@ board and a local suggestion form. See Farming section below for controls and li
   the pack buttons. With 1 free rack, shop_operations.gd skips the built-in snack/soap
   racks and rack_furnishing.gd maps only rack 0; bought racks are PurchasedRack nodes.
   Test fixtures (Backend.new()/main.tscn) still start with 3 racks.
+- Farm detailing (farm_details.gd, built by town_fill.gd): tube-well pump room with a
+  cement tank and water, scarecrow, two hay stacks, gunny sacks, a charpai and a red
+  tractor (vehicle_models.gd tractor), merged into one mesh plus water and tractor.
+- Udhaar khata (business_backend.gd): regular town customers sometimes ask for credit
+  at the till (customer.gd wants_udhaar, 18%); checkout_menu.gd shows "Write in khata"
+  / "No udhaar". give_udhaar moves the amount from the till into `khata` (due in 2
+  days); each new day due entries are paid back (70%) or lost after 5 more days
+  (khata_news signal -> HUD). Saved: khata, udhaar_given, udhaar_collected; the money
+  check subtracts (given - collected). Limit Rs2,000. Bank page shows the khata.
+- Cold-drink fridge: display "fridge" (rack_store.gd FRIDGE_PRODUCTS bottle+milk);
+  bought cold-drink/milk racks are fridges (RackStore.display_for), built by
+  shop_operations.gd build_fridge; Wholesale > Furniture card; a stocked fridge makes
+  cold drinks a likelier pick (x2, x4 at 12:00-17:00, customer.gd).
+- Rack rules: racks.strict (games with 1 free rack) -> products need their kind of
+  rack (fridge / produce table / shelf); the free rack is a fridge; wrong-rack E/hint
+  says where it goes (Store.place_hint); Wholesale cards warn "Needs a ...". Older
+  saves keep mixed shelves (only fridges are drinks-only).
+- Difficulty (game_session.gd new_game(path, difficulty)): Aasaan Rs15,000 / Normal
+  Rs10,000 / Mushkil Rs6,000 starting money; patience x1.3/1/0.75; town budgets
+  x1.15/1/0.85. New Game always asks (main menu; ConfirmButton is Normal).
+- Wall shelves show real stock (shop_decor.gd show_stock): items owned on racks, in
+  storage, at the bay and in hand, per product.
+- How to Play (how_to_play.gd, "Ui/HowToPlay" in game, also in the main menu): 10
+  picture pages (assets/ui/howto/*.jpg rendered by tools/how_to_play_pictures.gd),
+  key chips, page dots, Back/Next/Close, arrows/Enter/Esc. Opens from the main menu
+  and pause menu buttons, F1 in the game, and once by itself in a player's first new
+  game from the menu (user://help.cfg remembers). Counts as a menu (player locked,
+  clock paused).
+- Detailing (no downloads): vehicle_models.gd builds one-mesh auto-rickshaw, scooter,
+  hatchback and cycle-rickshaw; traffic.gd uses them (bus unchanged). town_fill.gd
+  parks an auto and a cycle-rickshaw at the West Park and scooters by new houses, and
+  adds two roadside hoardings (Apna Mart, Apna Bank). shop_decor.gd: counter details
+  (khata, pen, calculator, digital scale, phone) as one mesh on the counter, and the
+  wall shelves show real catalog products (baked make_product meshes, batched).
 - PC Wholesale has a Furniture category (pc_store.gd): Shelf rack and Produce table
   cards with pictures (assets/ui/products/rack_*.png from tools/rack_thumbnails.gd)
   and an Order button (order_racks; a shelf gets the first product without a restock

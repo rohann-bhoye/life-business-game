@@ -74,6 +74,8 @@ var coop_forward := Callable()
 ## Talking with the player (customer_chat.gd): they stand still meanwhile. Each
 ## kind of reply works once (chat_done); a friendly one adds queue patience.
 var chatting := false
+## Asks to pay later (udhaar) at the checkout; the player decides (checkout_menu.gd).
+var wants_udhaar := false
 var chat_done := {}
 var chat_patience := 0.0
 
@@ -158,12 +160,18 @@ func _physics_process(delta: float) -> void:
 				state = State.ARRIVING
 				if physical_shop():
 					var town := town_customers()
-					if town and shopper_type.is_empty(): _pick_shopper_type()
+					if town and shopper_type.is_empty():
+						_pick_shopper_type()
+						# Difficulty: richer shoppers on Aasaan, tighter budgets on Mushkil.
+						spending_budget = maxi(50, roundi(spending_budget * shop_area.business.budget_factor() / 10.0) * 10)
 					var choices: Array[String] = []
 					for id in operations.Catalog.IDS:
 						if operations.available_stock(id) > 0: choices.append(id)
 					# Shoppers go for something they can afford when there is a choice.
 					var affordable := choices.filter(func(id): return shop_area.business.product_price(id) <= spending_budget)
+					# A stocked fridge draws people in for a thanda, most of all in the afternoon.
+					if town and "bottle" in affordable and operations.cold_drinks_chilled():
+						for extra in range(3 if shop_area.business.minutes_of_day >= 720 and shop_area.business.minutes_of_day < 1020 else 1): affordable.append("bottle")
 					if town and not affordable.is_empty(): product_id = affordable.pick_random()
 					elif not choices.is_empty(): product_id = choices.pick_random()
 					if is_instance_valid(operations.furnishing): rack_id = operations.furnishing.choose_rack(product_id)
@@ -338,7 +346,7 @@ func physical_shop() -> bool:
 	return is_instance_valid(operations) and operations.enabled
 
 func queue_patience_limit() -> float:
-	return [90.0, 120.0, 60.0][clampi(personality, 0, 2)] + chat_patience
+	return [90.0, 120.0, 60.0][clampi(personality, 0, 2)] * shop_area.business.patience_factor() + chat_patience
 
 func queue_is_impatient() -> bool:
 	return physical_shop() and state == State.QUEUING and queue_wait_seconds >= queue_patience_limit() * 0.75
@@ -409,10 +417,10 @@ func leave_shop() -> void:
 	elif points.is_empty(): points = [exit_point.global_position]
 	_set_route(points)
 
-func complete_checkout() -> void:
+func complete_checkout(udhaar := false) -> void:
 	if not has_product:
 		return
-	_coop_send("complete_checkout", [])
+	_coop_send("complete_checkout", [udhaar])
 	if physical_shop() and (operations.checkout_customer() != self or state != State.PAYING or scanned_count != total_items()):
 		return
 	if not shop_area.business.shop_is_open():
@@ -429,6 +437,8 @@ func complete_checkout() -> void:
 	# Co-op team report: who served this sale (coop_world.gd, host only).
 	if deal_sold and not coop_mirror: get_tree().call_group("coop_team", "record_sale", payment_total(), cashier_active)
 	deal_result = "Receipt: %s | %s%d" % [payment_method, String.chr(8377), payment_total()] if deal_sold else "Customer left without buying."
+	if deal_sold and udhaar and not coop_mirror and shop_area.business.give_udhaar(customer_name.get_slice(" - ", 0), payment_total()):
+		deal_result = "Written in khata: %s owes %s%d." % [customer_name.get_slice(" - ", 0), String.chr(8377), payment_total()]
 	leave_shop()
 	get_tree().current_scene.get_node("Ui").show_feedback(deal_result, not deal_sold)
 
@@ -469,6 +479,10 @@ func prepare_payment(price: int) -> void:
 		return
 	cash_tendered = ceili(payment_total() / 100.0) * 100
 	state = State.PAYING
+	# Regulars sometimes ask for udhaar; only the player at the till can say yes.
+	var regular := shopper_type in ["regular", "family"] or shopper_type.is_empty() and personality == 1
+	wants_udhaar = town_customers() and regular and randf() < 0.18 and shop_area.business.can_give_udhaar(payment_total())
+	if wants_udhaar: say("Bhaiya, udhaar likh do, kal de dunga!", 5.0)
 	bargain_seconds_left = 45.0
 	operations.show_payment(self)
 

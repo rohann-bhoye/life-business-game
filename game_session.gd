@@ -8,7 +8,7 @@ static func save_summary(path: String) -> Dictionary:
 	var valid: bool = state.save_status in ["Save: Loaded", "Save: Backup recovered", "Save: Recovery loaded"]
 	return {"valid": valid, "state": state}
 
-static func new_game(path: String) -> String:
+static func new_game(path: String, difficulty := 1) -> String:
 	# Archive every prior save/recovery file before replacing the active slot.
 	var archive := path.get_base_dir().path_join("save_history")
 	for suffix in ["", ".bak", ".recovered", ".recovered.bak"]:
@@ -19,8 +19,9 @@ static func new_game(path: String) -> String:
 	var state = Backend.new()
 	state.save_path = path
 	# A new shop starts with beginner money (the bank loan helps if it runs short).
-	state.starting_money = Backend.BEGINNER_MONEY
-	state.money = Backend.BEGINNER_MONEY
+	state.difficulty = clampi(difficulty, 0, 2)
+	state.starting_money = Backend.DIFFICULTY_MONEY[state.difficulty]
+	state.money = state.starting_money
 	# One free rack (cold drinks); more racks are bought on the shop PC.
 	state.start_with_one_rack()
 	return "" if state.save_progress() else "Could not create a new save."

@@ -64,6 +64,8 @@ func _sync() -> void:
 			var model: Dictionary
 			if record.get("display", "shelf") == "produce":
 				model = operations.build_produce_table(world.get_node("Neighbourhood"), "ProduceTable%d" % record.id, Store.point(record))
+			elif record.get("display", "shelf") == "fridge":
+				model = operations.build_fridge(world.get_node("Neighbourhood"), "Fridge%d" % record.id, Store.point(record))
 			else:
 				model = operations.build_stock_rack(world.get_node("Neighbourhood"), "PurchasedRack%d" % record.id, record.product, Store.point(record))
 				model.price = world.get_node("ShopPresentation").decorate_rack(model.node, record.product)
@@ -104,13 +106,25 @@ func near_rack(sku: String) -> int:
 	var distance := 1.0
 	var selected := -1
 	for record in business.racks.records:
-		if not Store.supports(record, sku): continue
+		if not Store.supports(record, sku, business.racks.strict): continue
 		var offset: Vector3 = player.global_position - Store.approach(record)
 		offset.y = 0
 		if offset.length() <= distance:
 			distance = offset.length()
 			selected = record.id
 	return selected
+
+## The rack whose front the player stands at (any kind), or {}.
+func near_any_rack() -> Dictionary:
+	var best: Dictionary = {}
+	var distance := 1.0
+	for record in business.racks.records:
+		var offset: Vector3 = player.global_position - Store.approach(record)
+		offset.y = 0
+		if offset.length() <= distance:
+			distance = offset.length()
+			best = record
+	return best
 
 ## The rack the player stands at that holds some `sku` (for Q: take one back).
 func near_stocked_rack(sku: String) -> int:
@@ -177,7 +191,8 @@ func _update_slot_label(node: Node3D, level: int, slot: Dictionary, record: Dict
 	if label == null:
 		label = world.get_node("ShopPresentation")._label(node, name, "", Vector3(0.41, 0.2 + level * 0.55, 0), 24, 0.002, Color(0.08, 0.13, 0.15))
 		label.rotation.y = PI / 2
-	label.text = "Empty row | any product" if slot.product == "" or int(slot.count) == 0 else "%s | %s%d | %d / 10" % [Catalog.NAMES[slot.product], String.chr(8377), business.product_price(slot.product), slot.count]
+	var fits := "cold drinks & milk" if record.get("display", "shelf") == "fridge" else ("packed goods" if business.racks.strict else "any product")
+	label.text = "Empty row | %s" % fits if slot.product == "" or int(slot.count) == 0 else "%s | %s%d | %d / 10" % [Catalog.NAMES[slot.product], String.chr(8377), business.product_price(slot.product), slot.count]
 	label.visible = level > 0 or int(slot.count) == 0 or slot.product != business.racks.find(_model_id(node)).product
 	if level == 0:
 		node.get_node("ShelfPrice").visible = not label.visible
@@ -272,7 +287,7 @@ func move_key() -> bool:
 func target_name() -> String:
 	if not fixture.is_empty(): return FIXTURE_NAMES[fixture]
 	if selected_id < 0: return "New rack"
-	return "Produce table" if business.racks.find(selected_id).get("display", "shelf") == "produce" else "Rack"
+	return {"produce": "Produce table", "fridge": "Fridge"}.get(business.racks.find(selected_id).get("display", "shelf"), "Rack")
 
 ## Q while moving packs an empty bought rack back into its box.
 func can_pack() -> bool:
@@ -298,7 +313,7 @@ func _begin(sku: String, id: int, orientation: int, fixture_name := "") -> bool:
 	for child in preview.get_children():
 		preview.remove_child(child)
 		child.queue_free()
-	var produce: bool = business.racks.find(id).get("display", "shelf") == "produce" if id >= 0 else sku == "tomato"
+	var produce: bool = business.racks.find(id).get("display", "shelf") == "produce" if id >= 0 else Store.display_for(sku) == "produce"
 	fixture = fixture_name
 	candidate.clear()
 	if fixture == "counter":

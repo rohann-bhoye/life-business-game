@@ -66,7 +66,7 @@ func _menu_is_open() -> bool:
 	if is_instance_valid(pause) and pause.is_open(): return true
 	var report := get_tree().current_scene.get_node_or_null("Ui/DayReportScreen")
 	if is_instance_valid(report) and report.visible: return true
-	for talk in ["Ui/StaffDialog", "Ui/CustomerChat", "Ui/FriendChat"]:
+	for talk in ["Ui/StaffDialog", "Ui/CustomerChat", "Ui/FriendChat", "Ui/HowToPlay"]:
 		var dialog := get_tree().current_scene.get_node_or_null(talk)
 		if is_instance_valid(dialog) and dialog.visible: return true
 	return shop_menu.visible or house_menu.visible or (is_instance_valid(bargain_menu) and bargain_menu.visible) or (is_instance_valid(supplier_menu) and supplier_menu.visible) or (is_instance_valid(checkout_menu) and checkout_menu.visible)
@@ -104,6 +104,12 @@ func _unhandled_input(event):
 		return
 
 	# Tab takes out the tablet anywhere (the open tablet puts itself away on Tab).
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F1:
+		var help := get_tree().current_scene.get_node_or_null("Ui/HowToPlay")
+		if help != null and not _menu_is_open():
+			help.open()
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_TAB:
 		open_tablet()
 		get_viewport().set_input_as_handled()

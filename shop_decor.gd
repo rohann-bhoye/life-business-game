@@ -14,6 +14,7 @@ const WALL_HEIGHTS := {"bottle": 0.27, "snack": 0.23, "oil": 0.27, "milk": 0.21,
 ## Flat packs are stacked.
 const WALL_STACKS := {"soap": 2, "chocolate": 3}
 const ProductAssets = preload("res://product_assets.gd")
+const HouseParts = preload("res://indian_house.gd")
 const ROOM_MIN_X := -5.94
 const ROOM_MAX_X := -0.06
 const BACK_Z := -7.44
@@ -59,6 +60,7 @@ func build(counter: Node3D) -> void:
 	_sign_panel("PaymentBoard", "CASH  |  CARD  |  UPI\nAll payments accepted", Vector3(ROOM_MAX_X - 0.02, 1.75, -0.1), -PI / 2, Vector2(1.1, 0.5), Color(0.1, 0.42, 0.36))
 	_sign_panel("WelcomeBoard", "APNA MART\nDaily needs - Fresh - Sasta", Vector3(-3.0, 3.48, BACK_Z + 0.02), 0.0, Vector2(2.6, 0.5), Color(0.12, 0.3, 0.26))
 	_counter_sweets(counter)
+	_counter_details(counter)
 	_indian_touches()
 	# Everything built against the back wall joins back_wall.
 	for child in get_children():
@@ -267,6 +269,9 @@ func _wall_shelf(center: Vector3, size: Vector3, board: Material, bracket: Mater
 				placements[id].append(Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * factor), spot + Vector3(0, layer * WALL_HEIGHTS[id], 0)))
 
 var baked := {}
+## Each product's wall batches (right wall, back wall): show_stock shows as many items
+## as the shop owns.
+var wall_batches := {}
 
 ## The product exactly as on the racks (shop_operations.gd make_product: model,
 ## label band, cap), merged into one mesh so a whole shelf is one batch.
@@ -298,6 +303,46 @@ func _wall_batch(parent: Node3D, node_name: String, id: String, transforms: Arra
 	node.name = node_name
 	node.multimesh = multimesh
 	parent.add_child(node, true)
+	if not wall_batches.has(id): wall_batches[id] = []
+	wall_batches[id].append(node)
+
+## The wall shelves show the shop's real stock: `counts` is product -> units owned
+## (on the racks and in the warehouse); the wall fills up to its space and empties
+## as things sell.
+func show_stock(counts: Dictionary) -> void:
+	for id in wall_batches:
+		var remaining := int(counts.get(id, 0))
+		for node in wall_batches[id]:
+			var room: int = node.multimesh.instance_count
+			node.multimesh.visible_instance_count = clampi(remaining, 0, room)
+			remaining -= room
+
+## The cashier's side of the counter: khata notebook and pen, calculator, a digital
+## weighing scale and a phone, merged into one mesh that moves with the counter.
+func _counter_details(counter: Node3D) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	var top := 0.58
+	HouseParts.box(st, Vector3(-0.6, top + 0.016, -0.27), Vector3(0.2, 0.03, 0.27), Color(0.62, 0.1, 0.12))
+	HouseParts.box(st, Vector3(-0.6, top + 0.016, -0.27), Vector3(0.19, 0.022, 0.275), Color(0.96, 0.95, 0.9))
+	HouseParts.box(st, Vector3(-0.46, top + 0.006, -0.25), Vector3(0.012, 0.012, 0.15), Color(0.1, 0.2, 0.6))
+	HouseParts.box(st, Vector3(-0.28, top + 0.012, -0.29), Vector3(0.11, 0.022, 0.16), Color(0.15, 0.16, 0.18))
+	HouseParts.box(st, Vector3(-0.28, top + 0.025, -0.325), Vector3(0.08, 0.006, 0.04), Color(0.55, 0.65, 0.5))
+	for row in range(3):
+		for column in range(3):
+			HouseParts.box(st, Vector3(-0.31 + column * 0.03, top + 0.025, -0.285 + row * 0.03), Vector3(0.02, 0.006, 0.02), Color(0.75, 0.77, 0.8))
+	HouseParts.box(st, Vector3(0.05, top + 0.02, -0.26), Vector3(0.27, 0.04, 0.25), Color(0.85, 0.86, 0.88))
+	HouseParts.box(st, Vector3(0.05, top + 0.045, -0.24), Vector3(0.22, 0.01, 0.18), Color(0.7, 0.72, 0.75))
+	HouseParts.box(st, Vector3(0.05, top + 0.035, -0.375), Vector3(0.14, 0.03, 0.02), Color(0.08, 0.08, 0.09))
+	HouseParts.box(st, Vector3(0.05, top + 0.035, -0.387), Vector3(0.1, 0.018, 0.005), Color(0.3, 0.85, 0.45))
+	HouseParts.box(st, Vector3(0.3, top + 0.006, -0.3), Vector3(0.08, 0.012, 0.16), Color(0.06, 0.06, 0.07))
+	HouseParts.box(st, Vector3(0.3, top + 0.013, -0.3), Vector3(0.068, 0.002, 0.14), Color(0.2, 0.35, 0.55))
+	var details := MeshInstance3D.new()
+	details.name = "CounterDetails"
+	details.mesh = st.commit()
+	details.material_override = HouseParts._material()
+	counter.add_child(details)
 
 func _paint_band() -> void:
 	var paint := _material(Color(0.93, 0.74, 0.38))

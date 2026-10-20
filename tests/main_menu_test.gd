@@ -84,6 +84,9 @@ func _run() -> void:
 	settings._apply()
 	assert(not settings.visible and menu.content.visible and FileAccess.file_exists(settings_path))
 	menu.new_button.pressed.emit()
+	# New Game always asks for the difficulty first.
+	assert(menu.confirmation.visible and menu.confirmation.has_node("EasyButton") and menu.confirmation.has_node("HardButton"))
+	menu.confirmation.get_node("ConfirmButton").pressed.emit()
 	assert(root.get_node_or_null("LoadingScreen") != null and menu.launching)
 	await scene_changed
 	await process_frame

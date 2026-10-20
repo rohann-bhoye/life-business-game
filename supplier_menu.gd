@@ -479,7 +479,7 @@ func _refresh_racks() -> void:
 	var record: Dictionary = business.racks.find(rack_selector.get_selected_id())
 	var quantity := int(rack_quantity.value)
 	get_node("FurnitureQuoteLabel").text = "%s%s | %d racks" % [String.chr(8377), shop._format_money(quantity * business.RackStore.COST), business.racks.records.size()]
-	get_node("BuyRackButton").text = "Order %d %s%s" % [quantity, "produce table" if Catalog.IDS[rack_product.selected] == "tomato" else "shelf", "" if quantity == 1 else "s"]
+	get_node("BuyRackButton").text = "Order %d %s%s" % [quantity, "produce table" if Catalog.IDS[rack_product.selected] == "tomato" else ("fridge" if Catalog.IDS[rack_product.selected] == "bottle" else "shelf"), "" if quantity == 1 else "s"]
 	get_node("RackDeliveryLabel").text = "In transit: %d | Packages outside: %d" % [business.logistics.rack_incoming.size(), business.logistics.rack_delivered.size()]
 	get_node("RackInfoLabel").text = "%d items | %s" % [record.amount, "Restocking destination" if record.get("restock", false) else "Display rack"]
 	get_node("BuyRackButton").disabled = not business.can_order_racks(Catalog.IDS[rack_product.selected], quantity)

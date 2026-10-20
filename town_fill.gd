@@ -14,6 +14,7 @@ const BlockPath := preload("res://block_path.gd")
 const Kenney := preload("res://kenney_assets.gd")
 const KAYKIT := "res://assets/restaurant/kaykit/%s.gltf"
 const KAYKIT_FURNITURE := "res://assets/furniture/kaykit/%s.gltf"
+const Models := preload("res://vehicle_models.gd")
 const SAFFRON := Color(1.0, 0.55, 0.1)
 const GREEN := Color(0.1, 0.5, 0.25)
 ## [x, z, seed]: every new house faces +z (towards the lanes and the road).
@@ -46,6 +47,14 @@ func build(neighbourhood: Node3D) -> void:
 	for lane in LANES: BlockPath.lay(self, lane[0], lane[1], lane[2], 3)
 	for x in [-14.0, 1.5, 16.0, 26.0]: town._streetlight(Vector3(x, 0.1, -21.3), PI, false)
 	_park()
+	_parked_vehicles()
+	_hoarding("HoardingWest", Vector3(-29.6, 0.1, 12.7), "APNA MART", "Sabse sasta, sabse taaza!", Color(0.05, 0.4, 0.36))
+	_hoarding("HoardingEast", Vector3(29.3, 0.1, 12.7), "APNA BANK", "Loan lo, dukaan badhao!", Color(0.11, 0.3, 0.75))
+	# Tube-well, scarecrow, hay, sacks, charpai and a tractor round the farm field.
+	var farm := Node3D.new()
+	farm.set_script(preload("res://farm_details.gd"))
+	add_child(farm)
+	farm.build(town)
 
 ## In front of each new house: a potted plant by the door, and on every other house
 ## two plastic chairs and a small table (KayKit models).
@@ -81,6 +90,44 @@ func _park() -> void:
 	for bench in [Vector3(-22.0, 0.1, -25.0), Vector3(-26.0, 0.1, -25.0)]: _bench(park, bench)
 	for tree in [Vector3(-20.0, 0.1, -28.5), Vector3(-29.0, 0.1, -27.5), Vector3(-29.5, 0.1, -22.0), Vector3(-19.0, 0.1, -23.5)]: town._tree(tree)
 	town._streetlight(Vector3(-25.0, 0.1, -21.5), 0.0, false)
+
+## Vehicles parked around the new areas, each one mesh with a solid body.
+func _parked_vehicles() -> void:
+	_vehicle("ParkedAuto", Models.auto_rickshaw(), Vector3(-17.4, 0.1, -15.0), PI / 2, Vector3(2.4, 1.85, 1.4))
+	_vehicle("ParkedCycleRickshaw", Models.cycle_rickshaw(), Vector3(-26.0, 0.1, -15.4), -PI / 2, Vector3(2.2, 1.7, 1.1))
+	_vehicle("ParkedScooterEast", Models.scooter(Color(0.15, 0.35, 0.8)), Vector3(29.4, 0.1, -14.8), PI / 2, Vector3(1.6, 1.4, 0.7))
+	_vehicle("ParkedScooterBack", Models.scooter(Color(0.9, 0.9, 0.9)), Vector3(-4.1, 0.1, -23.2), -PI / 2, Vector3(1.6, 1.4, 0.7))
+
+## `footprint` is the solid box in world axes (x, height, z) around `at`.
+func _vehicle(node_name: String, mesh: Mesh, at: Vector3, yaw: float, footprint: Vector3) -> void:
+	var model := MeshInstance3D.new()
+	model.name = node_name
+	model.mesh = mesh
+	model.position = at
+	model.rotation.y = yaw
+	add_child(model)
+	town._collider(node_name + "Body", self, footprint, at + Vector3(0, footprint.y / 2, 0))
+
+## A roadside hoarding on two legs facing the road, with a headline and a tag line.
+func _hoarding(node_name: String, at: Vector3, headline: String, tagline: String, colour: Color) -> void:
+	var board := Node3D.new()
+	board.name = node_name
+	board.position = at
+	board.rotation.y = PI
+	add_child(board)
+	for x in [-1.25, 1.25]: town._box("Leg", board, Vector3(0.14, 3.4, 0.14), Vector3(x, 1.7, 0.1), Color(0.3, 0.32, 0.34), true)
+	town._box("Frame", board, Vector3(3.2, 1.6, 0.1), Vector3(0, 3.2, 0), Color(0.2, 0.22, 0.24))
+	town._box("Poster", board, Vector3(3.0, 1.4, 0.04), Vector3(0, 3.2, 0.06), colour)
+	town._box("Stripe", board, Vector3(3.0, 0.12, 0.05), Vector3(0, 2.62, 0.07), Color(1.0, 0.75, 0.15))
+	town._box("Walkway", board, Vector3(3.0, 0.05, 0.4), Vector3(0, 2.36, 0.2), Color(0.3, 0.32, 0.34))
+	for line in [[headline, 64, 3.42], [tagline, 28, 2.95]]:
+		var label := Label3D.new()
+		label.text = line[0]
+		label.font_size = line[1]
+		label.pixel_size = 0.006
+		label.outline_size = 0
+		label.position = Vector3(0, line[2], 0.09)
+		board.add_child(label)
 
 ## A market stall: counter, four poles and a striped canopy with a sign.
 func _stall(parent: Node3D, node_name: String, at: Vector3, sign: String, colour: Color) -> void:

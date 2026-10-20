@@ -16,6 +16,7 @@ var status_label: Label
 var content: VBoxContainer
 var settings_menu: Panel
 var coop_menu: Panel
+var how_to_play: Control
 var confirmation: Panel
 var footer: Label
 var version_label: Label
@@ -116,6 +117,7 @@ func _ready() -> void:
 	new_button.theme_type_variation = "InfoButton"
 	var coop := _button(content, "Co-op", _open_coop)
 	coop.name = "CoopButton"
+	_button(content, "How to Play", func(): how_to_play.open()).name = "HowToPlayButton"
 	_button(content, "Settings", _open_settings).name = "SettingsButton"
 	var quit := _button(content, "Quit", func(): get_tree().quit())
 	quit.name = "QuitButton"
@@ -129,6 +131,8 @@ func _ready() -> void:
 	version_label = _label(self, VERSION, 13)
 	version_label.name = "Version"
 	version_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	how_to_play = preload("res://how_to_play.gd").new()
+	add_child(how_to_play)
 	settings_menu = SettingsMenu.new()
 	settings_menu.name = "SettingsMenu"
 	add_child(settings_menu)
@@ -173,18 +177,25 @@ func _build_confirmation() -> void:
 	confirmation.name = "NewGameConfirmation"
 	add_child(confirmation)
 	confirmation.hide()
-	var title := _label(confirmation, "Start a new game?", 24)
+	var title := _label(confirmation, "New game: choose difficulty", 24)
+	title.name = "Title"
 	title.position = Vector2(20, 20)
-	var message := _label(confirmation, "Start with %s50,000.\nYour current save will be archived,\nnot deleted." % String.chr(8377), 16)
+	var message := _label(confirmation, "", 15)
 	message.name = "Message"
-	message.position = Vector2(20, 64)
+	message.position = Vector2(20, 60)
 	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	message.clip_text = true
-	var start := _button(confirmation, "Start new game", _new_game)
-	start.name = "ConfirmButton"
-	start.position = Vector2(20, 146)
+	# Normal keeps the old ConfirmButton name.
+	var rupee := String.chr(8377)
+	var choices := [["EasyButton", "Aasaan - %s15,000" % rupee, 0, "PrimaryButton"], ["ConfirmButton", "Normal - %s10,000" % rupee, 1, "InfoButton"], ["HardButton", "Mushkil - %s6,000" % rupee, 2, "DangerButton"]]
+	for index in range(choices.size()):
+		var choice: Array = choices[index]
+		var button := _button(confirmation, choice[1], _new_game.bind(choice[2]))
+		button.name = choice[0]
+		button.theme_type_variation = choice[3]
+		button.position = Vector2(20, 132 + index * 52)
 	var cancel := _button(confirmation, "Cancel", _cancel_new)
-	cancel.position = Vector2(20, 202)
+	cancel.position = Vector2(20, 296)
 
 ## "What's new" card on the right, like a game launcher's news feed.
 func _build_news() -> Panel:
@@ -235,7 +246,7 @@ func _layout() -> void:
 	version_label.size = Vector2(260, 22)
 	version_label.position = Vector2(viewport_size.x - 284, viewport_size.y - 32)
 	version_label.visible = viewport_size.x >= 700
-	confirmation.size = Vector2(minf(420, viewport_size.x - 32), 262)
+	confirmation.size = Vector2(minf(460, viewport_size.x - 32), 360)
 	confirmation.position = (viewport_size - confirmation.size) / 2
 	for child in confirmation.get_children():
 		child.size.x = confirmation.size.x - 40
@@ -315,20 +326,21 @@ func _continue() -> void:
 
 func _request_new() -> void:
 	if launching: return
-	if FileAccess.file_exists(save_path) or FileAccess.file_exists(save_path + ".bak") or FileAccess.file_exists(save_path + ".recovered"):
-		content.hide()
-		confirmation.show()
-		_layout()
-	else: _new_game()
+	# Always choose a difficulty; an old save in this slot is archived, not deleted.
+	var has_save := FileAccess.file_exists(save_path) or FileAccess.file_exists(save_path + ".bak") or FileAccess.file_exists(save_path + ".recovered")
+	confirmation.get_node("Message").text = "Aasaan: patient customers, bigger budgets. Mushkil: impatient customers, tight budgets." + ("\nYour current save here is archived, not deleted." if has_save else "\nYou start with one free cold-drink fridge.")
+	content.hide()
+	confirmation.show()
+	_layout()
 
-func _new_game() -> void:
+func _new_game(difficulty := 1) -> void:
 	if launching: return
-	var error := Session.new_game(save_path)
+	var error := Session.new_game(save_path, difficulty)
 	if not error.is_empty():
 		_cancel_new()
 		status_label.text = error
 		return
-	_start_game("New shop  |  Slot %d  |  Day 1  |  %s%s" % [slot, String.chr(8377), _money(Session.Backend.BEGINNER_MONEY)], "Welcome to your new shop! Follow the First Day guide to get started.")
+	_start_game("New shop  |  Slot %d  |  Day 1  |  %s%s  |  %s" % [slot, String.chr(8377), _money(Session.Backend.DIFFICULTY_MONEY[difficulty]), Session.Backend.DIFFICULTY_NAMES[difficulty]], "Welcome to your new shop! Follow the First Day guide to get started.")
 
 static func _money(value: int) -> String:
 	var digits := str(absi(value))

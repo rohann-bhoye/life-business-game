@@ -51,6 +51,7 @@ func _ready() -> void:
 			status.text = "Code copied. Send it to your friends!"
 			_layout())
 		copy.name = "CopyCoopCode"
+	_button("How to Play", func(): ui.get_node("HowToPlay").open()).name = "HowToPlayButton"
 	_button("Settings", _settings).name = "SettingsButton"
 	_button("Save & Main Menu", _return_menu, "InfoButton").name = "ReturnButton"
 	status = Label.new()
@@ -130,6 +131,9 @@ func _return_menu() -> void:
 		_layout()
 
 func _input(event: InputEvent) -> void:
+	# The guide on top closes first.
+	var help := ui.get_node_or_null("HowToPlay")
+	if help != null and help.visible: return
 	if visible and event.is_action_pressed("ui_cancel"):
 		close_menu()
 		get_viewport().set_input_as_handled()

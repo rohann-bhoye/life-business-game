@@ -8,6 +8,7 @@ extends Node3D
 # goes over a crest and down a valley (horizon.gd): vehicles follow it, tilting on
 # the slope, and loop round far below the horizon. Pure scenery: no economy.
 const Horizon := preload("res://horizon.gd")
+const Models := preload("res://vehicle_models.gd")
 const ROAD_END := 118.0
 const EAST_LANE := 5.6
 const WEST_LANE := 8.4
@@ -57,22 +58,17 @@ func _vehicle(index: int, kind: String) -> Node3D:
 	var size := Vector3.ZERO
 	match kind:
 		"auto":
-			town._box("Body", vehicle, Vector3(1.3, 0.75, 2.4), Vector3(0, 0.65, 0), Color(0.95, 0.78, 0.1))
-			town._box("Lower", vehicle, Vector3(1.32, 0.25, 2.42), Vector3(0, 0.38, 0), Color(0.1, 0.5, 0.25))
-			town._box("Canopy", vehicle, Vector3(1.35, 0.12, 1.9), Vector3(0, 1.55, 0.15), Color(0.08, 0.08, 0.09))
-			for z in [-0.8, 1.1]: town._box("Pillar%s" % z, vehicle, Vector3(1.25, 0.6, 0.06), Vector3(0, 1.2, z), Color(0.08, 0.08, 0.09))
-			_person(vehicle, Color(0.85, 0.85, 0.8), Vector3(0, 0.3, -0.45))
-			size = Vector3(1.4, 1.6, 2.5)
+			_model(vehicle, Models.auto_rickshaw() if index % 2 == 0 else Models.auto_rickshaw(Color(0.98, 0.8, 0.12), Color(0.08, 0.08, 0.09)))
+			_person(vehicle, Color(0.85, 0.85, 0.8), Vector3(0, 0.55, -0.3))
+			size = Vector3(1.4, 1.85, 2.4)
 		"scooter":
 			var colour: Color = [Color(0.8, 0.15, 0.15), Color(0.15, 0.35, 0.8), Color(0.9, 0.9, 0.9)][index % 3]
-			town._box("Body", vehicle, Vector3(0.35, 0.45, 1.3), Vector3(0, 0.5, 0), colour)
-			town._box("Handle", vehicle, Vector3(0.6, 0.06, 0.06), Vector3(0, 1.05, -0.55), Color(0.2, 0.2, 0.2))
-			_person(vehicle, [Color(0.9, 0.4, 0.5), Color(0.3, 0.6, 0.4), Color(0.95, 0.7, 0.2)][index % 3], Vector3(0, 0.45, 0.15))
+			_model(vehicle, Models.scooter(colour))
+			_person(vehicle, [Color(0.9, 0.4, 0.5), Color(0.3, 0.6, 0.4), Color(0.95, 0.7, 0.2)][index % 3], Vector3(0, 0.68, 0.22))
 			size = Vector3(0.7, 1.6, 1.5)
 		"car":
-			town._box("Body", vehicle, Vector3(1.7, 0.7, 3.8), Vector3(0, 0.6, 0), Color(0.85, 0.85, 0.88))
-			town._box("Cabin", vehicle, Vector3(1.5, 0.55, 2.0), Vector3(0, 1.22, 0.2), Color(0.25, 0.35, 0.45))
-			size = Vector3(1.8, 1.6, 3.9)
+			_model(vehicle, Models.car(Color(0.85, 0.85, 0.88)))
+			size = Vector3(1.8, 1.6, 3.7)
 		"bus":
 			town._box("Body", vehicle, Vector3(2.4, 2.4, 9.0), Vector3(0, 1.55, 0), Color(0.15, 0.45, 0.75))
 			town._box("Stripe", vehicle, Vector3(2.42, 0.3, 9.02), Vector3(0, 1.0, 0), Color(0.95, 0.75, 0.15))
@@ -87,11 +83,14 @@ func _vehicle(index: int, kind: String) -> Node3D:
 			sign.modulate = Color(1, 0.85, 0.3)
 			vehicle.add_child(sign)
 			size = Vector3(2.5, 2.8, 9.1)
-	for x in ([-0.45, 0.45] if kind != "scooter" else [0.0]):
-		var lamp: MeshInstance3D = town._box("Headlight%s" % x, vehicle, Vector3(0.22, 0.14, 0.04), Vector3(x * (2.0 if kind == "bus" else 1.0), 0.75 if kind != "bus" else 0.7, -size.z / 2.0 - 0.01), Color(1, 0.97, 0.85))
+	# Head lamps that glow at night, where each model has its lights.
+	var lamps: Array = {"auto": [Vector3(0, 0.92, -1.14)], "scooter": [Vector3(0, 1.1, -0.68)], "car": [Vector3(-0.6, 0.66, -1.79), Vector3(0.6, 0.66, -1.79)]}.get(kind, [Vector3(-0.9, 0.7, -size.z / 2.0 - 0.01), Vector3(0.9, 0.7, -size.z / 2.0 - 0.01)])
+	for point in lamps:
+		var lamp: MeshInstance3D = town._box("Headlight%s" % point.x, vehicle, Vector3(0.2, 0.12, 0.03), point, Color(1, 0.97, 0.85))
 		lamp.material_override = headlight_material
-	for wheel in [-size.z * 0.32, size.z * 0.32]:
-		town._box("Wheel%s" % wheel, vehicle, Vector3(size.x + 0.04 if kind != "scooter" else 0.12, 0.42, 0.42), Vector3(0, 0.22, wheel), Color(0.05, 0.05, 0.05))
+	if kind == "bus":
+		for wheel in [-size.z * 0.32, size.z * 0.32]:
+			town._box("Wheel%s" % wheel, vehicle, Vector3(size.x + 0.04, 0.42, 0.42), Vector3(0, 0.22, wheel), Color(0.05, 0.05, 0.05))
 	# Moving solid body so the player cannot walk through vehicles.
 	var body := AnimatableBody3D.new()
 	body.name = "Collider"
@@ -106,6 +105,12 @@ func _vehicle(index: int, kind: String) -> Node3D:
 	vehicle.add_child(body)
 	vehicle.set_meta("length", size.z)
 	return vehicle
+
+func _model(vehicle: Node3D, mesh: Mesh) -> void:
+	var model := MeshInstance3D.new()
+	model.name = "Model"
+	model.mesh = mesh
+	vehicle.add_child(model)
 
 func _person(vehicle: Node3D, shirt: Color, offset: Vector3) -> void:
 	# Seated low-poly rider (an animated character would play its walk cycle while moving).

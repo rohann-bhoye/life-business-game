@@ -8,6 +8,8 @@ var payment_label: Label
 var scan_button: Button
 var pay_button: Button
 var payment_buttons := {}
+var khata_button: Button
+var refuse_button: Button
 var wrong_payment_seconds := 0.0
 @onready var ui = get_parent()
 @onready var operations = get_tree().current_scene.get_node("ShopOperations")
@@ -31,6 +33,9 @@ func _ready() -> void:
 		var button := _button(method + "Button", _choose_payment.bind(method))
 		button.text = method
 		payment_buttons[method] = button
+	khata_button = _button("KhataButton", _give_udhaar)
+	refuse_button = _button("RefuseUdhaarButton", _refuse_udhaar)
+	refuse_button.text = "No udhaar"
 	_button("CloseButton", close_menu).text = "Close"
 	get_viewport().size_changed.connect(_layout)
 	_layout()
@@ -55,6 +60,8 @@ func _layout() -> void:
 	ui._place(pay_button, 16, 300, width - 32, 32)
 	var choice_width := (width - 44) / 3.0
 	for index in range(3): ui._place(payment_buttons[["Cash", "Card", "UPI"][index]], 16 + index * (choice_width + 6), 344, choice_width, 36)
+	ui._place(khata_button, 16, 300, (width - 38) * 0.6, 34)
+	ui._place(refuse_button, 22 + (width - 38) * 0.6, 300, (width - 38) * 0.4, 34)
 
 func open_menu() -> void:
 	ui.shop_menu.hide()
@@ -80,6 +87,11 @@ func _refresh() -> void:
 	scan_button.visible = not paying
 	# Runs every frame: flipping disabled off and on would cancel a click mid-press.
 	for button in payment_buttons.values(): button.disabled = not paying
+	var asking: bool = paying and customer.wants_udhaar
+	khata_button.visible = asking
+	refuse_button.visible = asking
+	pay_button.visible = not asking
+	if asking: khata_button.text = "Write in khata - %s%d" % [String.chr(8377), customer.payment_total()]
 	if not is_instance_valid(customer) or customer != operations.checkout_customer():
 		customer_label.text = "Waiting for customer"
 		items_label.text = "Items: 0"
@@ -98,6 +110,7 @@ func _refresh() -> void:
 		if customer.payment_method == "Cash":
 			payment_label.text += "\nReceived: %s%d | Change: %s%d" % [String.chr(8377), customer.cash_tendered, String.chr(8377), customer.change_due()]
 		pay_button.text = "Choose the matching payment below"
+		if customer.wants_udhaar: payment_label.text = "%s asks for udhaar: pay later, in %d days.\nOr say no and choose %s below." % [customer.customer_name.get_slice(" - ", 0), customer.shop_area.business.UDHAAR_DAYS, customer.payment_method]
 		if wrong_payment_seconds > 0.0:
 			payment_label.text += "\nWrong method. Select %s." % customer.payment_method
 			payment_label.modulate = Color(1.0, 0.55, 0.5)
@@ -105,6 +118,18 @@ func _refresh() -> void:
 	else:
 		payment_label.modulate = Color.WHITE
 		payment_label.text = "Customer approaching" if customer.state in [customer.State.QUEUING, customer.State.BUYING] else "Customer wants a discount"
+
+func _give_udhaar() -> void:
+	if not visible or not is_instance_valid(customer) or customer.state != customer.State.PAYING or not customer.wants_udhaar: return
+	var visitor = customer
+	close_menu()
+	visitor.complete_checkout(true)
+
+func _refuse_udhaar() -> void:
+	if not is_instance_valid(customer) or not customer.wants_udhaar: return
+	customer.wants_udhaar = false
+	customer.say("Theek hai bhaiya, abhi de deta hoon.", 3.0)
+	_refresh()
 
 func _scan() -> void:
 	if visible: close_menu()

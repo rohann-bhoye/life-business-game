@@ -14,10 +14,13 @@ const CATEGORIES := [
 	["Groceries", ["snack", "oil", "milk", "bread", "chocolate", "honey"]],
 	["Fresh produce", ["tomato", "carrot", "cabbage", "corn", "apple"]],
 	["Household", ["bottle", "soap"]],
-	["Furniture", ["rack_shelf", "rack_produce"]],
+	["Furniture", ["rack_shelf", "rack_produce", "rack_fridge"]],
 ]
 ## Furniture cards: [id, name, what it holds].
-const FURNITURE := [["rack_shelf", "Shelf rack", "3 rows, any product"], ["rack_produce", "Produce table", "12 veg baskets"]]
+const FURNITURE := [["rack_shelf", "Shelf rack", "3 rows, any product"], ["rack_produce", "Produce table", "12 veg baskets"], ["rack_fridge", "Cold-drink fridge", "Drinks + milk, sells more"]]
+## The rack product each furniture card orders (a shelf takes the first product
+## without its own restock rack; see _shelf_product).
+const FURNITURE_PRODUCT := {"rack_produce": "tomato", "rack_fridge": "bottle"}
 const SIZE := Vector2(912, 468)
 
 var business
@@ -230,11 +233,12 @@ func select_category(index: int) -> void:
 func _shelf_product() -> String:
 	for id in Catalog.IDS:
 		if id == "tomato": continue
+		if business.RackStore.display_for(id) != "shelf": continue
 		if not business.racks.records.any(func(record): return record.product == id and record.get("restock", false)): return id
-	return "bottle"
+	return "snack"
 
 func order_furniture(kind: String) -> bool:
-	var success: bool = business.order_racks("tomato" if kind == "rack_produce" else _shelf_product(), 1)
+	var success: bool = business.order_racks(FURNITURE_PRODUCT.get(kind, _shelf_product()), 1)
 	status_label.text = "Rack ordered: the furniture truck brings it to your warehouse. Unpack it there with E." if success else "Cannot order: check money and the rack limit (%d)." % business.rack_limit()
 	status_label.add_theme_color_override("font_color", KenneyTheme.GREEN if success else Color("b91c1c"))
 	refresh()
@@ -280,13 +284,18 @@ func refresh() -> void:
 		var entry: Dictionary = cards[id]
 		entry.price.text = "%s / box of 10" % _money(Catalog.COSTS[id])
 		entry.stock.text = "Shelf %d  |  Warehouse %d" % [business.product_stock(id), business.logistics.stored_units(id)]
+		# Products need their own kind of rack in new games: warn before buying.
+		var store = business.RackStore
+		var fits: bool = business.racks.records.any(func(record): return store.holds(record, id, business.racks.strict))
+		entry.stock.add_theme_color_override("font_color", KenneyTheme.MUTED if fits else Color("b91c1c"))
+		if not fits: entry.stock.text = {"fridge": "Needs a fridge", "produce": "Needs a produce table"}.get(store.display_for(id), "Needs a shelf rack")
 		entry.add.text = "In cart: %d  +1" % cart[id] if cart.has(id) else "Add to cart"
 	var owned: int = business.racks.records.size() + business.logistics.rack_count()
 	for id in furniture_cards:
 		var entry: Dictionary = furniture_cards[id]
 		entry.price.text = "%s each" % _money(business.RackStore.COST)
 		entry.stock.text = "Racks %d / %d  |  Coming %d" % [owned, business.rack_limit(), business.logistics.rack_count()]
-		entry.order.disabled = not business.can_order_racks("tomato" if id == "rack_produce" else _shelf_product(), 1)
+		entry.order.disabled = not business.can_order_racks(FURNITURE_PRODUCT.get(id, _shelf_product()), 1)
 		entry.order.text = "Rack limit" if owned >= business.rack_limit() else "Order"
 	for child in cart_list.get_children():
 		cart_list.remove_child(child)

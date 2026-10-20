@@ -1,6 +1,8 @@
 extends RefCounted
 
 signal changed
+## Udhaar khata news for the HUD ("Ravi paid back Rs240").
+signal khata_news(message: String, good: bool)
 signal clock_changed
 ## Items went onto shelves (the co-op team report counts who shelved them).
 signal shelved(amount: int, by_worker: bool)
@@ -16,6 +18,20 @@ var shop_expansion := 0
 ## Racks the shop started with for free (they can't be packed away): 3 in older
 ## games, 1 in new games from the menu (game_session.gd new_game); buy the rest.
 var starting_racks := 3
+## Udhaar khata: customers who bought on credit, {name, amount, day, due}. Money lent
+## so far and money paid back; what is neither owed nor paid back was lost.
+## Difficulty chosen for a new game (main menu): 0 Aasaan, 1 Normal, 2 Mushkil.
+## Sets the starting money, customers' queue patience and their budgets.
+var difficulty := 1
+const DIFFICULTY_NAMES := ["Aasaan", "Normal", "Mushkil"]
+const DIFFICULTY_MONEY := [15000, 10000, 6000]
+var khata: Array = []
+var udhaar_given := 0
+var udhaar_collected := 0
+const UDHAAR_LIMIT := 2000
+const UDHAAR_DAYS := 2
+const UDHAAR_WRITE_OFF_DAYS := 5
+const UDHAAR_PAY_CHANCE := 0.7
 var expansion_expenses := 0
 const FarmStore := preload("res://farm_store.gd")
 var farm := FarmStore.new()
@@ -928,6 +944,7 @@ func _bill_new_day() -> void:
 	_settle_bills()
 	_pay_loan_installments(elapsed_days)
 	_rain_waters_farm()
+	_collect_udhaar()
 
 func advance_clock(minutes: float) -> void:
 	if not is_finite(minutes) or minutes <= 0.0:
@@ -1149,7 +1166,8 @@ func place_rack(product: String, position: Vector2, turn: int, id := -1, from_de
 	if not buying and (previous.is_empty() or previous.product != product): return false
 	var candidate := {"id": racks.records.size() if buying else id, "product": product, "x": position.x, "z": position.y, "turn": turn, "amount": 0 if buying else int(previous.amount), "restock": true if buying else previous.get("restock", id < 3)}
 	if buying:
-		candidate["display"] = "produce" if product == "tomato" else "shelf"
+		# Fruit and vegetable racks are produce tables; cold-drink and milk racks are fridges.
+		candidate["display"] = RackStore.display_for(product)
 		RackStore.migrate_record(candidate)
 		for slot in candidate.slots: slot.product = ""
 	else:
@@ -1178,6 +1196,46 @@ func place_rack(product: String, position: Vector2, turn: int, id := -1, from_de
 	changed.emit()
 	return true
 
+func patience_factor() -> float:
+	return [1.3, 1.0, 0.75][clampi(difficulty, 0, 2)]
+
+func budget_factor() -> float:
+	return [1.15, 1.0, 0.85][clampi(difficulty, 0, 2)]
+
+func udhaar_outstanding() -> int:
+	var total := 0
+	for entry in khata: total += int(entry.amount)
+	return total
+
+func udhaar_lost() -> int:
+	return udhaar_given - udhaar_collected - udhaar_outstanding()
+
+func can_give_udhaar(amount: int) -> bool:
+	return amount > 0 and udhaar_outstanding() + amount <= UDHAAR_LIMIT and khata.size() < 20
+
+## Checkout: the customer just paid with the sale; this takes the amount back out of
+## the till into the khata, to be paid back from UDHAAR_DAYS later.
+func give_udhaar(customer_name: String, amount: int) -> bool:
+	if not can_give_udhaar(amount) or amount > money: return false
+	money -= amount
+	udhaar_given += amount
+	khata.append({"name": customer_name.left(30), "amount": amount, "day": day, "due": day + UDHAAR_DAYS})
+	_commit()
+	return true
+
+## Each new day: people whose udhaar is due may pay it back; after a long wait it is lost.
+func _collect_udhaar() -> void:
+	for entry in khata.duplicate():
+		if day < int(entry.due): continue
+		if day > int(entry.due) + UDHAAR_WRITE_OFF_DAYS:
+			khata.erase(entry)
+			khata_news.emit("%s never paid back %s%d udhaar." % [entry.name, String.chr(8377), entry.amount], false)
+		elif randf() < UDHAAR_PAY_CHANCE:
+			khata.erase(entry)
+			money += int(entry.amount)
+			udhaar_collected += int(entry.amount)
+			khata_news.emit("%s paid back %s%d udhaar." % [entry.name, String.chr(8377), entry.amount], true)
+
 ## New games from the menu: only the cold drink rack is free; the snack and soap
 ## racks of older games are bought like any other rack (PC: Wholesale > Furniture).
 func start_with_one_rack() -> bool:
@@ -1186,7 +1244,10 @@ func start_with_one_rack() -> bool:
 		if int(racks.records[index].amount) != 0: return false
 	racks.records = [racks.records[0]]
 	racks.records[0].restock = true
+	# The free rack is a cold-drink fridge, and products need their own kind of rack.
+	racks.records[0].display = "fridge"
 	starting_racks = 1
+	racks.strict = true
 	return true
 
 ## G in the shop: moves the checkout counter or the PC desk (rack_store.gd fixtures).
@@ -1217,7 +1278,7 @@ func pack_rack(id: int) -> bool:
 			if item.product == record.product:
 				item.restock = true
 				break
-	logistics.rack_delivered.append("tomato" if record.get("display", "shelf") == "produce" else record.product)
+	logistics.rack_delivered.append({"produce": "tomato", "fridge": "bottle"}.get(record.get("display", "shelf"), record.product))
 	if not save_progress():
 		racks.records = old_layout
 		logistics.rack_delivered = old_delivered
@@ -1277,6 +1338,10 @@ func snapshot() -> Dictionary:
 	data["furnishing_expenses"] = furnishing_expenses
 	data["shop_expansion"] = shop_expansion
 	data["starting_racks"] = starting_racks
+	data["khata"] = khata.duplicate(true)
+	data["difficulty"] = difficulty
+	data["udhaar_given"] = udhaar_given
+	data["udhaar_collected"] = udhaar_collected
 	data["expansion_expenses"] = expansion_expenses
 	data["stock_collection_assigned"] = stock_collection_assigned
 	data["logistics"] = logistics.snapshot()
@@ -1360,6 +1425,12 @@ func restore(data: Dictionary) -> void:
 	furnishing_expenses = int(data.get("furnishing_expenses", 0))
 	shop_expansion = int(data.get("shop_expansion", 0))
 	starting_racks = int(data.get("starting_racks", 3))
+	racks.strict = starting_racks == 1
+	difficulty = int(data.get("difficulty", 1))
+	khata.clear()
+	for entry in data.get("khata", []): khata.append({"name": str(entry.name), "amount": int(entry.amount), "day": int(entry.day), "due": int(entry.due)})
+	udhaar_given = int(data.get("udhaar_given", 0))
+	udhaar_collected = int(data.get("udhaar_collected", 0))
 	expansion_expenses = int(data.get("expansion_expenses", 0))
 	racks.expansion = shop_expansion
 
@@ -1533,6 +1604,20 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	# Expansions: whole count up to the last one, paid in full.
 	var expansion = data.get("shop_expansion", 0)
 	var base = data.get("starting_racks", 3)
+	# Udhaar: whole amounts; the khata holds no more than was lent and not paid back.
+	if not EmployeeRelations.whole(data.get("difficulty", 1), 2): return false
+	var owed := 0
+	var saved_khata = data.get("khata", [])
+	if not saved_khata is Array or saved_khata.size() > 20: return false
+	for entry in saved_khata:
+		if not entry is Dictionary or not entry.get("name") is String or entry.name.length() > 30: return false
+		for field in ["amount", "day", "due"]:
+			if not EmployeeRelations.whole(entry.get(field), MAX_SAVED_VALUE): return false
+		if int(entry.amount) < 1: return false
+		owed += int(entry.amount)
+	var lent = data.get("udhaar_given", 0)
+	var repaid = data.get("udhaar_collected", 0)
+	if not EmployeeRelations.whole(lent, MAX_SAVED_VALUE) or not EmployeeRelations.whole(repaid, MAX_SAVED_VALUE) or int(lent) - int(repaid) < owed: return false
 	if not EmployeeRelations.whole(base, 3) or base < 1: return false
 	if not EmployeeRelations.whole(expansion, EXPANSION_COSTS.size()): return false
 	var expected_expansion := 0
@@ -1713,8 +1798,8 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	if not _valid_loan(data): return false
 	expenses -= int(data.get("loan_received", 0)) - int(data.get("loan_principal_repaid", 0))
 	var start_money := int(data.get("starting_money", INITIAL_MONEY))
-	if start_money not in [INITIAL_MONEY, BEGINNER_MONEY]: return false
-	if int(data["money"]) != start_money + revenue - expenses - int(data["property_expenses"]):
+	if start_money not in [INITIAL_MONEY] + DIFFICULTY_MONEY: return false
+	if int(data["money"]) != start_money + revenue - expenses - int(data["property_expenses"]) - (int(lent) - int(repaid)):
 		return false
 	var purchased_stock := bottle_cost / STOCK_COST * STOCK_AMOUNT + extra_purchased
 	return int(data["stock"]) + stored_supply == INITIAL_STOCK + purchased_stock - sold

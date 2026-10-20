@@ -369,7 +369,7 @@ func hint() -> String:
 	var slot := storage_box_target()
 	if business.carried_stock == 0 and slot >= 0: return "Pick up stored box"
 	var index := _aimed(furniture_boxes)
-	if business.carried_stock == 0 and index >= 0: return "Unpack produce table" if business.logistics.rack_delivered[index] == "tomato" else "Unpack rack: " + Catalog.NAMES[business.logistics.rack_delivered[index]]
+	if business.carried_stock == 0 and index >= 0: return "Unpack produce table" if business.logistics.rack_delivered[index] == "tomato" else ("Unpack cold-drink fridge" if business.logistics.rack_delivered[index] == "bottle" else "Unpack rack: " + Catalog.NAMES[business.logistics.rack_delivered[index]])
 	if business.carried_stock == 0 and computer_target(): return "Warehouse ordering PC"
 	if receiver.parked_box.visible and _aimed([receiver.parked_box]) >= 0: return "Pick up receiver's box"
 	if receiver.visible and _near(receiver.global_position, 2): return "Talk to Anil - Warehouse"

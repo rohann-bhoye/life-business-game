@@ -86,7 +86,9 @@ func build_room(builder: Node3D) -> void:
 		if body.name == "Player": body.shop_indoors = false)
 	building.get_node("ShopArea/CollisionShape3D").shape = BoxShape3D.new()
 	building.get_node("ShopArea/CollisionShape3D").shape.size = Vector3(7, 3, 6)
-	var first := build_stock_rack(builder, "StockRack", "bottle", Vector3(-5.6, 0.1, -0.5))
+	# New games start with a cold-drink fridge in place of the cold-drink shelf.
+	var opening = get_parent().get_node("Shop/ShopArea").business
+	var first := build_fridge(builder, "StockRack", Vector3(-5.6, 0.1, -0.5)) if opening.racks.find(0).get("display", "shelf") == "fridge" else build_stock_rack(builder, "StockRack", "bottle", Vector3(-5.6, 0.1, -0.5))
 	rack = first.node
 	rack_bottles = first.items
 	rack_label = first.label
@@ -180,6 +182,58 @@ func build_stock_rack(builder: Node3D, node_name: String, product: String, posit
 	var label := _sign(node, "StockSign", "", Vector3(0.4, 2.1, 0))
 	label.rotation.y = PI / 2
 	return {"node": node, "items": items, "label": label}
+
+## A double glass-door cold-drink fridge around the usual three shelves of ten, on
+## the rack footprint (rack_store.gd), with a lit THANDA header and an inner light.
+func build_fridge(builder: Node3D, node_name: String, position: Vector3) -> Dictionary:
+	var model := build_stock_rack(builder, node_name, "bottle", position)
+	var node: Node3D = model.node
+	var body := Color(0.92, 0.94, 0.95)
+	builder._box("FridgeBack", node, Vector3(0.06, 2.0, 2.16), Vector3(-0.32, 1.0, 0), body)
+	for z in [-1.05, 1.05]: builder._box("FridgeSide%s" % z, node, Vector3(0.7, 2.0, 0.06), Vector3(0, 1.0, z), body)
+	builder._box("FridgeTop", node, Vector3(0.72, 0.1, 2.18), Vector3(0, 2.05, 0), body)
+	builder._box("FridgeBase", node, Vector3(0.72, 0.14, 2.18), Vector3(0, 0.07, 0), Color(0.2, 0.22, 0.24))
+	var header: MeshInstance3D = builder._box("FridgeHeader", node, Vector3(0.05, 0.28, 2.1), Vector3(0.36, 1.9, 0), Color(0.85, 0.12, 0.14))
+	var glow := StandardMaterial3D.new()
+	glow.albedo_color = Color(0.9, 0.15, 0.15)
+	glow.emission_enabled = true
+	glow.emission = Color(0.9, 0.15, 0.15)
+	glow.emission_energy_multiplier = 0.6
+	header.material_override = glow
+	var sign := _sign(node, "FridgeSign", "THANDA  -  COLD DRINKS", Vector3(0.39, 1.9, 0))
+	sign.rotation.y = PI / 2
+	sign.font_size = 30
+	sign.modulate = Color.WHITE
+	var strip: MeshInstance3D = builder._box("FridgeLight", node, Vector3(0.04, 0.03, 1.9), Vector3(0.2, 1.74, 0), Color(0.9, 0.97, 1.0))
+	var light := StandardMaterial3D.new()
+	light.albedo_color = Color(0.9, 0.97, 1.0)
+	light.emission_enabled = true
+	light.emission = Color(0.85, 0.95, 1.0)
+	strip.material_override = light
+	# Two glass doors with frames and handles; items stay visible behind the glass.
+	var glass := StandardMaterial3D.new()
+	glass.albedo_color = Color(0.7, 0.88, 0.95, 0.22)
+	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glass.roughness = 0.1
+	for z in [-0.52, 0.52]:
+		var door: MeshInstance3D = builder._box("FridgeGlass%s" % z, node, Vector3(0.02, 1.62, 1.0), Vector3(0.355, 0.97, z), Color.WHITE)
+		door.material_override = glass
+		door.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		for y in [0.15, 1.79]: builder._box("DoorRail", node, Vector3(0.04, 0.04, 1.02), Vector3(0.36, y, z), Color(0.75, 0.77, 0.8))
+		builder._box("DoorHandle", node, Vector3(0.05, 0.5, 0.03), Vector3(0.39, 1.0, z - sign_side(z) * 0.44), Color(0.6, 0.62, 0.65))
+	builder._box("DoorMiddle", node, Vector3(0.04, 1.66, 0.04), Vector3(0.36, 0.97, 0), Color(0.75, 0.77, 0.8))
+	model["fridge"] = true
+	return model
+
+static func sign_side(value: float) -> float:
+	return -1.0 if value < 0 else 1.0
+
+## Customers pick cold drinks more often while a fridge has some (customer.gd).
+func cold_drinks_chilled() -> bool:
+	if not is_instance_valid(furnishing): return false
+	for record in shop.business.racks.records:
+		if record.get("display", "shelf") == "fridge" and furnishing.available(int(record.id), "bottle") > 0: return true
+	return false
 
 static func basket_position(slot: int) -> Vector3:
 	return Vector3(0.22 - (slot / 4) * 0.22, 0.7 + (slot / 4) * 0.12, -0.78 + (slot % 4) * 0.52)
@@ -533,6 +587,15 @@ func _sync_state() -> void:
 	_update_room_size()
 	follow_back_wall()
 	apply_fixtures()
+	var decor := get_node_or_null("ShopDecor")
+	if decor != null:
+		var counts := {}
+		# Everything the shop owns: on the racks, in storage, in boxes at the bay or in hand.
+		var business = shop.business
+		for id in decor.WALL_PRODUCTS: counts[id] = business.product_stock(id) + business.logistics.stored_units(id)
+		for box in business.queued_boxes: counts[box.product] = int(counts.get(box.product, 0)) + int(box.amount)
+		if counts.has(business.pending_product): counts[business.pending_product] += business.boxed_stock + business.carried_stock
+		decor.show_stock(counts)
 	delivery_box.visible = shop.business.boxed_stock > 0
 	delivery_box.scale = Vector3.ONE * 0.75
 	delivery_box.rotation.y = PI
@@ -960,6 +1023,8 @@ func interaction_hint() -> String:
 	if shop.business.carried_stock > 0:
 		var amount: int = shop.business.carried_stock
 		var product_name: String = Catalog.NAMES[shop.business.pending_product]
+		var nearby: Dictionary = furnishing.near_any_rack() if is_instance_valid(furnishing) else {}
+		if not nearby.is_empty() and not Store.holds(nearby, shop.business.pending_product, shop.business.racks.strict): return Store.place_hint(shop.business.pending_product)
 		var can_place: bool = furnishing.near_rack(shop.business.pending_product) >= 0 if is_instance_valid(furnishing) else false
 		var can_take: bool = furnishing.near_stocked_rack(shop.business.pending_product) >= 0 if is_instance_valid(furnishing) else false
 		if can_place and can_take: return "E: place 1 %s   |   Q: take 1 back   (%d in box)" % [product_name, amount]
@@ -1003,6 +1068,11 @@ func try_interact() -> bool:
 				play_sound("stock")
 				ui.show_feedback("Box empty. %s stocked." % Catalog.NAMES[product] if remaining == 0 else "Shelved 1 %s. %d left in box." % [Catalog.NAMES[product], remaining])
 			else: ui.show_feedback("Rack full. Use another rack with an empty row, or warehouse storage.", true)
+			return true
+		# At a rack that can never hold this product: say where it goes.
+		var nearby: Dictionary = furnishing.near_any_rack() if is_instance_valid(furnishing) else {}
+		if not nearby.is_empty() and not Store.holds(nearby, shop.business.pending_product, shop.business.racks.strict):
+			ui.show_feedback(Store.place_hint(shop.business.pending_product), true)
 			return true
 		for id in Catalog.IDS:
 			if id != shop.business.pending_product and (furnishing.near_rack(id) >= 0 if is_instance_valid(furnishing) else _near(rack_target(id), 1.0)):

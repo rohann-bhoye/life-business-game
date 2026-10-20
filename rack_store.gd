@@ -59,7 +59,31 @@ static func count_product(record: Dictionary, product: String) -> int:
 		if slot.product == product: count += int(slot.count)
 	return count
 
-static func supports(record: Dictionary, product: String) -> bool:
+## Where products go. A fridge only ever holds drinks. In new games (`strict`, one
+## free rack) fruit and vegetables also need produce baskets, and packed goods
+## shelf racks, like real store sims; older saves keep their mixed shelves.
+const FRIDGE_PRODUCTS := ["bottle", "milk"]
+const PRODUCE_PRODUCTS := ["tomato", "carrot", "cabbage", "corn", "apple"]
+var strict := false
+
+static func display_for(product: String) -> String:
+	return "produce" if product in PRODUCE_PRODUCTS else ("fridge" if product in FRIDGE_PRODUCTS else "shelf")
+
+static func holds(record: Dictionary, product: String, strict_rules := false) -> bool:
+	var display: String = record.get("display", "shelf")
+	if display == "fridge": return product in FRIDGE_PRODUCTS
+	if not strict_rules: return true
+	return display == display_for(product)
+
+## What to tell a player carrying `product` to the wrong kind of rack.
+static func place_hint(product: String) -> String:
+	match display_for(product):
+		"fridge": return "%s goes in a fridge (PC: Wholesale > Furniture)." % Catalog.NAMES[product]
+		"produce": return "%s goes in produce baskets (a produce table)." % Catalog.NAMES[product]
+	return "%s goes on a shelf rack." % Catalog.NAMES[product]
+
+static func supports(record: Dictionary, product: String, strict_rules := false) -> bool:
+	if not holds(record, product, strict_rules): return false
 	if not record.has("slots"): return record.product == product
 	for slot in record.slots:
 		if slot.product in [product, ""] or int(slot.count) == 0: return true
@@ -69,7 +93,7 @@ func free_space(id: int, product: String) -> int:
 	var record := find(id)
 	if record.is_empty(): return 0
 	migrate_record(record)
-	if int(record.legacy_overflow) > 0: return 0
+	if int(record.legacy_overflow) > 0 or not holds(record, product, strict): return 0
 	var space := 0
 	for slot in record.slots:
 		if slot.product in [product, ""] or int(slot.count) == 0: space += SHELF_CAPACITY - int(slot.count)
@@ -84,7 +108,7 @@ func restock_rack(product: String) -> int:
 
 func assign_slot(id: int, index: int, product: String) -> bool:
 	var record := find(id)
-	if record.is_empty() or index < 0 or index >= slot_count(record) or product not in Catalog.IDS + [""]: return false
+	if record.is_empty() or index < 0 or index >= slot_count(record) or product not in Catalog.IDS + [""] or product != "" and not holds(record, product, strict): return false
 	migrate_record(record)
 	var slot: Dictionary = record.slots[index]
 	if int(slot.count) > 0 or int(record.legacy_overflow) > 0: return false
@@ -308,6 +332,8 @@ func remove_stock(product: String, amount: int, id := -1) -> bool:
 static func valid(layout, stock: int, inventory: Dictionary, fx = FIXTURE_HOME, expansion_level := 0, base := 3) -> bool:
 	if not fixtures_valid(fx): return false
 	if not layout is Array or layout.size() < base or layout.size() > rack_limit(expansion_level): return false
+	# New games' one free rack is the cold-drink fridge.
+	var base_displays: Array = ["shelf", "fridge"] if base == 1 else ["shelf"]
 	var totals := {}
 	for id in Catalog.IDS: totals[id] = 0
 	var destinations := {"bottle": 0, "snack": 0, "soap": 0}
@@ -320,8 +346,8 @@ static func valid(layout, stock: int, inventory: Dictionary, fx = FIXTURE_HOME, 
 			if not is_finite(float(value)) or value < 0 or value != int(value): return false
 		if item.id != index or item.turn > 3 or item.amount > 1000000000: return false
 		if index < base and item.product != Catalog.IDS[index]: return false
-		if item.get("display", "shelf") not in ["shelf", "produce"]: return false
-		if index < base and item.get("display", "shelf") != "shelf": return false
+		if item.get("display", "shelf") not in ["shelf", "produce", "fridge"]: return false
+		if index < base and item.get("display", "shelf") not in base_displays: return false
 		if not item.get("restock", index < base) is bool: return false
 		if item.get("restock", index < base) and destinations.has(item.product): destinations[item.product] += 1
 		for field in ["x", "z"]:

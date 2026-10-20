@@ -16,8 +16,9 @@ func _ready() -> void:
 	_update_clock()
 
 func _process(delta: float) -> void:
-	var dialog := get_tree().current_scene.get_node_or_null("Ui/StaffDialog")
-	if is_instance_valid(dialog) and dialog.visible: return
+	for node_path in ["Ui/StaffDialog", "Ui/HowToPlay"]:
+		var dialog := get_tree().current_scene.get_node_or_null(node_path)
+		if is_instance_valid(dialog) and dialog.visible: return
 	business.advance_clock(delta * minutes_per_second)
 
 func _update_clock() -> void:
