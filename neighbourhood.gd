@@ -67,7 +67,9 @@ func _update_shop_upgrade() -> void:
 	var shop: MeshInstance3D = get_parent().get_node("Shop")
 	var level: int = shop.get_node("ShopArea").business.shop_level
 	var colors := [Color(0.12, 0.3, 0.26), Color(0.17, 0.36, 0.52), Color(0.58, 0.43, 0.12)]
-	for node_name in ["RoofTrim", "SignBoard"]:
+	# The full shop (shop_presentation.gd) keeps its own dark ceiling.
+	var operations = get_parent().get_node_or_null("ShopOperations")
+	for node_name in ["SignBoard"] if operations != null and operations.enabled else ["RoofTrim", "SignBoard"]:
 		shop.get_node(node_name).material_override = _material(colors[level - 1])
 	shop.get_node("ShopSign").text = ["SHOP", "SHOP II", "SHOP III"][level - 1]
 

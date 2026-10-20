@@ -71,6 +71,29 @@ board and a local suggestion form. See Farming section below for controls and li
   A1-D4 bay boards above the storage racks. Shop (shop_presentation.gd): brick walls,
   pink window/door frames (old WindowGlass hidden, WindowSill removed), goods shutter
   on the left outer wall, I-beams at z 1.9/-0.4/-4.2/-6.5 (clear of fans and lights).
+- Shop matched to the owner's APNA MART reference sheet: FrontWall meshes are an
+  ArrayMesh with a real 1.6 x 1.7 m window opening (shop_operations.gd _window_wall;
+  the full-size collider stays, so _update_room_size no longer resizes FrontWall),
+  clear glass in pink frames, sloped striped awning with valance, pink Parapet*
+  roof edge (resized with expansions), dark ceiling (neighbourhood.gd no longer
+  recolours RoofTrim in the full shop), wooden checkout counter, AC unit at every
+  level, corner CCTV + "Better Choices Everyday!" poster on the left wall,
+  BackWallInside (store-room door, clock) and BackWallOutside (back door, vent,
+  downpipe, step) moved by follow_back_wall. tools/shop_views.gd renders the six
+  reference views (front, interior, top with roof hidden, left, back, floor plan).
+- Shop interior matched to the reference: racks are a merged RackFrame (steel
+  gondola: slotted posts, back panel, plinth, shelf lips, top cap); the old Upright/
+  Shelf meshes are gone but their *Body colliders and the 3 rows of 10 stay. Produce
+  table = wooden ProduceStand (3 plank steps, wooden crates, FRESH VEGGIES DAILY
+  chalkboard; TableBaseBody collider kept). Fridge header is blue. Counter: wooden
+  with CounterFront (planks, kick plate, orange trim, APNA MART logo panel, UPI QR
+  stand); CheckoutSign moved under the logo. Level 1 floor is grey tiles (shop_style
+  _tiles(1)). Green SASTA / GOOD FOOD posters on the left wall. PC Furniture
+  pictures re-rendered (tools/rack_thumbnails.gd).
+- Startup check (2026-10-20): the player spawns beside the bed from frame 0; only the
+  very first frame (behind the loading screen) shows the home without its walls
+  (HomeDecor is added deferred). One replay showed a ~2 m slide toward the door just
+  after start that did not repeat; not fixed, owner stopped further testing.
 - Farm detailing (farm_details.gd, built by town_fill.gd): tube-well pump room with a
   cement tank and water, scarecrow, two hay stacks, gunny sacks, a charpai and a red
   tractor (vehicle_models.gd tractor), merged into one mesh plus water and tractor.

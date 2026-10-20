@@ -33,6 +33,7 @@ var cashier_point := Vector3(-2.5, 0.1, -0.6)
 const ROOM_HEIGHT := 3.8
 const Catalog = preload("res://product_catalog.gd")
 const Store = preload("res://rack_store.gd")
+const IndianHouse = preload("res://indian_house.gd")
 ## Movable furniture (G): each fixture's nodes with their transforms at its home spot.
 var fixture_parts := {}
 var product_racks := {}
@@ -61,16 +62,28 @@ func build_room(builder: Node3D) -> void:
 	builder._box("BackWall", building, Vector3(6, 3, 0.12), Vector3(0, 0, -2.5), wall, true)
 	for x in [-3.0, 3.0]:
 		builder._box("SideWall%s" % x, building, Vector3(0.12, 3, 5), Vector3(x, 0, 0), wall, true)
+	# Front walls keep a full-height collider (the glass stops you) but the visible
+	# brick has a real window opening, so you can see into the shop from the street.
 	for x in [-2.0, 2.0]:
-		builder._box("FrontWall%s" % x, building, Vector3(2, 3, 0.12), Vector3(x, 0, 2.5), wall, true)
-		builder._box("WindowGlass%s" % x, building, Vector3(1.5, 1.4, 0.05), Vector3(x, -0.05, 2.59), Color(0.32, 0.61, 0.67))
+		var front: MeshInstance3D = builder._box("FrontWall%s" % x, building, Vector3(2, ROOM_HEIGHT, 0.12), Vector3(x, 0.5, 2.5), wall, true)
+		front.mesh = _window_wall(ROOM_HEIGHT)
+		front.material_override = builder._material(wall)
+		builder._box("WindowGlass%s" % x, building, Vector3(1.5, 1.4, 0.05), Vector3(x, -0.05, 2.59), Color(0.32, 0.61, 0.67)).hide()
 	builder._box("DoorLintel", building, Vector3(2, 0.6, 0.12), Vector3(0, 1.2, 2.5), wall, true)
 	builder._box("RoofTrim", building, Vector3(6.3, 0.18, 5.3), Vector3(0, 1.6, 0), trim, true)
+	# Pink roof edge all round (resized with the room in _update_room_size).
+	for part in ["ParapetFront", "ParapetBack", "ParapetLeft", "ParapetRight"]:
+		builder._box(part, building, Vector3(6.3, 0.3, 0.16), Vector3(0, 2.55, 2.66), Color(0.86, 0.2, 0.56))
 	builder._box("Floor", building, Vector3(5.9, 0.012, 4.9), Vector3(0, -1.394, 0), Color(0.72, 0.75, 0.73))
 	builder._box("SignBoard", building, Vector3(5.8, 0.62, 0.12), Vector3(0, 1.62, 2.64), trim)
 	building.get_node("ShopSign").position = Vector3(0, 1.62, 2.72)
+	# Striped awning sloping out over the windows, with a hanging valance.
 	for index in range(12):
-		builder._box("Awning%d" % index, building, Vector3(0.5, 0.1, 0.8), Vector3(-2.75 + index * 0.5, 1.08, 2.82), Color(0.86, 0.29, 0.29) if index % 2 == 0 else Color(0.93, 0.94, 0.9))
+		var colour := Color(0.86, 0.29, 0.29) if index % 2 == 0 else Color(0.93, 0.94, 0.9)
+		var awning: MeshInstance3D = builder._box("Awning%d" % index, building, Vector3(0.5, 0.06, 0.8), Vector3(-2.75 + index * 0.5, 1.08, 2.98), colour)
+		awning.rotation.x = 0.35
+		var valance: MeshInstance3D = builder._box("Valance", awning, Vector3(0.5, 0.18, 0.02), Vector3(0, -0.06, 0.4), colour)
+		valance.rotation.x = -0.35
 	var interior := Area3D.new()
 	interior.name = "ShopInterior"
 	var collision := CollisionShape3D.new()
@@ -94,7 +107,7 @@ func build_room(builder: Node3D) -> void:
 	rack_label = first.label
 	# Waist height for the 1.45 m characters (top at 0.88 m): the 1 m box sinks
 	# 0.3 m into the floor so everything on the counter keeps its local layout.
-	counter = builder._box("CheckoutCounter", self, Vector3(2.8, 1, 0.7), Vector3(-2.5, 0.3, 0.4), Color(0.18, 0.4, 0.35), true)
+	counter = builder._box("CheckoutCounter", self, Vector3(2.8, 1, 0.7), Vector3(-2.5, 0.3, 0.4), Color(0.58, 0.37, 0.2), true)
 	builder._box("CounterTop", counter, Vector3(2.9, 0.08, 0.8), Vector3(0, 0.54, 0), Color(0.2, 0.24, 0.26))
 	# The monitor stands at the cashier's side, turned toward the cashier, so it
 	# never hides the customer's face at the middle of the counter.
@@ -116,7 +129,9 @@ func build_room(builder: Node3D) -> void:
 	scanner_light.omni_range = 0.8
 	scanner.add_child(scanner_light)
 	builder._box("CardTerminal", counter, Vector3(0.19, 0.08, 0.25), Vector3(1.05, 0.63, 0.2), Color(0.1, 0.17, 0.19))
-	_sign(counter, "CheckoutSign", "CHECKOUT", Vector3(0, 0.25, 0.38))
+	var checkout_sign := _sign(counter, "CheckoutSign", "CHECKOUT", Vector3(0, 0.07, 0.375))
+	checkout_sign.modulate = Color(1.0, 0.62, 0.15)
+	_counter_front(counter)
 	var desk = builder._box("ComputerDesk", self, Vector3(1.3, 0.85, 0.65), Vector3(-1.1, 0.525, -1.6), Color(0.39, 0.44, 0.43), true)
 	desk.mesh = null
 	var office = preload("res://office_assets.gd")
@@ -175,16 +190,77 @@ func build_stock_rack(builder: Node3D, node_name: String, product: String, posit
 	node.position = position
 	add_child(node)
 	var items: Array[Node3D] = []
-	for z in [-1.0, 1.0]: builder._box("Upright%s" % z, node, Vector3(0.55, 1.9, 0.07), Vector3(0, 0.95, z), Color(0.2, 0.25, 0.27), true)
+	for z in [-1.0, 1.0]: builder._collider("Upright%sBody" % z, node, Vector3(0.55, 1.9, 0.07), Vector3(0, 0.95, z))
 	for level in range(3):
-		builder._box("Shelf%d" % level, node, Vector3(0.65, 0.06, 2.1), Vector3(0, 0.22 + level * 0.55, 0), Color(0.4, 0.47, 0.49), true)
+		builder._collider("Shelf%dBody" % level, node, Vector3(0.65, 0.06, 2.1), Vector3(0, 0.22 + level * 0.55, 0))
 		for index in range(10): items.append(make_product(node, ("Bottle" if product == "bottle" else "Product") + str(level * 10 + index), Vector3(0, 0.26 + level * 0.55, -0.86 + index * 0.19), product))
+	_rack_frame(node)
 	var label := _sign(node, "StockSign", "", Vector3(0.4, 2.1, 0))
 	label.rotation.y = PI / 2
 	return {"node": node, "items": items, "label": label}
 
+## The customer's side of the wooden counter (one merged mesh that moves with it):
+## plank lines, a kick plate, an orange trim under the top, a dark APNA MART logo
+## panel and a UPI QR stand on the top.
+func _counter_front(counter: Node3D) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for plank in range(13): IndianHouse.box(st, Vector3(-1.2 + plank * 0.2, 0.15, 0.352), Vector3(0.012, 0.64, 0.006), Color(0.43, 0.27, 0.13))
+	for x in [-1.402, 1.402]: IndianHouse.box(st, Vector3(x, -0.15, 0), Vector3(0.006, 0.1, 0.7), Color(0.15, 0.12, 0.1))
+	IndianHouse.box(st, Vector3(0, -0.15, 0.354), Vector3(2.8, 0.1, 0.012), Color(0.15, 0.12, 0.1))
+	IndianHouse.box(st, Vector3(0, 0.47, 0.356), Vector3(2.8, 0.03, 0.012), Color(0.95, 0.55, 0.12))
+	IndianHouse.box(st, Vector3(0, 0.19, 0.362), Vector3(1.1, 0.44, 0.02), Color(0.13, 0.14, 0.16))
+	IndianHouse.box(st, Vector3(0, 0.0, 0.373), Vector3(1.1, 0.012, 0.004), Color(0.95, 0.55, 0.12))
+	# UPI QR stand at the customer's corner of the top.
+	var top := 0.58
+	IndianHouse.box(st, Vector3(1.32, top + 0.006, 0.22), Vector3(0.12, 0.012, 0.07), Color(0.2, 0.2, 0.22))
+	IndianHouse.box(st, Vector3(1.32, top + 0.09, 0.2), Vector3(0.11, 0.16, 0.012), Color(0.97, 0.97, 0.95))
+	IndianHouse.box(st, Vector3(1.32, top + 0.155, 0.207), Vector3(0.11, 0.03, 0.003), Color(0.95, 0.45, 0.1))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	for row in range(5):
+		for column in range(5):
+			var corner := (row < 2 and column < 2) or (row < 2 and column > 2) or (row > 2 and column < 2)
+			if corner or rng.randf() < 0.45:
+				IndianHouse.box(st, Vector3(1.288 + column * 0.016, top + 0.042 + row * 0.016, 0.207), Vector3(0.014, 0.014, 0.003), Color(0.05, 0.05, 0.06))
+	var front := MeshInstance3D.new()
+	front.name = "CounterFront"
+	front.mesh = st.commit()
+	front.material_override = IndianHouse._material()
+	counter.add_child(front)
+	var logo := _sign(counter, "CounterLogo", "APNA MART", Vector3(0, 0.25, 0.375))
+	logo.font_size = 44
+	logo.pixel_size = 0.0035
+	logo.outline_size = 0
+	logo.modulate = Color.WHITE
+
+## Supermarket gondola look (one merged mesh): dark steel end frames with slotted
+## front posts, a back panel, a base plinth, light shelves with steel lips and a top
+## cap. Same footprint and the same three rows of ten as before (front = +x).
+func _rack_frame(node: Node3D) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var steel := Color(0.2, 0.22, 0.25)
+	var post := Color(0.3, 0.33, 0.37)
+	IndianHouse.box(st, Vector3(0, 0.07, 0), Vector3(0.6, 0.14, 2.06), Color(0.13, 0.14, 0.16))
+	IndianHouse.box(st, Vector3(-0.29, 0.97, 0), Vector3(0.03, 1.66, 2.06), Color(0.27, 0.29, 0.32))
+	IndianHouse.box(st, Vector3(0, 1.82, 0), Vector3(0.62, 0.04, 2.12), steel)
+	for z in [-1.04, 1.04]:
+		IndianHouse.box(st, Vector3(-0.01, 0.92, z), Vector3(0.58, 1.84, 0.035), steel)
+		IndianHouse.box(st, Vector3(0.3, 0.92, z), Vector3(0.05, 1.84, 0.06), post)
+		for slot in range(20): IndianHouse.box(st, Vector3(0.326, 0.18 + slot * 0.08, z), Vector3(0.005, 0.03, 0.02), Color(0.08, 0.08, 0.09))
+	for level in range(3):
+		var y := 0.22 + level * 0.55
+		IndianHouse.box(st, Vector3(0.0, y, 0), Vector3(0.58, 0.035, 2.04), Color(0.76, 0.78, 0.8))
+		IndianHouse.box(st, Vector3(0.3, y - 0.01, 0), Vector3(0.025, 0.06, 2.04), post)
+	var frame := MeshInstance3D.new()
+	frame.name = "RackFrame"
+	frame.mesh = st.commit()
+	frame.material_override = IndianHouse._material()
+	node.add_child(frame)
+
 ## A double glass-door cold-drink fridge around the usual three shelves of ten, on
-## the rack footprint (rack_store.gd), with a lit THANDA header and an inner light.
+## the rack footprint (rack_store.gd), with a lit blue THANDA header and an inner light.
 func build_fridge(builder: Node3D, node_name: String, position: Vector3) -> Dictionary:
 	var model := build_stock_rack(builder, node_name, "bottle", position)
 	var node: Node3D = model.node
@@ -193,11 +269,11 @@ func build_fridge(builder: Node3D, node_name: String, position: Vector3) -> Dict
 	for z in [-1.05, 1.05]: builder._box("FridgeSide%s" % z, node, Vector3(0.7, 2.0, 0.06), Vector3(0, 1.0, z), body)
 	builder._box("FridgeTop", node, Vector3(0.72, 0.1, 2.18), Vector3(0, 2.05, 0), body)
 	builder._box("FridgeBase", node, Vector3(0.72, 0.14, 2.18), Vector3(0, 0.07, 0), Color(0.2, 0.22, 0.24))
-	var header: MeshInstance3D = builder._box("FridgeHeader", node, Vector3(0.05, 0.28, 2.1), Vector3(0.36, 1.9, 0), Color(0.85, 0.12, 0.14))
+	var header: MeshInstance3D = builder._box("FridgeHeader", node, Vector3(0.05, 0.28, 2.1), Vector3(0.36, 1.9, 0), Color(0.1, 0.36, 0.78))
 	var glow := StandardMaterial3D.new()
-	glow.albedo_color = Color(0.9, 0.15, 0.15)
+	glow.albedo_color = Color(0.12, 0.4, 0.85)
 	glow.emission_enabled = true
-	glow.emission = Color(0.9, 0.15, 0.15)
+	glow.emission = Color(0.12, 0.4, 0.85)
 	glow.emission_energy_multiplier = 0.6
 	header.material_override = glow
 	var sign := _sign(node, "FridgeSign", "THANDA  -  COLD DRINKS", Vector3(0.39, 1.9, 0))
@@ -243,14 +319,15 @@ func build_produce_table(builder: Node3D, node_name: String, position: Vector3) 
 	node.name = node_name
 	node.position = position
 	add_child(node)
-	builder._box("TableBase", node, Vector3(0.65, 0.65, 2.1), Vector3(0, 0.325, 0), Color(0.4, 0.3, 0.21), true)
+	builder._collider("TableBaseBody", node, Vector3(0.65, 0.65, 2.1), Vector3(0, 0.325, 0))
+	_produce_stand(node)
 	var items: Array[Node3D] = []
 	for slot in range(12):
 		var point := basket_position(slot)
-		builder._box("BasketFloor%d" % slot, node, Vector3(0.2, 0.04, 0.49), point, Color(0.32, 0.43, 0.26))
+		builder._box("BasketFloor%d" % slot, node, Vector3(0.2, 0.04, 0.49), point, Color(0.5, 0.34, 0.18))
 		for side in [-1, 1]:
-			builder._box("BasketEdge%d_%d" % [slot, side], node, Vector3(0.015, 0.085, 0.49), point + Vector3(side * 0.095, 0.04, 0), Color(0.34, 0.46, 0.28))
-			builder._box("BasketEnd%d_%d" % [slot, side], node, Vector3(0.2, 0.085, 0.015), point + Vector3(0, 0.04, side * 0.237), Color(0.34, 0.46, 0.28))
+			builder._box("BasketEdge%d_%d" % [slot, side], node, Vector3(0.015, 0.085, 0.49), point + Vector3(side * 0.095, 0.04, 0), Color(0.66, 0.46, 0.26))
+			builder._box("BasketEnd%d_%d" % [slot, side], node, Vector3(0.2, 0.085, 0.015), point + Vector3(0, 0.04, side * 0.237), Color(0.66, 0.46, 0.26))
 		for index in range(10):
 			var item := make_product(node, "BasketItem%d" % (slot * 10 + index), point + Vector3(-0.04 + (index % 2) * 0.08, 0.025, -0.19 + (index / 2) * 0.095), "tomato")
 			item.scale = Vector3.ONE * 0.4
@@ -260,6 +337,48 @@ func build_produce_table(builder: Node3D, node_name: String, position: Vector3) 
 	label.font_size = 24
 	label.pixel_size = 0.003
 	return {"node": node, "items": items, "label": label, "produce": true}
+
+## Wooden market stand under the produce crates: three plank steps (one per crate
+## row), corner posts and a "Fresh veggies daily" chalkboard on the front (+x).
+func _produce_stand(node: Node3D) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var wood := Color(0.62, 0.43, 0.25)
+	var groove := Color(0.44, 0.29, 0.15)
+	for tier in range(3):
+		var x := 0.22 - tier * 0.22
+		var height := 0.68 + tier * 0.12
+		IndianHouse.box(st, Vector3(x, height / 2.0, 0), Vector3(0.22, height, 2.06), wood.darkened(tier * 0.04))
+		for line in range(int(height / 0.14)): IndianHouse.box(st, Vector3(x + 0.111, 0.14 + line * 0.14, 0), Vector3(0.004, 0.012, 2.06), groove)
+	for x in [-0.31, 0.31]:
+		for z in [-1.04, 1.04]: IndianHouse.box(st, Vector3(x, 0.46, z), Vector3(0.05, 0.92, 0.05), groove)
+	IndianHouse.box(st, Vector3(0.345, 0.34, 0), Vector3(0.02, 0.38, 0.6), wood.lightened(0.15))
+	IndianHouse.box(st, Vector3(0.356, 0.34, 0), Vector3(0.01, 0.32, 0.54), Color(0.12, 0.16, 0.14))
+	var stand := MeshInstance3D.new()
+	stand.name = "ProduceStand"
+	stand.mesh = st.commit()
+	stand.material_override = IndianHouse._material()
+	node.add_child(stand)
+	var board := _sign(node, "ChalkBoard", "FRESH\nVEGGIES DAILY", Vector3(0.364, 0.34, 0))
+	board.rotation.y = PI / 2
+	board.font_size = 26
+	board.pixel_size = 0.003
+	board.outline_size = 0
+	board.modulate = Color(0.95, 0.95, 0.88)
+
+## A 2 m front wall piece (`height` tall, 0.12 thick, centred) with a 1.6 x 1.7 m
+## window opening from 0.65 m to 2.35 m above the floor.
+func _window_wall(height: float) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var bottom := -height / 2.0
+	var sill := bottom + 0.55
+	var head := sill + 1.7
+	var top := height / 2.0
+	IndianHouse.box(st, Vector3(0, (bottom + sill) / 2.0, 0), Vector3(2, sill - bottom, 0.12), Color.WHITE)
+	IndianHouse.box(st, Vector3(0, (head + top) / 2.0, 0), Vector3(2, top - head, 0.12), Color.WHITE)
+	for x in [-0.9, 0.9]: IndianHouse.box(st, Vector3(x, (sill + head) / 2.0, 0), Vector3(0.2, head - sill, 0.12), Color.WHITE)
+	return st.commit()
 
 func _resize_room_box(building: Node3D, node_name: String, size: Vector3, offset: Vector3) -> void:
 	var instance: MeshInstance3D = building.get_node(node_name.validate_node_name())
@@ -281,10 +400,12 @@ func _update_room_size() -> void:
 	_resize_room_box(building, "BackWall", Vector3(6, ROOM_HEIGHT, 0.12), Vector3(0, 0.5, -2.5 - extension))
 	for x in [-3.0, 3.0]:
 		_resize_room_box(building, "SideWall%s" % x, Vector3(0.12, ROOM_HEIGHT, depth), Vector3(x, 0.5, center_z))
-	for x in [-2.0, 2.0]:
-		_resize_room_box(building, "FrontWall%s" % x, Vector3(2, ROOM_HEIGHT, 0.12), Vector3(x, 0.5, 2.5))
 	_resize_room_box(building, "DoorLintel", Vector3(2, 1.4, 0.12), Vector3(0, 1.7, 2.5))
 	_resize_room_box(building, "RoofTrim", Vector3(6.3, 0.18, depth + 0.3), Vector3(0, 2.5, center_z))
+	_resize_room_box(building, "ParapetFront", Vector3(6.3, 0.3, 0.16), Vector3(0, 2.55, 2.66))
+	_resize_room_box(building, "ParapetBack", Vector3(6.3, 0.3, 0.16), Vector3(0, 2.55, 2.43 - depth))
+	for side in [-1, 1]:
+		_resize_room_box(building, "ParapetLeft" if side < 0 else "ParapetRight", Vector3(0.16, 0.3, depth + 0.3), Vector3(side * 3.07, 2.55, center_z))
 	_resize_room_box(building, "Floor", Vector3(5.9, 0.012, depth - 0.1), Vector3(0, -1.394, center_z))
 	building.get_node("ShopInterior/CollisionShape3D").shape.size = Vector3(5.8, ROOM_HEIGHT, depth - 0.2)
 	building.get_node("ShopInterior/CollisionShape3D").position = Vector3(0, 0.5, center_z)
@@ -317,6 +438,11 @@ func follow_back_wall() -> void:
 		skirting.position.z = (2.44 + back) / 2.0
 	var sign := building.get_node_or_null("InteriorCategory") as Node3D
 	if sign != null: sign.position.z = back + 0.02
+	# Store-room door and clock inside, back door and vent outside (shop_presentation.gd).
+	var inside := building.get_node_or_null("BackWallInside") as Node3D
+	if inside != null: inside.position.z = back + 0.02
+	var outside := building.get_node_or_null("BackWallOutside") as Node3D
+	if outside != null: outside.position.z = building.get_node("BackWall").position.z - 0.06
 	for index in range(Store.MAX_EXPANSION):
 		var fixture := get_node_or_null("ExpansionLight%d" % index) as Node3D
 		if fixture == null:

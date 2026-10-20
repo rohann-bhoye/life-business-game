@@ -75,14 +75,43 @@ func _exterior(shop: Node3D) -> void:
 	for x in [-1.03, 1.03]:
 		builder._box("EntranceTrim%s" % x, shop, Vector3(0.14, 2.48, 0.12), Vector3(x, -0.18, 2.58), Bricks.FRAME)
 	builder._box("EntranceTop", shop, Vector3(2.2, 0.14, 0.12), Vector3(0, 1.03, 2.58), Bricks.FRAME)
+	# Clear glass in the real window openings (shop_operations.gd _window_wall).
 	for x in [-2.0, 2.0]:
-		shop.get_node(("WindowGlass%s" % x).validate_node_name()).hide()
-		Bricks.framed_window(shop, "ShopWindow%d" % int(x), Vector3(x, -0.75, 2.575), 0.0, 1.5, 1.4, Bricks.FRAME, 1)
-		builder._box("WindowDecal%s" % x, shop, Vector3(1.12, 0.45, 0.008), Vector3(x, -0.05, 2.636), Color(0.08, 0.17, 0.2))
+		Bricks.framed_window(shop, "ShopWindow%d" % int(x), Vector3(x, -0.85, 2.5), 0.0, 1.6, 1.7, Bricks.FRAME, 1, Color.TRANSPARENT)
 	Bricks.shutter(shop, "GoodsShutter", Vector3(-3.06, -1.4, -3.5), -PI / 2, 2.2, 2.4)
+	Bricks.poster(shop, "SidePoster", Vector3(-3.08, 0.2, -1.2), -PI / 2, Vector2(0.9, 1.1), Color(0.12, 0.36, 0.62), "BETTER\nCHOICES\nEVERYDAY!")
+	_cctv(shop, Vector3(-3.08, 2.1, 2.3))
+	shop.get_node("RoofTrim").material_override = builder._material(Color(0.24, 0.26, 0.29))
 	Bricks.i_beams(shop, "CeilingBeams", -2.94, 2.94, [1.9, -0.4, -4.2, -6.5], 2.41)
-	_label(shop, "WindowHours", "OPEN\n08:00 - 20:00", Vector3(2, -0.05, 2.65), 28, 0.0035)
-	_label(shop, "WindowPayments", "CASH  /  CARD\nUPI ACCEPTED", Vector3(-2, -0.05, 2.65), 24, 0.0035)
+	_label(shop, "WindowHours", "OPEN  08:00 - 20:00", Vector3(2, -0.68, 2.57), 22, 0.003)
+	_label(shop, "WindowPayments", "CASH / CARD / UPI", Vector3(-2, -0.68, 2.57), 22, 0.003)
+	# Back wall: a store-room door and a clock inside; a back door, vent window and
+	# downpipe outside (shop_operations.gd follow_back_wall keeps them on the wall).
+	var inside := Node3D.new()
+	inside.name = "BackWallInside"
+	shop.add_child(inside)
+	Bricks.door(inside, "StoreRoomDoor", Vector3(2.25, -1.4, 0.0), 0.0, 0.9, 2.0, Color(0.42, 0.5, 0.56), "STORE ROOM")
+	Bricks.clock(inside, "WallClock", Vector3(-2.4, 2.0, 0.0), 0.0)
+	var outside := Node3D.new()
+	outside.name = "BackWallOutside"
+	outside.rotation.y = PI
+	shop.add_child(outside)
+	Bricks.door(outside, "BackDoor", Vector3(-1.0, -1.4, 0.0), 0.0, 0.95, 2.1, Color(0.46, 0.5, 0.54))
+	Bricks.vent(outside, "BackVent", Vector3(1.4, 0.9, 0.0), 0.0, 0.8)
+	builder._box("BackDoorStep", outside, Vector3(1.3, 0.12, 0.45), Vector3(-1.0, -1.34, 0.22), Color(0.66, 0.66, 0.64))
+	builder._box("Downpipe", outside, Vector3(0.1, 3.9, 0.1), Vector3(-2.85, 0.5, 0.07), Bricks.STEEL)
+
+## A white bullet CCTV camera on a wall bracket at a front corner, looking out.
+func _cctv(shop: Node3D, at: Vector3) -> void:
+	var holder := Node3D.new()
+	holder.name = "CornerCctv"
+	holder.position = at
+	holder.rotation.y = -PI / 2
+	shop.add_child(holder)
+	builder._box("Bracket", holder, Vector3(0.12, 0.12, 0.04), Vector3(0, 0, 0), Color(0.9, 0.9, 0.9))
+	var body: MeshInstance3D = builder._box("Body", holder, Vector3(0.11, 0.11, 0.28), Vector3(0.08, -0.06, 0.14), Color(0.94, 0.94, 0.92))
+	body.rotation = Vector3(0.35, 0.6, 0)
+	builder._box("Lens", body, Vector3(0.07, 0.07, 0.02), Vector3(0, 0, 0.15), Color(0.05, 0.05, 0.06))
 
 func _interior(shop: Node3D) -> void:
 	for x in [-2.92, 2.92]:
@@ -106,6 +135,9 @@ func _interior(shop: Node3D) -> void:
 		lamp.shadow_enabled = false
 		fixture.add_child(lamp)
 	_label(shop, "InteriorCategory", "EVERYDAY ESSENTIALS", Vector3(0, 0.3, -7.42), 40, 0.003)
+	# Green slogan posters high on the left wall, above the racks.
+	Bricks.poster(shop, "SastaPoster", Vector3(-2.93, 1.45, 1.2), PI / 2, Vector2(0.7, 0.85), Color(0.1, 0.36, 0.22), "SASTA\nSAHI\nHAR DIN")
+	Bricks.poster(shop, "GoodFoodPoster", Vector3(-2.93, 1.45, -1.4), PI / 2, Vector2(0.7, 0.85), Color(0.1, 0.36, 0.22), "GOOD\nFOOD\nHAPPY\nLIFE")
 
 func _shelves() -> void:
 	for product in Catalog.IDS:

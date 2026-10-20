@@ -138,8 +138,9 @@ static func framed_window(parent: Node3D, node_name: String, at: Vector3, yaw: f
 	for x in [-1, 1]: IndianHouse.box(st, Vector3(x * (width / 2.0 + 0.04), height / 2.0, 0.06), Vector3(0.16, height, 0.14), frame)
 	for pane in range(1, panes): IndianHouse.box(st, Vector3(-width / 2.0 + pane * width / panes, height / 2.0, 0.05), Vector3(0.06, height, 0.08), frame.darkened(0.2))
 	IndianHouse.box(st, Vector3(0, -0.12, 0.14), Vector3(width + 0.4, 0.06, 0.26), Color(0.7, 0.7, 0.68))
-	# What shows through the glass: a dark room from outside, daylight from inside.
-	IndianHouse.box(st, Vector3(0, height / 2.0, 0.0), Vector3(width, height, 0.01), backing)
+	# What shows through the glass: a dark room from outside, daylight from inside
+	# (a clear backing leaves the opening see-through).
+	if backing.a > 0.0: IndianHouse.box(st, Vector3(0, height / 2.0, 0.0), Vector3(width, height, 0.01), backing)
 	_mesh(holder, st, "Frame")
 	var pane_mesh := MeshInstance3D.new()
 	pane_mesh.name = "Glass"
@@ -177,6 +178,67 @@ static func planter(parent: Node3D, node_name: String, at: Vector3, yaw: float, 
 	IndianHouse.box(st, Vector3(0, 0.82, 0), Vector3(length - 0.1, 0.56, 0.5), HEDGE)
 	IndianHouse.box(st, Vector3(0, 1.12, 0), Vector3(length - 0.2, 0.08, 0.42), HEDGE.lightened(0.08))
 	_mesh(holder, st)
+
+## A closed steel door in a frame with a handle and a kick plate, its bottom
+## centre at `at` (front = +z), with an optional sign above it.
+static func door(parent: Node3D, node_name: String, at: Vector3, yaw: float, width: float, height: float, colour: Color, sign_text := "") -> Node3D:
+	var holder := _holder(parent, node_name, at, yaw)
+	var st := _begin()
+	IndianHouse.box(st, Vector3(0, height / 2.0, 0.02), Vector3(width, height, 0.04), colour)
+	for x in [-1, 1]: IndianHouse.box(st, Vector3(x * (width / 2.0 + 0.04), height / 2.0, 0.04), Vector3(0.08, height + 0.04, 0.08), STEEL.darkened(0.3))
+	IndianHouse.box(st, Vector3(0, height + 0.04, 0.04), Vector3(width + 0.16, 0.08, 0.08), STEEL.darkened(0.3))
+	IndianHouse.box(st, Vector3(width * 0.36, height * 0.46, 0.07), Vector3(0.04, 0.18, 0.04), Color(0.85, 0.85, 0.82))
+	IndianHouse.box(st, Vector3(0, 0.12, 0.045), Vector3(width - 0.06, 0.22, 0.01), colour.darkened(0.2))
+	for y in [0.55, 1.35]: IndianHouse.box(st, Vector3(0, y * height / 2.1, 0.045), Vector3(width - 0.2, 0.5, 0.01), colour.lightened(0.06))
+	if sign_text != "": IndianHouse.box(st, Vector3(0, height * 0.82, 0.055), Vector3(width - 0.16, 0.16, 0.01), Color(0.12, 0.3, 0.26))
+	_mesh(holder, st)
+	if sign_text != "":
+		var label := Label3D.new()
+		label.text = sign_text
+		label.font_size = 26
+		label.pixel_size = 0.004
+		label.outline_size = 0
+		label.position = Vector3(0, height * 0.82, 0.062)
+		holder.add_child(label)
+	return holder
+
+## A small louvred vent window (front = +z), centred on `at`.
+static func vent(parent: Node3D, node_name: String, at: Vector3, yaw: float, width: float) -> void:
+	var holder := _holder(parent, node_name, at, yaw)
+	var st := _begin()
+	IndianHouse.box(st, Vector3.ZERO, Vector3(width + 0.12, 0.46, 0.04), STEEL.darkened(0.3))
+	IndianHouse.box(st, Vector3(0, 0, 0.02), Vector3(width, 0.34, 0.01), Color(0.1, 0.11, 0.12))
+	for index in range(5): IndianHouse.box(st, Vector3(0, -0.14 + index * 0.07, 0.04), Vector3(width, 0.03, 0.03), STEEL.lightened(0.15))
+	IndianHouse.box(st, Vector3(0, -0.26, 0.06), Vector3(width + 0.2, 0.05, 0.12), Color(0.7, 0.7, 0.68))
+	_mesh(holder, st)
+
+## A round wall clock (front = +z) at 10:10.
+static func clock(parent: Node3D, node_name: String, at: Vector3, yaw: float) -> void:
+	var holder := _holder(parent, node_name, at, yaw)
+	var st := _begin()
+	IndianHouse.disc(st, Vector3.ZERO, 0.2, 0.04, Color(0.15, 0.15, 0.16), 24)
+	IndianHouse.disc(st, Vector3(0, 0, 0.025), 0.175, 0.01, Color(0.97, 0.96, 0.92), 24)
+	for hour in range(12):
+		var angle := hour * TAU / 12.0
+		IndianHouse.box(st, Vector3(sin(angle) * 0.15, cos(angle) * 0.15, 0.033), Vector3(0.012, 0.03, 0.005), Color(0.15, 0.15, 0.16))
+	_turned_box(st, Vector3(-0.04, 0.025, 0.038), Vector3(0.1, 0.014, 0.005), -0.52, Color(0.1, 0.1, 0.1))
+	_turned_box(st, Vector3(0.055, 0.03, 0.04), Vector3(0.13, 0.01, 0.005), 0.52, Color(0.1, 0.1, 0.1))
+	_mesh(holder, st)
+
+## A painted wall poster board with a slogan (front = +z), centred on `at`.
+static func poster(parent: Node3D, node_name: String, at: Vector3, yaw: float, size: Vector2, colour: Color, text: String) -> void:
+	var holder := _holder(parent, node_name, at, yaw)
+	var st := _begin()
+	IndianHouse.box(st, Vector3.ZERO, Vector3(size.x + 0.08, size.y + 0.08, 0.03), Color(0.95, 0.95, 0.92))
+	IndianHouse.box(st, Vector3(0, 0, 0.02), Vector3(size.x, size.y, 0.01), colour)
+	_mesh(holder, st)
+	var label := Label3D.new()
+	label.text = text
+	label.font_size = 40
+	label.pixel_size = 0.004
+	label.outline_size = 0
+	label.position = Vector3(0, 0, 0.03)
+	holder.add_child(label)
 
 ## A big hanging bay board (blue with white letters, e.g. "A1") facing +z.
 static func bay_number(parent: Node3D, node_name: String, at: Vector3, yaw: float, text: String) -> void:

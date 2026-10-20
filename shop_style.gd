@@ -2,12 +2,13 @@ extends Node3D
 
 # The shop's look for each business level (tablet: Upgrade). Each upgrade gives
 # the shop a new name, fascia, floor, wall paint and fittings:
-# 1 Apna Mart (kirana): dark fascia, painted walls, patterned floor.
+# Every level: an AC unit on the left wall.
+# 1 Apna Mart (kirana): dark fascia, painted walls, grey tiled floor.
 # 2 Apna Super Mart: blue fascia with a lit LED frame, blade sign, ice-cream
 #   freezer by the door, light grey tiles, sky-blue walls, LED ceiling panels and
 #   hanging offer banners.
-# 3 Apna Mega Mart: maroon and gold fascia, stone pillars, pennant bunting, an AC
-#   unit, cream marble floor, a lit offer screen and CCTV cameras.
+# 3 Apna Mega Mart: maroon and gold fascia, stone pillars, pennant bunting, cream
+#   marble floor, a lit offer screen and CCTV cameras.
 # Everything sits on the walls, the ceiling or outside the door, so the floor rules
 # for racks and moved furniture (rack_store.gd) stay the same.
 
@@ -24,7 +25,6 @@ var level := 0
 ## The shop expansions the look was last built for (the CCTV sits on the back wall).
 var expansion := -1
 var extras: Node3D
-var original_floor: Material
 var materials := {}
 @onready var world = get_parent().get_parent()
 @onready var shop: Node3D = world.get_node("Shop")
@@ -32,7 +32,6 @@ var materials := {}
 
 func _ready() -> void:
 	name = "ShopStyle"
-	original_floor = shop.get_node("Floor").material_override
 	business.changed.connect(_refresh)
 	_refresh.call_deferred()
 
@@ -57,9 +56,10 @@ func apply(new_level: int) -> void:
 	if decor != null:
 		for child in decor.find_children("WallPaint*", "MeshInstance3D", true, false): child.material_override = _plain(PAINT[tier])
 		for child in decor.find_children("WallStripe*", "MeshInstance3D", true, false): child.material_override = _plain(STRIPE[tier])
-	shop.get_node("Floor").material_override = original_floor if level == 1 else _tiles(level)
+	shop.get_node("Floor").material_override = _tiles(level)
 	var light := world.get_node_or_null("ShopOperations/ShopLight") as OmniLight3D
 	if light != null: light.light_energy = [0.8, 0.86, 0.92][tier]
+	_ac_unit()
 	if level >= 2:
 		_led_frame(GLOW[tier])
 		_blade_sign(["", "SUPER\nSTORE", "MEGA\nMART"][tier], FASCIA[tier], GLOW[tier])
@@ -69,7 +69,6 @@ func apply(new_level: int) -> void:
 	if level >= 3:
 		_pillars()
 		_bunting()
-		_ac_unit()
 		_offer_screen()
 		var back: float = world.get_node("ShopOperations").back_z()
 		for spot in [Vector3(-5.75, 3.86, 2.25), Vector3(-0.25, 3.86, back + 0.2)]: _cctv(spot)
@@ -87,11 +86,11 @@ func _plain(colour: Color, glow := 0.0) -> StandardMaterial3D:
 		materials[key] = material
 	return materials[key]
 
-## Big floor tiles (0.6 m) with grout lines: light grey, or cream marble.
+## Big floor tiles (0.6 m) with grout lines: grey, light grey, or cream marble.
 func _tiles(tier_level: int) -> StandardMaterial3D:
 	var image := Image.create(64, 64, false, Image.FORMAT_RGB8)
-	var light := Color(0.88, 0.9, 0.92) if tier_level == 2 else Color(0.96, 0.92, 0.85)
-	var dark := Color(0.8, 0.83, 0.86) if tier_level == 2 else Color(0.84, 0.76, 0.64)
+	var light: Color = [Color(0.8, 0.82, 0.84), Color(0.88, 0.9, 0.92), Color(0.96, 0.92, 0.85)][tier_level - 1]
+	var dark: Color = [Color(0.73, 0.75, 0.78), Color(0.8, 0.83, 0.86), Color(0.84, 0.76, 0.64)][tier_level - 1]
 	var rng := RandomNumberGenerator.new()
 	rng.seed = tier_level
 	for y in range(64):
