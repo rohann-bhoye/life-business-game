@@ -334,7 +334,6 @@ func _run_checks() -> void:
 	await _walk_forward(0.65)
 	assert(house_player.global_position.z < -2.8)
 	assert(house_player.indoors and is_zero_approx(house_player.spring_arm.spring_length))
-	var outdoor_zoom: float = house_player.camera_distance
 	await process_frame
 	await process_frame
 	assert(not house_player.player_mesh.visible)
@@ -381,7 +380,6 @@ func _run_checks() -> void:
 	assert(shop.business.save_status == "Save: Saved")
 	assert(camera.global_position.y < 3.1)
 	assert(camera.global_position.distance_to(house_player.camera_pivot.global_position) < 0.01)
-	assert(house_player.camera_distance == outdoor_zoom)
 	house_player.global_position = Vector3(4, 1.1, -9.0)
 	house_player.rotation.y = 0.0
 	house_player.camera_pivot.rotation.x = deg_to_rad(-12)
@@ -390,7 +388,8 @@ func _run_checks() -> void:
 	assert(not house_player.indoors)
 	sleep_area._process(0.0)
 	assert(not sleep_area.sleep_sign.visible)
-	assert(house_player.spring_arm.get_hit_length() < house_player.spring_arm.spring_length)
+	# First person outdoors too.
+	assert(camera.global_position.distance_to(house_player.camera_pivot.global_position) < 0.05)
 	house_player.camera_pivot.rotation.x = deg_to_rad(-12)
 	house_player.global_transform = original_player_transform
 	house_player.velocity = Vector3.ZERO
@@ -398,10 +397,8 @@ func _run_checks() -> void:
 	assert(not house.house_menu.visible)
 	await create_timer(0.2).timeout
 	await process_frame
-	assert(not house_player.indoors and house_player.player_mesh.visible)
-	assert(house_player.player_mesh.get_node("KenneyModel").is_visible_in_tree())
-	assert(house_player.camera_distance == outdoor_zoom)
-	assert(camera.global_position.distance_to(house_player.camera_pivot.global_position) > 1.8)
+	assert(not house_player.indoors and not house_player.player_mesh.visible)
+	assert(camera.global_position.distance_to(house_player.camera_pivot.global_position) < 0.05)
 	shop.marketing_timer.start(35.0)
 	await process_frame
 	shop._on_autosave_timer_timeout()
@@ -470,14 +467,8 @@ func _run_checks() -> void:
 		assert(Input.mouse_mode == Input.MOUSE_MODE_CAPTURED)
 	await _walk_forward(0.1)
 	assert(player.global_position.z < old_position.z)
-	var wheel := InputEventMouseButton.new()
-	wheel.button_index = MOUSE_BUTTON_WHEEL_UP
-	wheel.pressed = true
-	var old_distance: float = player.camera_distance
 	# The headless display cannot capture the OS cursor.
 	if supports_mouse_capture:
-		player._unhandled_input(wheel)
-		assert(player.camera_distance == old_distance - 0.5)
 		player._unhandled_input(motion)
 		assert(player.rotation.y != old_yaw and player.camera_pivot.rotation.x != old_pitch)
 	player.rotation.y = old_yaw

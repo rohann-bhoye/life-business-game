@@ -50,7 +50,8 @@ func _process(delta: float) -> void:
 	var walking: bool = visible and not player._menu_is_open() and moving
 	walk_blend = move_toward(walk_blend, 1.0 if walking else 0.0, delta * 6.0)
 	phase += delta * 8.0
-	var first_person: bool = player.indoors or player.shop_indoors or player.warehouse_indoors
+	# The camera is first person everywhere (player.gd), so the view's own arms hold the box.
+	var first_person := true
 	var bob := Vector3(sin(phase) * 0.012, absf(sin(phase)) * 0.018, 0) * walk_blend
 	place_animation_remaining = maxf(0.0, place_animation_remaining - delta)
 	var place_arc := sin((1.0 - place_animation_remaining / PLACE_DURATION) * PI) if place_animation_remaining > 0.0 else 0.0

@@ -111,6 +111,18 @@ board and a local suggestion form. See Farming section below for controls and li
   product's picture, rack code and how many are still needed; order_panel.gd rows
   have the picture + rack code; the bags sit in a white box on the counter; the held
   bag is bigger with an APNA MART / Shukriya print. Screen and list refresh 4x/s.
+- Carry bag models (2026-10-21): tools/blender/build_carry_bag.py (headless Blender
+  5.2) makes assets/props/carry_bag/carry_bag.glb (empty, open; HeldCarryBag in the
+  player's hand) and carry_bag_full.glb (bread, chips, cold drink, dhaniya on top;
+  CounterBag and customers' HeldBag), sharing carry_bag_print.png (front APNA MART
+  badge + "Shukriya! Phir aana", back "Your daily kirana / Reusable bag", white hem
+  with stitching, gussets). Same 0.26 x 0.30 x 0.11 m size as the old box bag, print
+  on +z, 480 / 792 faces. make_carry_bag(parent, name, offset, full := true) loads
+  them; editable source/carry_bag.blend (.gdignore).
+- First person everywhere (2026-10-21, owner: "FPP all in game"): player.gd keeps
+  spring_length 0 and hides the body indoors and out, no wheel zoom, look limit
+  +-70 deg, small head bob on camera_pivot (EYE_HEIGHT 0.7); box_carry_visual.gd
+  always uses the first-person arms. Tests updated (business_backend, box_carry).
 - Startup check (2026-10-20): the player spawns beside the bed from frame 0; only the
   very first frame (behind the loading screen) shows the home without its walls
   (HomeDecor is added deferred). One replay showed a ~2 m slide toward the door just

@@ -7,7 +7,11 @@ var invert_y := false
 @export var gravity := 20.0
 @export var jump_velocity := 6.5
 @export var mouse_sensitivity := 0.003
-@export var camera_distance := 4.5
+## First person everywhere: the camera sits at the eyes (CameraPivot), the player's
+## own body stays hidden, and the view bobs a little while walking.
+const EYE_HEIGHT := 0.7
+const LOOK_LIMIT := 70.0
+var bob_phase := 0.0
 
 var indoors := false
 var shop_indoors := false
@@ -32,6 +36,9 @@ func _ready():
 	settings.apply_player(self)
 	camera.near = 0.05
 	spring_arm.add_excluded_object(get_rid())
+	spring_arm.spring_length = 0.0
+	camera.position = Vector3.ZERO
+	player_mesh.hide()
 	var interior: Area3D = get_tree().current_scene.get_node("House/InteriorArea")
 	interior.body_entered.connect(_on_interior_entered)
 	interior.body_exited.connect(_on_interior_exited)
@@ -72,13 +79,13 @@ func _menu_is_open() -> bool:
 	return shop_menu.visible or house_menu.visible or (is_instance_valid(bargain_menu) and bargain_menu.visible) or (is_instance_valid(supplier_menu) and supplier_menu.visible) or (is_instance_valid(checkout_menu) and checkout_menu.visible)
 
 func _process(_delta: float) -> void:
-	player_mesh.visible = not (indoors or shop_indoors or warehouse_indoors) and spring_arm.get_hit_length() >= 1.8
+	player_mesh.visible = false
 
 func _input(event: InputEvent) -> void:
 	if not event is InputEventMouseMotion or Input.mouse_mode != Input.MOUSE_MODE_CAPTURED or _menu_is_open(): return
 	rotate_y(-event.relative.x * mouse_sensitivity)
 	camera_pivot.rotate_x(event.relative.y * mouse_sensitivity * (1 if invert_y else -1))
-	camera_pivot.rotation.x = clampf(camera_pivot.rotation.x, deg_to_rad(-55), deg_to_rad(55 if warehouse_indoors else 30))
+	camera_pivot.rotation.x = clampf(camera_pivot.rotation.x, deg_to_rad(-LOOK_LIMIT), deg_to_rad(LOOK_LIMIT))
 	get_viewport().set_input_as_handled()
 
 func _unhandled_input(event):
@@ -121,18 +128,14 @@ func _unhandled_input(event):
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-		elif Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and not indoors and not shop_indoors and not warehouse_indoors:
-			if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-				camera_distance = clampf(camera_distance - 0.5, 1.2, 6.0)
-			elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-				camera_distance = clampf(camera_distance + 0.5, 1.2, 6.0)
 
 func _physics_process(delta):
 	var direction = Vector3.ZERO
-	if indoors or shop_indoors or warehouse_indoors:
-		spring_arm.spring_length = 0.0
-	else:
-		spring_arm.spring_length = lerpf(spring_arm.spring_length, camera_distance, minf(delta * 10.0, 1.0))
+	spring_arm.spring_length = 0.0
+	# A small head bob while walking on the ground; back to eye height when still.
+	var walking: bool = is_on_floor() and Vector2(velocity.x, velocity.z).length() > 0.5
+	bob_phase = bob_phase + delta * 9.0 if walking else 0.0
+	camera_pivot.position.y = move_toward(camera_pivot.position.y, EYE_HEIGHT + (sin(bob_phase) * 0.025 if walking else 0.0), delta * 0.6)
 
 	if not _menu_is_open():
 		# Returning from a computer/menu can leave Windows mouse capture released.

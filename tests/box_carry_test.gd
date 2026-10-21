@@ -93,17 +93,15 @@ func _run() -> void:
 		box.set_process(true)
 		player.position = Vector3(-6.8, 1.1, 4.7)
 		player.shop_indoors = false
-		player.spring_arm.spring_length = 4.5
-		player.spring_arm.rotation.y = 0.75
 		await physics_frame
 		await process_frame
 		player.shop_indoors = false
 		box._process(0.016)
-		assert(not box.get_node("LeftCarryForearm").visible)
+		# First person outdoors too: the view's own forearms hold the box.
+		assert(box.get_node("LeftCarryForearm").visible and is_zero_approx(player.spring_arm.spring_length))
 		var visual = player.get_node("MeshInstance3D")
 		assert(not visual.left_arm.get_node("Hand").visible)
-		await _capture(product + "_third_person")
-		player.spring_arm.rotation.y = 0
+		await _capture(product + "_outdoors")
 		if product == "bottle":
 			var origin: Vector3 = player.position
 			var key := InputEventKey.new()
