@@ -90,6 +90,21 @@ board and a local suggestion form. See Farming section below for controls and li
   stand); CheckoutSign moved under the logo. Level 1 floor is grey tiles (shop_style
   _tiles(1)). Green SASTA / GOOD FOOD posters on the left wall. PC Furniture
   pictures re-rendered (tools/rack_thumbnails.gd).
+- Counter orders (2026-10-21, kirana style): in real solo games about half of town
+  customers (customer.gd COUNTER_ORDER_CHANCE, counter_order) walk straight to the
+  till and wait in State.ORDERING (appended last). E at the till: hear the list
+  (order_lines, max 3 products x 3; shown by order_panel.gd on the right), E: take a
+  carry bag (business.use_carry_bag, shop_operations.holding_bag), E at a rack: put
+  one listed item in (customer.add_to_bag -> bag_lines, reserved in
+  rack_furnishing.available and available_stock), Q: take one out / put an empty
+  bag back, E at the till: hand_over_bag -> basket fields filled, all "scanned",
+  prepare_payment -> normal payment menu. Partial bags sell what is there. Timeout
+  ORDER_PATIENCE 150 s x patience factor; a hired cashier fills untaken orders when
+  nobody is at the till. Carry bags: business carry_bags (STARTER_BAGS 20, saved,
+  validated <= 20 + packs x 25) and bag_expenses (in the money identity); PC
+  Wholesale > Supplies sells packs of 25 for Rs50 (buy_carry_bags). Bag stand with
+  count on the counter (BagLayer*, BagStandLabel), CounterBag shown at payment.
+  How to Play has a Counter orders page. Off in co-op.
 - Startup check (2026-10-20): the player spawns beside the bed from frame 0; only the
   very first frame (behind the loading screen) shows the home without its walls
   (HomeDecor is added deferred). One replay showed a ~2 m slide toward the door just

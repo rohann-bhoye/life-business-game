@@ -16,6 +16,14 @@ var counter: Node3D
 var van: Node3D
 var delivery_box: Node3D
 var carried_box: Node3D
+## Counter orders (customer.gd counter_order): the carry bag in the player's hand,
+## the stand of folded bags on the counter and the filled bag shown at payment.
+var holding_bag := false
+var held_bag: Node3D
+var counter_bag: Node3D
+var bag_layers: Array[Node3D] = []
+var bag_stand_label: Label3D
+static var bag_mesh: ArrayMesh
 var checkout_pc: Node3D
 var checkout_display: Label3D
 var checkout_items: Array[Node3D] = []
@@ -132,6 +140,7 @@ func build_room(builder: Node3D) -> void:
 	var checkout_sign := _sign(counter, "CheckoutSign", "CHECKOUT", Vector3(0, 0.07, 0.375))
 	checkout_sign.modulate = Color(1.0, 0.62, 0.15)
 	_counter_front(counter)
+	_build_bag_stand(builder)
 	var desk = builder._box("ComputerDesk", self, Vector3(1.3, 0.85, 0.65), Vector3(-1.1, 0.525, -1.6), Color(0.39, 0.44, 0.43), true)
 	desk.mesh = null
 	var office = preload("res://office_assets.gd")
@@ -233,6 +242,48 @@ func _counter_front(counter: Node3D) -> void:
 	logo.pixel_size = 0.0035
 	logo.outline_size = 0
 	logo.modulate = Color.WHITE
+
+## The stand of folded carry bags at the cashier's end of the counter; the pile and
+## the count follow business.carry_bags (_refresh_bag_stand).
+func _build_bag_stand(builder: Node3D) -> void:
+	var top := 0.58
+	builder._box("BagStandBase", counter, Vector3(0.32, 0.02, 0.24), Vector3(-1.22, top + 0.01, -0.22), Color(0.2, 0.22, 0.25))
+	for layer in range(8):
+		bag_layers.append(builder._box("BagLayer%d" % layer, counter, Vector3(0.28, 0.014, 0.2), Vector3(-1.22, top + 0.027 + layer * 0.016, -0.22), Color(0.16, 0.55, 0.3) if layer % 2 == 0 else Color(0.9, 0.92, 0.88)))
+	bag_stand_label = _sign(counter, "BagStandLabel", "", Vector3(-1.22, top + 0.25, -0.22))
+	bag_stand_label.rotation.y = PI
+	bag_stand_label.font_size = 26
+	bag_stand_label.pixel_size = 0.0022
+	counter_bag = make_carry_bag(counter, "CounterBag", Vector3(-0.7, top, 0.12))
+	counter_bag.hide()
+
+func _refresh_bag_stand() -> void:
+	if not is_instance_valid(bag_stand_label): return
+	var bags: int = shop.business.carry_bags
+	for index in range(bag_layers.size()): bag_layers[index].visible = bags > index * 3
+	bag_stand_label.text = "CARRY BAGS: %d" % bags if bags > 0 else "NO CARRY BAGS\nBuy on the shop PC"
+
+## A green APNA MART carry bag with handles (one cached merged mesh); its bottom
+## centre sits at `offset`.
+func make_carry_bag(parent: Node3D, node_name: String, offset: Vector3) -> MeshInstance3D:
+	if bag_mesh == null:
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var green := Color(0.16, 0.55, 0.3)
+		IndianHouse.box(st, Vector3(0, 0.15, 0), Vector3(0.26, 0.3, 0.1), green)
+		IndianHouse.box(st, Vector3(0, 0.275, 0), Vector3(0.264, 0.05, 0.104), Color(0.95, 0.95, 0.92))
+		IndianHouse.box(st, Vector3(0, 0.13, 0), Vector3(0.12, 0.08, 0.106), Color(0.95, 0.55, 0.12))
+		for z in [-0.035, 0.035]:
+			for x in [-0.07, 0.07]: IndianHouse.box(st, Vector3(x, 0.35, z), Vector3(0.018, 0.1, 0.018), green.darkened(0.2))
+			IndianHouse.box(st, Vector3(0, 0.4, z), Vector3(0.158, 0.018, 0.018), green.darkened(0.2))
+		bag_mesh = st.commit()
+	var bag := MeshInstance3D.new()
+	bag.name = node_name
+	bag.mesh = bag_mesh
+	bag.material_override = IndianHouse._material()
+	bag.position = offset
+	parent.add_child(bag)
+	return bag
 
 ## Supermarket gondola look (one merged mesh): dark steel end frames with slotted
 ## front posts, a back panel, a base plinth, light shelves with steel lips and a top
@@ -532,6 +583,8 @@ func _ready() -> void:
 	carried_box.scale = Vector3.ONE * 0.85
 	carried_box.set_script(preload("res://box_carry_visual.gd"))
 	carried_box.initialize(player)
+	held_bag = make_carry_bag(player, "HeldCarryBag", Vector3(0.34, 0.2, -0.62))
+	held_bag.hide()
 	for index in range(3):
 		var bottle := make_bottle(counter, "CheckoutBottle%d" % index, Vector3(-1.0 + index * 0.27, 0.59, 0.1))
 		bottle.hide()
@@ -710,6 +763,7 @@ func _build_van() -> void:
 func _sync_state() -> void:
 	if not enabled or not is_instance_valid(delivery_box):
 		return
+	_refresh_bag_stand()
 	_update_room_size()
 	follow_back_wall()
 	apply_fixtures()
@@ -829,6 +883,17 @@ func release_held_item() -> bool:
 	if not enabled or player._menu_is_open(): return false
 	if is_instance_valid(furnishing) and furnishing.active:
 		furnishing.cancel()
+		return true
+	if holding_bag:
+		var customer := order_customer()
+		var product: String = customer.take_from_bag() if customer != null else ""
+		if not product.is_empty():
+			ui.show_feedback("Took 1 %s out of the bag." % Catalog.NAMES[product])
+		else:
+			holding_bag = false
+			held_bag.hide()
+			shop.business.return_carry_bag()
+			ui.show_feedback("Carry bag put back on the stand.")
 		return true
 	if shop.business.carried_stock <= 0: return false
 	# At a rack holding this box's product, Q takes one item back into the box.
@@ -964,6 +1029,9 @@ func available_stock(product := "bottle") -> int:
 		if child.has_method("resolve_bargain") and child.has_product and child.state != child.State.LEAVING and not child.is_queued_for_deletion():
 			for line in child.extra_lines:
 				if line.taken and line.product == product: reserved += int(line.count)
+		if child.has_method("resolve_bargain"):
+			for line in child.bag_lines:
+				if line.product == product: reserved += int(line.count)
 	return maxi(0, shop.business.product_stock(product) - reserved)
 
 func update_rack() -> void:
@@ -1029,6 +1097,9 @@ func show_basket(customer: Node3D) -> void:
 	_update_checkout_display()
 
 func _update_checkout_display() -> void:
+	if is_instance_valid(basket_customer) and basket_customer.counter_order and basket_customer.state == basket_customer.State.ORDERING:
+		checkout_display.text = "COUNTER ORDER\n%d/%d IN BAG\n%s" % [basket_customer.bag_total(), basket_customer.order_items(), "FILL THE BAG" if basket_customer.order_told else "TAKE ORDER"]
+		return
 	if is_instance_valid(basket_customer):
 		var status: String = basket_customer.payment_method if basket_customer.state == basket_customer.State.PAYING else "READY TO SCAN"
 		if basket_customer.state == basket_customer.State.SCANNING and basket_customer.cashier_active:
@@ -1078,6 +1149,79 @@ func scan_aimed_checkout_item(customer: Node3D) -> bool:
 		return false
 	return customer.scan_item(index)
 
+## Counter orders: nothing to scan on the counter; the filled bag stands there
+## while the customer pays (place_counter_bag).
+func show_bag(customer: Node3D) -> void:
+	basket_customer = customer
+	for item in checkout_items: item.hide()
+	place_counter_bag(false)
+	_update_checkout_display()
+
+func place_counter_bag(shown: bool) -> void:
+	if is_instance_valid(counter_bag): counter_bag.visible = shown
+
+## The customer at the till waiting for their counter order, or null.
+func order_customer() -> Node3D:
+	var customer := checkout_customer()
+	return customer if customer != null and customer.get("counter_order") == true and customer.state == customer.State.ORDERING else null
+
+## E for counter orders: at the till take the order, then a carry bag, then hand the
+## filled bag over (the payment menu opens); at a rack put one listed item in the bag.
+func _try_counter_order() -> bool:
+	var customer := order_customer()
+	if customer == null or not is_instance_valid(furnishing): return false
+	var name: String = customer.customer_name.get_slice(" - ", 0)
+	if player_at_counter():
+		if not customer.order_told:
+			customer.tell_order()
+			ui.show_feedback("%s's list is on the right. Take a carry bag (E) and fill it at the racks." % name)
+		elif not holding_bag:
+			if shop.business.carried_stock > 0:
+				ui.show_feedback("Put the box down first (Q), then take a carry bag.", true)
+			elif shop.business.use_carry_bag():
+				holding_bag = true
+				held_bag.show()
+				play_sound("stock")
+				ui.show_feedback("Carry bag in hand. At each rack press E to put a listed item in.")
+			else: ui.show_feedback("No carry bags left! Buy a pack on the shop PC (Wholesale > Supplies).", true)
+		elif customer.bag_total() == 0:
+			ui.show_feedback("The bag is empty. Put the listed items in at the racks.", true)
+		elif customer.hand_over_bag():
+			holding_bag = false
+			held_bag.hide()
+			play_sound("stock")
+			if customer.state == customer.State.PAYING: ui.checkout_menu.open_menu()
+		return true
+	if not holding_bag: return false
+	var record: Dictionary = furnishing.near_any_rack()
+	if record.is_empty(): return false
+	for line in customer.order_lines:
+		if customer.still_needed(line.product) > 0 and furnishing.available(int(record.id), line.product) > 0 and customer.add_to_bag(line.product, int(record.id)):
+			play_sound("stock")
+			ui.show_feedback("In the bag: %s %d/%d" % [Catalog.NAMES[line.product], customer.in_bag(line.product), line.count])
+			return true
+	if customer.bag_total() < customer.order_items(): ui.show_feedback("Nothing from %s's list on this rack." % name, true)
+	else: ui.show_feedback("The bag is full. Give it to %s at the counter." % name)
+	return true
+
+func _counter_order_hint() -> String:
+	var customer := order_customer()
+	if customer == null or not is_instance_valid(furnishing):
+		return "Q: put the carry bag back" if holding_bag and player_at_counter() else ""
+	var name: String = customer.customer_name.get_slice(" - ", 0)
+	if player_at_counter():
+		if not customer.order_told: return "Take %s's order" % name
+		if not holding_bag: return "Take a carry bag (%d left)" % shop.business.carry_bags if shop.business.carry_bags > 0 else "No carry bags! Buy a pack on the shop PC"
+		if customer.bag_total() == 0: return "Fill the bag at the racks   |   Q: put the bag back"
+		return "Give the bag to %s (%d/%d items)" % [name, customer.bag_total(), customer.order_items()]
+	if not holding_bag: return ""
+	var record: Dictionary = furnishing.near_any_rack()
+	if record.is_empty(): return ""
+	for line in customer.order_lines:
+		if customer.still_needed(line.product) > 0 and furnishing.available(int(record.id), line.product) > 0:
+			return "Put 1 %s in the bag (%d/%d)   |   Q: take 1 out" % [Catalog.NAMES[line.product], customer.in_bag(line.product), line.count]
+	return "Nothing from the list here"
+
 func show_payment(customer: Node3D) -> void:
 	if basket_customer != customer: return
 	payment_prop.show()
@@ -1089,6 +1233,7 @@ func show_payment(customer: Node3D) -> void:
 func clear_basket(customer: Node3D) -> void:
 	if basket_customer != customer: return
 	basket_customer = null
+	place_counter_bag(false)
 	for bottle in checkout_items: bottle.hide()
 	payment_prop.hide()
 	checkout_display.text = "CHECKOUT\n%s0" % String.chr(8377)
@@ -1139,6 +1284,8 @@ func delivery_box_target() -> int:
 
 func interaction_hint() -> String:
 	if is_instance_valid(furnishing) and furnishing.active: return "Place %s" % furnishing.target_name().to_lower()
+	var order_hint := _counter_order_hint() if enabled else ""
+	if not order_hint.is_empty(): return order_hint
 	if shop.business.carried_stock == 0 and ground_box_target() >= 0: return "Pick up ground box"
 	var warehouse = get_parent().get_node_or_null("Warehouse")
 	if is_instance_valid(warehouse):
@@ -1177,6 +1324,7 @@ func interaction_hint() -> String:
 func try_interact() -> bool:
 	if not enabled or player._menu_is_open():
 		return false
+	if _try_counter_order(): return true
 	if shop.business.carried_stock == 0:
 		var ground_index := ground_box_target()
 		if ground_index >= 0:

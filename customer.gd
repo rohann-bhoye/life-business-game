@@ -1,6 +1,6 @@
 extends Node3D
 
-enum State { WAITING, ARRIVING, BUYING, LEAVING, NEGOTIATING, TAKING, TO_COUNTER, QUEUING, CHECKOUT, SCANNING, PAYING, SHOPPING_MORE }
+enum State { WAITING, ARRIVING, BUYING, LEAVING, NEGOTIATING, TAKING, TO_COUNTER, QUEUING, CHECKOUT, SCANNING, PAYING, SHOPPING_MORE, ORDERING }
 
 @export var walk_speed := 1.5
 @export var spawn_delay := 3.0
@@ -78,6 +78,20 @@ var chatting := false
 var wants_udhaar := false
 var chat_done := {}
 var chat_patience := 0.0
+## Counter orders (kirana style, real solo games): about half of town customers walk
+## straight to the till and tell the shopkeeper a list. The player takes a carry bag
+## from the stand, fills it at the racks and hands it over (shop_operations.gd), then
+## takes payment as usual. A hired cashier fills the order when the player is away.
+const COUNTER_ORDER_CHANCE := 0.5
+const ORDER_PATIENCE := 150.0
+const ORDER_AUTO_SECONDS := 4.0
+var counter_order := false
+## The list: {product, count} lines, at most three products of up to three each.
+var order_lines: Array = []
+var order_told := false
+## What is in the carry bag so far: {product, rack, count}; reserved on those racks.
+var bag_lines: Array = []
+var order_seconds := 0.0
 
 @onready var shop_area: Area3D = get_node(shop_area_path)
 @onready var purchase_point: Marker3D = get_node(purchase_point_path)
@@ -143,7 +157,7 @@ func _physics_process(delta: float) -> void:
 	if speech_seconds > 0.0:
 		speech_seconds -= delta
 		if speech_seconds <= 0.0: speech_label.hide()
-	if state in [State.QUEUING, State.BUYING, State.SCANNING, State.NEGOTIATING, State.PAYING, State.CHECKOUT]:
+	if state in [State.QUEUING, State.BUYING, State.SCANNING, State.NEGOTIATING, State.PAYING, State.CHECKOUT, State.ORDERING]:
 		service_wait_seconds += delta
 	if not shop_area.business.shop_is_open():
 		if state == State.WAITING:
@@ -177,12 +191,17 @@ func _physics_process(delta: float) -> void:
 					if is_instance_valid(operations.furnishing): rack_id = operations.furnishing.choose_rack(product_id)
 					_plan_extra_products(choices)
 					var points: Array[Vector3] = operations.customer_entry_route(product_id, rack_id)
+					if town and not choices.is_empty() and _wants_counter_order():
+						_plan_counter_order()
+						points = [Vector3(-3, 0.1, 3.3), Vector3(-3, 0.1, 1.65)]
+						points.append_array(shop_area.business.racks.route(points[-1], operations.queue_entry()))
 					if town:
 						# Start at one end of the street and walk along the pavement to the door.
 						arrival_side = 1.0 if randf() < 0.5 else -1.0
 						global_position = Vector3(arrival_side * randf_range(22.0, 28.0), 0.1, pavement_lane)
 						points.push_front(Vector3(points[0].x, 0.1, pavement_lane))
 					_set_route(points)
+					if counter_order: state = State.TO_COUNTER
 		State.ARRIVING:
 			if physical_shop():
 				if _walk_route(delta):
@@ -231,6 +250,8 @@ func _physics_process(delta: float) -> void:
 				if physical_shop():
 					if operations.checkout_customer() != self:
 						state = State.QUEUING
+					elif counter_order:
+						_start_order()
 					else:
 						quoted_price = shop_area.business.product_price(product_id)
 						var sharma: int = shop_area.business.rival_price_today(product_id)
@@ -270,6 +291,8 @@ func _physics_process(delta: float) -> void:
 				leave_shop()
 				deal_result = "Customer left without buying."
 				shop_area.business.record_bargain_refusal(true)
+		State.ORDERING:
+			_update_order(delta)
 		State.LEAVING:
 			if (_walk_route(delta) if physical_shop() else _walk_to(exit_point.global_position, delta)):
 				queue_free()
@@ -386,6 +409,8 @@ func _walk_route(delta: float) -> bool:
 
 func leave_shop() -> void:
 	patience_label.hide()
+	# Anything still in a carry bag goes back to its rack.
+	bag_lines.clear()
 	if not review_recorded and (deal_sold or not review_outcome.is_empty()):
 		review_recorded = true
 		# Friendly service (a chat) makes the wait feel 10 s shorter.
@@ -568,3 +593,144 @@ func _walk_to(destination: Vector3, delta: float) -> bool:
 		look_at(destination, Vector3.UP)
 	global_position = global_position.move_toward(destination, walk_speed * delta)
 	return global_position.distance_squared_to(destination) < 0.0001
+
+func _wants_counter_order() -> bool:
+	return physical_shop() and is_instance_valid(operations.furnishing) and not preload("res://coop.gd").active and randf() < COUNTER_ORDER_CHANCE
+
+## The list a counter-order customer tells: the main product and the extra products
+## already planned (at most three products, up to three of each, no haggling).
+func _plan_counter_order() -> void:
+	counter_order = true
+	wants_discount = false
+	order_lines = [{"product": product_id, "count": clampi(shopping_quantity, 1, 3)}]
+	for line in extra_lines:
+		if order_lines.size() < 3: order_lines.append({"product": line.product, "count": clampi(int(line.count), 1, 3)})
+	extra_lines.clear()
+	rack_id = -1
+
+## At the front of the queue: wait at the till for the shopkeeper to take the order.
+func _start_order() -> void:
+	state = State.ORDERING
+	order_seconds = ORDER_PATIENCE * shop_area.business.patience_factor() + chat_patience
+	quoted_price = shop_area.business.product_price(product_id)
+	agreed_unit_price = quoted_price
+	auto_checkout_seconds = ORDER_AUTO_SECONDS + order_items() * shop_area.business.cashier_scan_seconds()
+	operations.show_bag(self)
+	say("Bhaiya, saaman dena! List hai.", 4.0)
+
+func _update_order(delta: float) -> void:
+	order_seconds -= delta
+	patience_label.text = "%s\nOrder: %ds" % [customer_name.get_slice(" - ", 0), ceili(maxf(0.0, order_seconds))]
+	patience_label.modulate = Color(1, 0.7, 0.25) if order_seconds < 40.0 else Color(0.8, 1, 0.85)
+	patience_label.position.y = 1.9
+	patience_label.show()
+	# The hired cashier serves alone while nobody is at the till and the order is not taken.
+	if not order_told and shop_area.business.cashier_on_shift() and not operations.someone_at_counter():
+		auto_checkout_seconds -= delta
+		if auto_checkout_seconds <= 0.0:
+			_cashier_fills_order()
+			return
+	if order_seconds > 0.0: return
+	review_outcome = "timeout"
+	deal_result = "%s left: the order took too long." % customer_name.get_slice(" - ", 0)
+	shop_area.business.record_bargain_refusal(true)
+	leave_shop()
+	get_tree().current_scene.get_node("Ui").show_feedback(deal_result, true)
+
+func _cashier_fills_order() -> void:
+	for line in order_lines:
+		while still_needed(line.product) > 0:
+			var rack: int = operations.furnishing.choose_rack(line.product)
+			if operations.furnishing.available(rack, line.product) <= 0: break
+			add_to_bag(line.product, rack)
+	if bag_total() == 0:
+		review_outcome = "stock"
+		shop_area.business.record_stock_shortage()
+		leave_shop()
+		return
+	shop_area.business.use_carry_bag()
+	hand_over_bag()
+
+## The customer says what they want (the player talked to them at the till); the
+## full list shows on the right of the screen (order_panel.gd).
+func tell_order() -> void:
+	order_told = true
+	var first: Dictionary = order_lines[0]
+	var more := "" if order_lines.size() == 1 else "\naur %d cheez" % (order_lines.size() - 1)
+	say("%d %s%s dena!" % [first.count, operations.Catalog.NAMES[first.product], more], 6.0)
+
+func order_items() -> int:
+	var total := 0
+	for line in order_lines: total += int(line.count)
+	return total
+
+func bag_total() -> int:
+	var total := 0
+	for line in bag_lines: total += int(line.count)
+	return total
+
+func in_bag(product: String) -> int:
+	var total := 0
+	for line in bag_lines:
+		if line.product == product: total += int(line.count)
+	return total
+
+func still_needed(product: String) -> int:
+	for line in order_lines:
+		if line.product == product: return maxi(0, int(line.count) - in_bag(product))
+	return 0
+
+## One item from `rack` into the carry bag (it stays reserved on that rack).
+func add_to_bag(product: String, rack: int) -> bool:
+	if state != State.ORDERING or still_needed(product) <= 0: return false
+	var line: Dictionary = {}
+	for item in bag_lines:
+		if item.product == product and int(item.rack) == rack: line = item
+	if line.is_empty():
+		line = {"product": product, "rack": rack, "count": 0}
+		bag_lines.append(line)
+	line.count += 1
+	operations.update_rack()
+	return true
+
+## Q: the last item put in the bag goes back to its rack; returns its product or "".
+func take_from_bag() -> String:
+	if bag_lines.is_empty(): return ""
+	var line: Dictionary = bag_lines[-1]
+	line.count -= 1
+	if int(line.count) <= 0: bag_lines.pop_back()
+	operations.update_rack()
+	return line.product
+
+## The filled bag goes to the customer: its contents become the basket (already
+## counted, so nothing to scan) and the customer pays as usual.
+func hand_over_bag() -> bool:
+	if state != State.ORDERING or bag_total() == 0: return false
+	# One line per product (a product taken from two racks sells from any rack).
+	var lines: Array = []
+	for line in bag_lines:
+		var same: Array = lines.filter(func(item): return item.product == line.product)
+		if same.is_empty(): lines.append(line.duplicate())
+		else:
+			same[0].count += int(line.count)
+			same[0].rack = -1
+	var missing := bag_total() < order_items()
+	bag_lines.clear()
+	product_id = lines[0].product
+	rack_id = int(lines[0].rack)
+	basket_count = int(lines[0].count)
+	has_product = true
+	extra_lines.clear()
+	for line in lines.slice(1): extra_lines.append({"product": line.product, "rack": int(line.rack), "count": int(line.count), "taken": true})
+	quoted_price = shop_area.business.product_price(product_id)
+	agreed_unit_price = quoted_price
+	scanned_items.clear()
+	for index in range(total_items()): scanned_items.append(index)
+	scanned_count = total_items()
+	if missing: shop_area.business.record_stock_shortage()
+	say("Baaki nahi hai? Chalo, theek hai." if missing else "Shukriya bhaiya!", 3.0)
+	held_bottle = operations.make_carry_bag(self, "HeldBag", Vector3(0.3, 0.5, -0.12))
+	held_bottle.hide()
+	operations.place_counter_bag(true)
+	prepare_payment(quoted_price)
+	return true

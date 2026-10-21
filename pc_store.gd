@@ -5,6 +5,7 @@ extends Panel
 # products can be ordered in one go (business.order_cart). Kenney UI Pack styling.
 # Furniture shows racks the same way: a picture card with an Order button (the
 # furniture truck brings the package to the warehouse; unpack it there with E).
+# Supplies sells packs of carry bags for counter orders (straight onto the stand).
 signal back_requested
 
 const Catalog = preload("res://product_catalog.gd")
@@ -15,6 +16,7 @@ const CATEGORIES := [
 	["Fresh produce", ["tomato", "carrot", "cabbage", "corn", "apple"]],
 	["Household", ["bottle", "soap"]],
 	["Furniture", ["rack_shelf", "rack_produce", "rack_fridge"]],
+	["Supplies", ["carry_bags"]],
 ]
 ## Furniture cards: [id, name, what it holds].
 const FURNITURE := [["rack_shelf", "Shelf rack", "3 rows, any product"], ["rack_produce", "Produce table", "12 veg baskets"], ["rack_fridge", "Cold-drink fridge", "Drinks + milk, sells more"]]
@@ -38,6 +40,7 @@ var order_button: Button
 var clear_button: Button
 var cards := {}
 var furniture_cards := {}
+var supply_cards := {}
 
 func setup(business_ref, money_formatter: Callable) -> void:
 	business = business_ref
@@ -104,17 +107,17 @@ func _build_sidebar() -> void:
 	var heading := _label("CATEGORIES", Vector2(16, 70), 150, 15, KenneyTheme.GREEN)
 	heading.add_theme_font_override("font", KenneyTheme.heading_font())
 	for index in range(CATEGORIES.size()):
-		var button := _button(CATEGORIES[index][0], Rect2(14, 98 + index * 46, 152, 40))
+		var button := _button(CATEGORIES[index][0], Rect2(14, 98 + index * 42, 152, 36))
 		button.name = "Category%d" % index
 		button.add_theme_font_size_override("font_size", 13)
 		button.pressed.connect(select_category.bind(index))
 		category_buttons.append(button)
 	var deal := Panel.new()
-	deal.position = Vector2(14, 336)
-	deal.size = Vector2(152, 116)
+	deal.position = Vector2(14, 352)
+	deal.size = Vector2(152, 104)
 	deal.add_theme_stylebox_override("panel", KenneyTheme.button_box("yellow"))
 	add_child(deal)
-	var title := _label("BULK DEAL", Vector2(10, 10), 132, 18, Color("713f12"), deal)
+	var title := _label("BULK DEAL", Vector2(10, 6), 132, 18, Color("713f12"), deal)
 	title.add_theme_font_override("font", KenneyTheme.heading_font())
 	var text := Label.new()
 	text.text = "Order 5 or more boxes of one product and get 10% off that line."
@@ -122,8 +125,8 @@ func _build_sidebar() -> void:
 	text.add_theme_font_size_override("font_size", 13)
 	text.add_theme_color_override("font_color", Color("713f12"))
 	deal.add_child(text)
-	text.position = Vector2(10, 36)
-	text.size = Vector2(132, 76)
+	text.position = Vector2(10, 30)
+	text.size = Vector2(132, 72)
 
 func _build_products() -> void:
 	var scroll := ScrollContainer.new()
@@ -184,6 +187,48 @@ func _build_products() -> void:
 		order.name = "OrderButton"
 		order.pressed.connect(order_furniture.bind(entry[0]))
 		furniture_cards[entry[0]] = {"card": card, "price": price, "stock": stock, "order": order}
+	var bags := Panel.new()
+	bags.name = "Card_carry_bags"
+	bags.custom_minimum_size = Vector2(150, 196)
+	grid.add_child(bags)
+	var picture := TextureRect.new()
+	picture.texture = _bag_picture()
+	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	picture.position = Vector2(35, 8)
+	picture.size = Vector2(80, 80)
+	bags.add_child(picture)
+	var bag_title := _label("Carry bags", Vector2(8, 88), 134, 15, KenneyTheme.TEXT, bags)
+	bag_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var bag_about := _label("Pack of %d | counter orders" % business.BAG_PACK_SIZE, Vector2(8, 108), 134, 11, KenneyTheme.MUTED, bags)
+	bag_about.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var bag_price := _label("", Vector2(8, 124), 134, 14, KenneyTheme.GREEN, bags)
+	bag_price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var bag_stock := _label("", Vector2(8, 142), 134, 11, KenneyTheme.MUTED, bags)
+	bag_stock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var buy := _button("Buy pack", Rect2(12, 158, 126, 32), "PrimaryButton", bags)
+	buy.name = "BuyBagsButton"
+	buy.pressed.connect(buy_carry_bags)
+	supply_cards["carry_bags"] = {"card": bags, "price": bag_price, "stock": bag_stock, "order": buy}
+
+## A drawn green carry bag for the Supplies card.
+func _bag_picture() -> ImageTexture:
+	var image := Image.create(96, 96, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0, 0, 0, 0))
+	var green := Color(0.16, 0.55, 0.3)
+	image.fill_rect(Rect2i(20, 34, 56, 56), green)
+	image.fill_rect(Rect2i(20, 34, 56, 10), Color(0.95, 0.95, 0.92))
+	image.fill_rect(Rect2i(36, 56, 24, 16), Color(0.95, 0.55, 0.12))
+	for x in [30, 62]: image.fill_rect(Rect2i(x, 14, 4, 22), green.darkened(0.25))
+	image.fill_rect(Rect2i(30, 12, 36, 4), green.darkened(0.25))
+	return ImageTexture.create_from_image(image)
+
+func buy_carry_bags() -> bool:
+	var success: bool = business.buy_carry_bags()
+	status_label.text = "%d carry bags are on the stand at the counter." % business.carry_bags if success else "Cannot buy: check money (the stand holds %d bags)." % business.MAX_BAGS
+	status_label.add_theme_color_override("font_color", KenneyTheme.GREEN if success else Color("b91c1c"))
+	refresh()
+	return success
 
 func _build_cart() -> void:
 	var panel := Panel.new()
@@ -226,6 +271,7 @@ func select_category(index: int) -> void:
 	var allowed: Array = CATEGORIES[index][1]
 	for id in cards: cards[id].card.visible = allowed.is_empty() or id in allowed
 	for id in furniture_cards: furniture_cards[id].card.visible = id in allowed
+	for id in supply_cards: supply_cards[id].card.visible = id in allowed
 	refresh()
 
 ## A shelf rack is for the first product without its own restock rack yet, so the
@@ -297,6 +343,12 @@ func refresh() -> void:
 		entry.stock.text = "Racks %d / %d  |  Coming %d" % [owned, business.rack_limit(), business.logistics.rack_count()]
 		entry.order.disabled = not business.can_order_racks(FURNITURE_PRODUCT.get(id, _shelf_product()), 1)
 		entry.order.text = "Rack limit" if owned >= business.rack_limit() else "Order"
+	var bag_card: Dictionary = supply_cards.get("carry_bags", {})
+	if not bag_card.is_empty():
+		bag_card.price.text = "%s / pack" % _money(business.BAG_PACK_COST)
+		bag_card.stock.text = "On the stand: %d" % business.carry_bags
+		bag_card.stock.add_theme_color_override("font_color", KenneyTheme.MUTED if business.carry_bags > 0 else Color("b91c1c"))
+		bag_card.order.disabled = not business.can_buy_carry_bags()
 	for child in cart_list.get_children():
 		cart_list.remove_child(child)
 		child.queue_free()

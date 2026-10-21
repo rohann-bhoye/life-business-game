@@ -33,6 +33,15 @@ const UDHAAR_DAYS := 2
 const UDHAAR_WRITE_OFF_DAYS := 5
 const UDHAAR_PAY_CHANCE := 0.7
 var expansion_expenses := 0
+## Carry bags for counter orders (customer.gd counter_order): packs bought on the
+## shop PC go straight onto the bag stand at the counter; every game starts with
+## STARTER_BAGS. One bag is used per order the player fills.
+const BAG_PACK_SIZE := 25
+const BAG_PACK_COST := 50
+const STARTER_BAGS := 20
+const MAX_BAGS := 500
+var carry_bags := STARTER_BAGS
+var bag_expenses := 0
 const FarmStore := preload("res://farm_store.gd")
 var farm := FarmStore.new()
 
@@ -1155,7 +1164,7 @@ func finish_marketing() -> void:
 	_commit()
 
 func total_expenses() -> int:
-	return restocking_expenses + marketing_expenses + hiring_expenses + operating_expenses + wage_expenses + upgrade_expenses + overtime_expenses + furnishing_expenses + expansion_expenses + farm.expenses() + loan_interest_paid
+	return restocking_expenses + marketing_expenses + hiring_expenses + operating_expenses + wage_expenses + upgrade_expenses + overtime_expenses + furnishing_expenses + expansion_expenses + bag_expenses + farm.expenses() + loan_interest_paid
 
 func place_rack(product: String, position: Vector2, turn: int, id := -1, from_delivery := false) -> bool:
 	if product not in Catalog.IDS or not position.is_finite() or turn < 0 or turn > 3: return false
@@ -1250,6 +1259,35 @@ func start_with_one_rack() -> bool:
 	racks.strict = true
 	return true
 
+## Shop PC (Wholesale > Supplies): a pack of carry bags, straight onto the stand.
+func can_buy_carry_bags() -> bool:
+	return money >= BAG_PACK_COST and carry_bags + BAG_PACK_SIZE <= MAX_BAGS
+
+func buy_carry_bags() -> bool:
+	if not can_buy_carry_bags(): return false
+	money -= BAG_PACK_COST
+	bag_expenses += BAG_PACK_COST
+	carry_bags += BAG_PACK_SIZE
+	if not save_progress():
+		money += BAG_PACK_COST
+		bag_expenses -= BAG_PACK_COST
+		carry_bags -= BAG_PACK_SIZE
+		return false
+	changed.emit()
+	return true
+
+## Takes one carry bag from the stand for a counter order.
+func use_carry_bag() -> bool:
+	if carry_bags <= 0: return false
+	carry_bags -= 1
+	_commit()
+	return true
+
+## Q with an empty carry bag: it goes back on the stand.
+func return_carry_bag() -> void:
+	carry_bags = mini(carry_bags + 1, MAX_BAGS)
+	_commit()
+
 ## G in the shop: moves the checkout counter or the PC desk (rack_store.gd fixtures).
 func move_fixture(fixture: String, position: Vector2, turn: int) -> bool:
 	if fixture not in RackStore.FIXTURE_HOME or not position.is_finite() or turn < 0 or turn > 3: return false
@@ -1343,6 +1381,8 @@ func snapshot() -> Dictionary:
 	data["udhaar_given"] = udhaar_given
 	data["udhaar_collected"] = udhaar_collected
 	data["expansion_expenses"] = expansion_expenses
+	data["carry_bags"] = carry_bags
+	data["bag_expenses"] = bag_expenses
 	data["stock_collection_assigned"] = stock_collection_assigned
 	data["logistics"] = logistics.snapshot()
 	for field in ["warehouse_worker_hired", "warehouse_worker_hired_day", "warehouse_shift_start", "warehouse_shift_end"]: data[field] = get(field)
@@ -1432,6 +1472,8 @@ func restore(data: Dictionary) -> void:
 	udhaar_given = int(data.get("udhaar_given", 0))
 	udhaar_collected = int(data.get("udhaar_collected", 0))
 	expansion_expenses = int(data.get("expansion_expenses", 0))
+	carry_bags = int(data.get("carry_bags", STARTER_BAGS))
+	bag_expenses = int(data.get("bag_expenses", 0))
 	racks.expansion = shop_expansion
 
 func save_progress() -> bool:
@@ -1623,6 +1665,11 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	var expected_expansion := 0
 	for index in range(int(expansion)): expected_expansion += EXPANSION_COSTS[index]
 	if not EmployeeRelations.whole(data.get("expansion_expenses", 0), MAX_SAVED_VALUE) or int(data.get("expansion_expenses", 0)) != expected_expansion: return false
+	# Carry bags: whole packs paid for, never more bags than the starter ones plus the packs.
+	var bags = data.get("carry_bags", STARTER_BAGS)
+	var bag_cost = data.get("bag_expenses", 0)
+	if not EmployeeRelations.whole(bags, MAX_BAGS) or not EmployeeRelations.whole(bag_cost, MAX_SAVED_VALUE) or int(bag_cost) % BAG_PACK_COST != 0: return false
+	if int(bags) > STARTER_BAGS + int(bag_cost) / BAG_PACK_COST * BAG_PACK_SIZE: return false
 	if not EmployeeRelations.whole(furnishing, MAX_SAVED_VALUE): return false
 	var layout = data.get("rack_layout", RackStore.fresh(int(data.stock), data.inventory))
 	if not RackStore.valid(layout, int(data.stock), data.inventory, data.get("shop_fixtures", RackStore.FIXTURE_HOME), int(expansion), int(base)): return false
@@ -1793,7 +1840,7 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	if extra_sold > sold or extra_stock > data.stock: return false
 	if revenue % 10 != 0 or revenue < sold * 50 or revenue > sold * 200:
 		return false
-	var expenses := int(data["restocking_expenses"]) + int(data["marketing_expenses"]) + int(data["hiring_expenses"]) + int(data["operating_expenses"]) + int(data["wage_expenses"]) + int(data["upgrade_expenses"]) + int(data.overtime_expenses) + int(furnishing) + expected_expansion + farm_state.expenses() + int(data.get("loan_interest_paid", 0))
+	var expenses := int(data["restocking_expenses"]) + int(data["marketing_expenses"]) + int(data["hiring_expenses"]) + int(data["operating_expenses"]) + int(data["wage_expenses"]) + int(data["upgrade_expenses"]) + int(data.overtime_expenses) + int(furnishing) + expected_expansion + int(bag_cost) + farm_state.expenses() + int(data.get("loan_interest_paid", 0))
 	# Loans: money received minus principal paid back.
 	if not _valid_loan(data): return false
 	expenses -= int(data.get("loan_received", 0)) - int(data.get("loan_principal_repaid", 0))

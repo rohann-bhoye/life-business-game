@@ -15,6 +15,8 @@ var notifications: Control
 var tablet: Node3D
 var staff_dialog: Panel
 var customer_chat: Panel
+## Counter order list on the right of the screen (order_panel.gd).
+var order_panel: Panel
 var friend_chat: Panel
 var how_to_play: Control
 var employee_role := "cashier"
@@ -180,6 +182,9 @@ func _ready() -> void:
 	friend_chat.set_script(FriendChat)
 	friend_chat.theme = theme
 	add_child(friend_chat)
+	order_panel = preload("res://order_panel.gd").new()
+	order_panel.theme = theme
+	add_child(order_panel)
 	shop.business.khata_news.connect(func(message: String, good: bool): show_feedback(message, not good))
 	how_to_play = HowToPlay.new()
 	add_child(how_to_play)

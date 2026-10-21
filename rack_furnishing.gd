@@ -95,6 +95,10 @@ func available(id: int, sku := "") -> int:
 		if child.get("has_product") == true and not child.get("deal_sold") and child.get("extra_lines") is Array:
 			for line in child.extra_lines:
 				if line.taken and line.product == sku and int(line.rack) == id: count -= int(line.count)
+		# Items in a counter order's carry bag (customer.gd bag_lines).
+		if child.get("bag_lines") is Array:
+			for line in child.bag_lines:
+				if line.product == sku and int(line.rack) == id: count -= int(line.count)
 	return maxi(0, count)
 
 func choose_rack(sku: String) -> int:
