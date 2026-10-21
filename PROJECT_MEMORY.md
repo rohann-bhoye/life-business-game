@@ -90,7 +90,7 @@ board and a local suggestion form. See Farming section below for controls and li
   stand); CheckoutSign moved under the logo. Level 1 floor is grey tiles (shop_style
   _tiles(1)). Green SASTA / GOOD FOOD posters on the left wall. PC Furniture
   pictures re-rendered (tools/rack_thumbnails.gd).
-- Counter orders (2026-10-21, kirana style): in real solo games about half of town
+- Counter orders (2026-10-21, kirana style): in real solo games EVERY town (owner: no self-service)
   customers (customer.gd COUNTER_ORDER_CHANCE, counter_order) walk straight to the
   till and wait in State.ORDERING (appended last). E at the till: hear the list
   (order_lines, max 3 products x 3; shown by order_panel.gd on the right), E: take a

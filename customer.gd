@@ -78,11 +78,12 @@ var chatting := false
 var wants_udhaar := false
 var chat_done := {}
 var chat_patience := 0.0
-## Counter orders (kirana style, real solo games): about half of town customers walk
-## straight to the till and tell the shopkeeper a list. The player takes a carry bag
-## from the stand, fills it at the racks and hands it over (shop_operations.gd), then
-## takes payment as usual. A hired cashier fills the order when the player is away.
-const COUNTER_ORDER_CHANCE := 0.5
+## Counter orders (kirana style, real solo games): every town customer walks straight
+## to the till and tells the shopkeeper a list; nobody takes things off the racks
+## themselves. The player takes a carry bag from the box, fills it at the racks and
+## hands it over (shop_operations.gd), then takes payment as usual. A hired cashier
+## fills the order when the player is away. (Test scenes and co-op still self-serve.)
+const COUNTER_ORDER_CHANCE := 1.0
 const ORDER_PATIENCE := 150.0
 const ORDER_AUTO_SECONDS := 4.0
 var counter_order := false
@@ -616,7 +617,10 @@ func _start_order() -> void:
 	agreed_unit_price = quoted_price
 	auto_checkout_seconds = ORDER_AUTO_SECONDS + order_items() * shop_area.business.cashier_scan_seconds()
 	operations.show_bag(self)
-	say("Bhaiya, saaman dena! List hai.", 4.0)
+	# Sharma's cheaper price still comes up, as at the till before.
+	var sharma: int = shop_area.business.rival_price_today(product_id)
+	if shop_area.business.rival_open() and quoted_price > sharma: say("Sharma ji ke yahan %s%d mein milta hai!" % [String.chr(8377), sharma])
+	else: say("Bhaiya, saaman dena! List hai.", 4.0)
 
 func _update_order(delta: float) -> void:
 	order_seconds -= delta

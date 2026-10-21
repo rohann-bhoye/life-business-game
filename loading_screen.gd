@@ -13,7 +13,7 @@ const GAME_SCENE := "res://main.tscn.tscn"
 const KenneyTheme := preload("res://kenney_theme.gd")
 const TIPS := [
 	"Customers show Cash, Card or UPI at the counter. Pick the same method to get paid.",
-	"Aim at each product on the counter and press E to scan it.",
+	"Customers tell their list at the counter. Find each item by its rack code (R1, R2...) and fill a carry bag.",
 	"Order 5 or more boxes of one product on the shop PC and get 10% off that line.",
 	"Hire Sunil to carry delivery boxes and fill the shelves for you.",
 	"Sharma's store opens on day 3. Use Match on the shop PC to win customers back.",
