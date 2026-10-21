@@ -199,7 +199,7 @@ func _run() -> void:
 	assert(business.supply_in_transit == 0 and business.logistics.rack_incoming.is_empty())
 	assert(business.logistics.rack_delivered.size() == packages_before + 1)
 	assert(ops.delivery_box.visible and ops.delivery_box.position == ops.product_delivery_point(0))
-	assert(ops.delivery_box.has_node("ShippingLabel") and ops.delivery_box.get_node("SupplierLabel").text == "APNA WHOLESALE")
+	assert(ops.delivery_box.has_node("Carton") and ops.delivery_box.get_node("SupplierLabel").text == "APNA WHOLESALE")
 	assert(warehouse.furniture_boxes[0].get_node("SupplierLabel").text == "RACKWORKS")
 	assert(business._is_valid_snapshot(business.snapshot()))
 	if DisplayServer.get_name() != "headless":

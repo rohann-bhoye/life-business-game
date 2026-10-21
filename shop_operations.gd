@@ -23,7 +23,6 @@ var held_bag: Node3D
 var counter_bag: Node3D
 var bag_layers: Array[Node3D] = []
 var bag_stand_label: Label3D
-static var bag_mesh: ArrayMesh
 ## The order screen on the counter (faces the cashier): each listed product's
 ## picture, its rack code and how many are still needed.
 var order_title: Label3D
@@ -123,7 +122,8 @@ func build_room(builder: Node3D) -> void:
 	# Waist height for the 1.45 m characters (top at 0.88 m): the 1 m box sinks
 	# 0.3 m into the floor so everything on the counter keeps its local layout.
 	counter = builder._box("CheckoutCounter", self, Vector3(2.8, 1, 0.7), Vector3(-2.5, 0.3, 0.4), Color(0.58, 0.37, 0.2), true)
-	builder._box("CounterTop", counter, Vector3(2.9, 0.08, 0.8), Vector3(0, 0.54, 0), Color(0.2, 0.24, 0.26))
+	counter.mesh = null
+	_prop(counter, "CounterModel", "shop/counter", Vector3(0, -0.3, 0))
 	# The monitor stands at the cashier's side, turned toward the cashier, so it
 	# never hides the customer's face at the middle of the counter.
 	checkout_pc = builder._box("CheckoutPC", counter, Vector3(0.64, 0.4, 0.08), Vector3(1.0, 0.98, -0.2), Color(0.08, 0.12, 0.14))
@@ -144,9 +144,6 @@ func build_room(builder: Node3D) -> void:
 	scanner_light.omni_range = 0.8
 	scanner.add_child(scanner_light)
 	builder._box("CardTerminal", counter, Vector3(0.19, 0.08, 0.25), Vector3(1.05, 0.63, 0.2), Color(0.1, 0.17, 0.19))
-	var checkout_sign := _sign(counter, "CheckoutSign", "CHECKOUT", Vector3(0, 0.07, 0.375))
-	checkout_sign.modulate = Color(1.0, 0.62, 0.15)
-	_counter_front(counter)
 	_build_bag_stand(builder)
 	var desk = builder._box("ComputerDesk", self, Vector3(1.3, 0.85, 0.65), Vector3(-1.1, 0.525, -1.6), Color(0.39, 0.44, 0.43), true)
 	desk.mesh = null
@@ -200,7 +197,9 @@ func build_room(builder: Node3D) -> void:
 		product_items[id] = extra.items
 		product_labels[id] = extra.label
 
-func build_stock_rack(builder: Node3D, node_name: String, product: String, position: Vector3) -> Dictionary:
+## Three rows of ten on a gondola (`frame` "rack") or inside a cooler ("fridge"): the
+## model from tools/blender/build_shop_fixtures.py, its shelves at the item heights.
+func build_stock_rack(builder: Node3D, node_name: String, product: String, position: Vector3, frame := "rack") -> Dictionary:
 	var node := Node3D.new()
 	node.name = node_name
 	node.position = position
@@ -210,59 +209,21 @@ func build_stock_rack(builder: Node3D, node_name: String, product: String, posit
 	for level in range(3):
 		builder._collider("Shelf%dBody" % level, node, Vector3(0.65, 0.06, 2.1), Vector3(0, 0.22 + level * 0.55, 0))
 		for index in range(10): items.append(make_product(node, ("Bottle" if product == "bottle" else "Product") + str(level * 10 + index), Vector3(0, 0.26 + level * 0.55, -0.86 + index * 0.19), product))
-	_rack_frame(node)
+	_prop(node, "RackFrame", "shop/" + frame)
 	var label := _sign(node, "StockSign", "", Vector3(0.4, 2.1, 0))
 	label.rotation.y = PI / 2
 	return {"node": node, "items": items, "label": label}
 
-## The customer's side of the wooden counter (one merged mesh that moves with it):
-## plank lines, a kick plate, an orange trim under the top, a dark APNA MART logo
-## panel and a UPI QR stand on the top.
-func _counter_front(counter: Node3D) -> void:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for plank in range(13): IndianHouse.box(st, Vector3(-1.2 + plank * 0.2, 0.15, 0.352), Vector3(0.012, 0.64, 0.006), Color(0.43, 0.27, 0.13))
-	for x in [-1.402, 1.402]: IndianHouse.box(st, Vector3(x, -0.15, 0), Vector3(0.006, 0.1, 0.7), Color(0.15, 0.12, 0.1))
-	IndianHouse.box(st, Vector3(0, -0.15, 0.354), Vector3(2.8, 0.1, 0.012), Color(0.15, 0.12, 0.1))
-	IndianHouse.box(st, Vector3(0, 0.47, 0.356), Vector3(2.8, 0.03, 0.012), Color(0.95, 0.55, 0.12))
-	IndianHouse.box(st, Vector3(0, 0.19, 0.362), Vector3(1.1, 0.44, 0.02), Color(0.13, 0.14, 0.16))
-	IndianHouse.box(st, Vector3(0, 0.0, 0.373), Vector3(1.1, 0.012, 0.004), Color(0.95, 0.55, 0.12))
-	# UPI QR stand at the customer's corner of the top.
-	var top := 0.58
-	IndianHouse.box(st, Vector3(1.32, top + 0.006, 0.22), Vector3(0.12, 0.012, 0.07), Color(0.2, 0.2, 0.22))
-	IndianHouse.box(st, Vector3(1.32, top + 0.09, 0.2), Vector3(0.11, 0.16, 0.012), Color(0.97, 0.97, 0.95))
-	IndianHouse.box(st, Vector3(1.32, top + 0.155, 0.207), Vector3(0.11, 0.03, 0.003), Color(0.95, 0.45, 0.1))
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7
-	for row in range(5):
-		for column in range(5):
-			var corner := (row < 2 and column < 2) or (row < 2 and column > 2) or (row > 2 and column < 2)
-			if corner or rng.randf() < 0.45:
-				IndianHouse.box(st, Vector3(1.288 + column * 0.016, top + 0.042 + row * 0.016, 0.207), Vector3(0.014, 0.014, 0.003), Color(0.05, 0.05, 0.06))
-	var front := MeshInstance3D.new()
-	front.name = "CounterFront"
-	front.mesh = st.commit()
-	front.material_override = IndianHouse._material()
-	counter.add_child(front)
-	var logo := _sign(counter, "CounterLogo", "APNA MART", Vector3(0, 0.25, 0.375))
-	logo.font_size = 44
-	logo.pixel_size = 0.0035
-	logo.outline_size = 0
-	logo.modulate = Color.WHITE
-
-## The stand of folded carry bags at the cashier's end of the counter; the pile and
-## the count follow business.carry_bags (_refresh_bag_stand).
+## The carry-bag dispenser at the cashier's end of the counter, open toward the
+## cashier; the pile of folded bags and the count follow business.carry_bags
+## (_refresh_bag_stand).
 func _build_bag_stand(builder: Node3D) -> void:
 	var top := 0.58
-	builder._box("BagStandBase", counter, Vector3(0.32, 0.02, 0.24), Vector3(-1.22, top + 0.01, -0.22), Color(0.2, 0.22, 0.25))
+	_prop(counter, "BagStand", "shop/bag_box", Vector3(-1.22, top, -0.22))
 	for layer in range(8):
-		bag_layers.append(builder._box("BagLayer%d" % layer, counter, Vector3(0.28, 0.014, 0.2), Vector3(-1.22, top + 0.027 + layer * 0.016, -0.22), Color(0.16, 0.55, 0.3) if layer % 2 == 0 else Color(0.9, 0.92, 0.88)))
-	# A white bag box, open toward the cashier, around the pile.
-	var box := Color(0.94, 0.94, 0.92)
-	for x in [-1.38, -1.06]: builder._box("BagBoxSide%s" % x, counter, Vector3(0.02, 0.2, 0.24), Vector3(x, top + 0.1, -0.22), box)
-	builder._box("BagBoxBack", counter, Vector3(0.34, 0.2, 0.02), Vector3(-1.22, top + 0.1, -0.1), box)
-	builder._box("BagBoxTop", counter, Vector3(0.34, 0.02, 0.26), Vector3(-1.22, top + 0.2, -0.22), box)
-	builder._box("BagBoxStripe", counter, Vector3(0.3, 0.004, 0.2), Vector3(-1.22, top + 0.212, -0.22), Color(0.95, 0.75, 0.1))
+		var folded := _prop(counter, "BagLayer%d" % layer, "shop/folded_bag", Vector3(-1.22, top + 0.02 + layer * 0.016, -0.22))
+		folded.rotation.y = PI * (layer % 2)
+		bag_layers.append(folded)
 	bag_stand_label = _sign(counter, "BagStandLabel", "", Vector3(-1.22, top + 0.3, -0.22))
 	bag_stand_label.rotation.y = PI
 	bag_stand_label.font_size = 26
@@ -337,63 +298,26 @@ func _refresh_bag_stand() -> void:
 	for index in range(bag_layers.size()): bag_layers[index].visible = bags > index * 3
 	bag_stand_label.text = "CARRY BAGS: %d" % bags if bags > 0 else "NO CARRY BAGS\nBuy on the shop PC"
 
-## A green APNA MART carry bag with handles (one cached merged mesh); its bottom
-## centre sits at `offset`.
-func make_carry_bag(parent: Node3D, node_name: String, offset: Vector3) -> MeshInstance3D:
-	if bag_mesh == null:
-		var st := SurfaceTool.new()
-		st.begin(Mesh.PRIMITIVE_TRIANGLES)
-		var green := Color(0.16, 0.55, 0.3)
-		IndianHouse.box(st, Vector3(0, 0.15, 0), Vector3(0.26, 0.3, 0.1), green)
-		IndianHouse.box(st, Vector3(0, 0.275, 0), Vector3(0.264, 0.05, 0.104), Color(0.95, 0.95, 0.92))
-		IndianHouse.box(st, Vector3(0, 0.13, 0), Vector3(0.12, 0.08, 0.106), Color(0.95, 0.55, 0.12))
-		for z in [-0.035, 0.035]:
-			for x in [-0.07, 0.07]: IndianHouse.box(st, Vector3(x, 0.35, z), Vector3(0.018, 0.1, 0.018), green.darkened(0.2))
-			IndianHouse.box(st, Vector3(0, 0.4, z), Vector3(0.158, 0.018, 0.018), green.darkened(0.2))
-		bag_mesh = st.commit()
-	var bag := MeshInstance3D.new()
-	bag.name = node_name
-	bag.mesh = bag_mesh
-	bag.material_override = IndianHouse._material()
-	bag.position = offset
-	parent.add_child(bag)
-	return bag
+## One of our Blender props (assets/props/<path>.glb), its origin at `offset`.
+func _prop(parent: Node3D, node_name: String, path: String, offset := Vector3.ZERO) -> Node3D:
+	var prop: Node3D = (load("res://assets/props/%s.glb" % path) as PackedScene).instantiate()
+	prop.name = node_name
+	prop.position = offset
+	parent.add_child(prop)
+	return prop
 
-## Supermarket gondola look (one merged mesh): dark steel end frames with slotted
-## front posts, a back panel, a base plinth, light shelves with steel lips and a top
-## cap. Same footprint and the same three rows of ten as before (front = +x).
-func _rack_frame(node: Node3D) -> void:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var steel := Color(0.2, 0.22, 0.25)
-	var post := Color(0.3, 0.33, 0.37)
-	IndianHouse.box(st, Vector3(0, 0.07, 0), Vector3(0.6, 0.14, 2.06), Color(0.13, 0.14, 0.16))
-	IndianHouse.box(st, Vector3(-0.29, 0.97, 0), Vector3(0.03, 1.66, 2.06), Color(0.27, 0.29, 0.32))
-	IndianHouse.box(st, Vector3(0, 1.82, 0), Vector3(0.62, 0.04, 2.12), steel)
-	for z in [-1.04, 1.04]:
-		IndianHouse.box(st, Vector3(-0.01, 0.92, z), Vector3(0.58, 1.84, 0.035), steel)
-		IndianHouse.box(st, Vector3(0.3, 0.92, z), Vector3(0.05, 1.84, 0.06), post)
-		for slot in range(20): IndianHouse.box(st, Vector3(0.326, 0.18 + slot * 0.08, z), Vector3(0.005, 0.03, 0.02), Color(0.08, 0.08, 0.09))
-	for level in range(3):
-		var y := 0.22 + level * 0.55
-		IndianHouse.box(st, Vector3(0.0, y, 0), Vector3(0.58, 0.035, 2.04), Color(0.76, 0.78, 0.8))
-		IndianHouse.box(st, Vector3(0.3, y - 0.01, 0), Vector3(0.025, 0.06, 2.04), post)
-	var frame := MeshInstance3D.new()
-	frame.name = "RackFrame"
-	frame.mesh = st.commit()
-	frame.material_override = IndianHouse._material()
-	node.add_child(frame)
+## Our green APNA MART carry bag (tools/blender/build_carry_bag.py): printed front
+## (+z), hem, loop handles; `full` is the packed one with groceries on top. Its
+## bottom centre sits at `offset`.
+func make_carry_bag(parent: Node3D, node_name: String, offset: Vector3, full := true) -> Node3D:
+	return _prop(parent, node_name, "carry_bag/carry_bag%s" % ("_full" if full else ""), offset)
 
-## A double glass-door cold-drink fridge around the usual three shelves of ten, on
-## the rack footprint (rack_store.gd), with a lit blue THANDA header and an inner light.
+## A double glass-door cold-drink cooler (the fridge model: THANDA sides, wire shelves,
+## door frames) around the usual three shelves of ten, on the rack footprint
+## (rack_store.gd), with glass doors, a lit blue THANDA header and an inner light.
 func build_fridge(builder: Node3D, node_name: String, position: Vector3) -> Dictionary:
-	var model := build_stock_rack(builder, node_name, "bottle", position)
+	var model := build_stock_rack(builder, node_name, "bottle", position, "fridge")
 	var node: Node3D = model.node
-	var body := Color(0.92, 0.94, 0.95)
-	builder._box("FridgeBack", node, Vector3(0.06, 2.0, 2.16), Vector3(-0.32, 1.0, 0), body)
-	for z in [-1.05, 1.05]: builder._box("FridgeSide%s" % z, node, Vector3(0.7, 2.0, 0.06), Vector3(0, 1.0, z), body)
-	builder._box("FridgeTop", node, Vector3(0.72, 0.1, 2.18), Vector3(0, 2.05, 0), body)
-	builder._box("FridgeBase", node, Vector3(0.72, 0.14, 2.18), Vector3(0, 0.07, 0), Color(0.2, 0.22, 0.24))
 	var header: MeshInstance3D = builder._box("FridgeHeader", node, Vector3(0.05, 0.28, 2.1), Vector3(0.36, 1.9, 0), Color(0.1, 0.36, 0.78))
 	var glow := StandardMaterial3D.new()
 	glow.albedo_color = Color(0.12, 0.4, 0.85)
@@ -411,7 +335,7 @@ func build_fridge(builder: Node3D, node_name: String, position: Vector3) -> Dict
 	light.emission_enabled = true
 	light.emission = Color(0.85, 0.95, 1.0)
 	strip.material_override = light
-	# Two glass doors with frames and handles; items stay visible behind the glass.
+	# Glass in the model's two door frames; items stay visible behind it.
 	var glass := StandardMaterial3D.new()
 	glass.albedo_color = Color(0.7, 0.88, 0.95, 0.22)
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -420,14 +344,8 @@ func build_fridge(builder: Node3D, node_name: String, position: Vector3) -> Dict
 		var door: MeshInstance3D = builder._box("FridgeGlass%s" % z, node, Vector3(0.02, 1.62, 1.0), Vector3(0.355, 0.97, z), Color.WHITE)
 		door.material_override = glass
 		door.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		for y in [0.15, 1.79]: builder._box("DoorRail", node, Vector3(0.04, 0.04, 1.02), Vector3(0.36, y, z), Color(0.75, 0.77, 0.8))
-		builder._box("DoorHandle", node, Vector3(0.05, 0.5, 0.03), Vector3(0.39, 1.0, z - sign_side(z) * 0.44), Color(0.6, 0.62, 0.65))
-	builder._box("DoorMiddle", node, Vector3(0.04, 1.66, 0.04), Vector3(0.36, 0.97, 0), Color(0.75, 0.77, 0.8))
 	model["fridge"] = true
 	return model
-
-static func sign_side(value: float) -> float:
-	return -1.0 if value < 0 else 1.0
 
 ## Customers pick cold drinks more often while a fridge has some (customer.gd).
 func cold_drinks_chilled() -> bool:
@@ -657,12 +575,8 @@ func _ready() -> void:
 	carried_box.scale = Vector3.ONE * 0.85
 	carried_box.set_script(preload("res://box_carry_visual.gd"))
 	carried_box.initialize(player)
-	held_bag = make_carry_bag(player, "HeldCarryBag", Vector3(0.46, 0.16, -0.82))
+	held_bag = make_carry_bag(player, "HeldCarryBag", Vector3(0.46, 0.16, -0.82), false)
 	held_bag.scale = Vector3.ONE * 1.1
-	var print_label := _sign(held_bag, "BagPrint", "APNA MART\nShukriya!", Vector3(0, 0.15, 0.054))
-	print_label.font_size = 30
-	print_label.pixel_size = 0.0016
-	print_label.outline_size = 0
 	held_bag.hide()
 	for index in range(3):
 		var bottle := make_bottle(counter, "CheckoutBottle%d" % index, Vector3(-1.0 + index * 0.27, 0.59, 0.1))
@@ -806,15 +720,13 @@ func _crate(parent: Node3D, node_name: String) -> Node3D:
 	var crate := Node3D.new()
 	crate.name = node_name
 	parent.add_child(crate)
-	_box(crate, "Carton", Vector3(0.8, 0.8, 0.8), Vector3.ZERO, Color(0.66, 0.5, 0.29))
-	_box(crate, "Tape", Vector3(0.14, 0.012, 0.81), Vector3(0, 0.406, 0), Color(0.9, 0.78, 0.48))
-	_box(crate, "ShippingLabel", Vector3(0.72, 0.42, 0.018), Vector3(0, -0.05, 0.412), Color(0.97, 0.98, 0.97))
-	_box(crate, "LabelStripe", Vector3(0.7, 0.035, 0.012), Vector3(0, 0.12, 0.428), Color(0.15, 0.55, 0.46))
-	var label := _sign(crate, "BoxLabel", "10 BOTTLES", Vector3(0, 0.01, 0.428))
+	# The carton model prints the tape, the shipping label and the handling marks.
+	_prop(crate, "Carton", "shop/carton")
+	var label := _sign(crate, "BoxLabel", "10 BOTTLES", Vector3(0, 0.01, 0.405))
 	label.font_size = 28
 	label.outline_size = 0
 	label.modulate = Color(0.08, 0.12, 0.15)
-	var company := _sign(crate, "SupplierLabel", "RACKWORKS" if node_name.begins_with("RackPackage") else "APNA WHOLESALE", Vector3(0, -0.17, 0.428))
+	var company := _sign(crate, "SupplierLabel", "RACKWORKS" if node_name.begins_with("RackPackage") else "APNA WHOLESALE", Vector3(0, -0.17, 0.405))
 	company.font_size = 20
 	company.outline_size = 0
 	company.modulate = Color(0.15, 0.2, 0.22)

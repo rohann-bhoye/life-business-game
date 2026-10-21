@@ -17,3 +17,6 @@ addons/terrain_3d/bin/~*
 
 # Blender auto-backups
 *.blend1
+
+# Python bytecode from the Blender scripts
+__pycache__/

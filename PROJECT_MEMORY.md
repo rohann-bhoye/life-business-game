@@ -119,6 +119,19 @@ board and a local suggestion form. See Farming section below for controls and li
   with stitching, gussets). Same 0.26 x 0.30 x 0.11 m size as the old box bag, print
   on +z, 480 / 792 faces. make_carry_bag(parent, name, offset, full := true) loads
   them; editable source/carry_bag.blend (.gdignore).
+- Shop fixture models (2026-10-21): tools/blender/build_shop_fixtures.py makes
+  assets/props/shop/{counter, rack, fridge, carton, bag_box, folded_bag}.glb on one
+  atlas shop_fixtures_print.png (wood counter with APNA MART / UPI print, granite
+  top, drawers + cupboards on the cashier side, QR card; gondola with pegboard and
+  APNA MART end panels; THANDA cooler body with wire shelves and door frames; kraft
+  carton with tape, shipping label, handling marks; bag dispenser). All at the old
+  sizes and heights, so gameplay nodes did not move. shop_operations._prop(parent,
+  name, "shop/<model>", offset) loads them: CheckoutCounter keeps its collider (mesh
+  null) + CounterModel; build_stock_rack(..., frame := "rack"|"fridge") adds
+  RackFrame; build_fridge keeps only the glass, lit header, sign and light strip in
+  code; _crate holds Carton + BoxLabel/SupplierLabel (z 0.405). tools/blender/
+  prop_kit.py is the shared Sheet (print atlas) + Builder (box/lathe/UV) for both
+  scripts. Next from the 3D list: Indian products, houses, vehicles, home, warehouse.
 - First person everywhere (2026-10-21, owner: "FPP all in game"): player.gd keeps
   spring_length 0 and hides the body indoors and out, no wheel zoom, look limit
   +-70 deg, small head bob on camera_pivot (EYE_HEIGHT 0.7); box_carry_visual.gd
