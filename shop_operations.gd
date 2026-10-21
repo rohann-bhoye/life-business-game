@@ -24,6 +24,13 @@ var counter_bag: Node3D
 var bag_layers: Array[Node3D] = []
 var bag_stand_label: Label3D
 static var bag_mesh: ArrayMesh
+## The order screen on the counter (faces the cashier): each listed product's
+## picture, its rack code and how many are still needed.
+var order_title: Label3D
+var order_icons: Array[Sprite3D] = []
+var order_texts: Array[Label3D] = []
+var product_pictures := {}
+var order_screen_due := 0
 var checkout_pc: Node3D
 var checkout_display: Label3D
 var checkout_items: Array[Node3D] = []
@@ -250,12 +257,79 @@ func _build_bag_stand(builder: Node3D) -> void:
 	builder._box("BagStandBase", counter, Vector3(0.32, 0.02, 0.24), Vector3(-1.22, top + 0.01, -0.22), Color(0.2, 0.22, 0.25))
 	for layer in range(8):
 		bag_layers.append(builder._box("BagLayer%d" % layer, counter, Vector3(0.28, 0.014, 0.2), Vector3(-1.22, top + 0.027 + layer * 0.016, -0.22), Color(0.16, 0.55, 0.3) if layer % 2 == 0 else Color(0.9, 0.92, 0.88)))
-	bag_stand_label = _sign(counter, "BagStandLabel", "", Vector3(-1.22, top + 0.25, -0.22))
+	# A white bag box, open toward the cashier, around the pile.
+	var box := Color(0.94, 0.94, 0.92)
+	for x in [-1.38, -1.06]: builder._box("BagBoxSide%s" % x, counter, Vector3(0.02, 0.2, 0.24), Vector3(x, top + 0.1, -0.22), box)
+	builder._box("BagBoxBack", counter, Vector3(0.34, 0.2, 0.02), Vector3(-1.22, top + 0.1, -0.1), box)
+	builder._box("BagBoxTop", counter, Vector3(0.34, 0.02, 0.26), Vector3(-1.22, top + 0.2, -0.22), box)
+	builder._box("BagBoxStripe", counter, Vector3(0.3, 0.004, 0.2), Vector3(-1.22, top + 0.212, -0.22), Color(0.95, 0.75, 0.1))
+	bag_stand_label = _sign(counter, "BagStandLabel", "", Vector3(-1.22, top + 0.3, -0.22))
 	bag_stand_label.rotation.y = PI
 	bag_stand_label.font_size = 26
 	bag_stand_label.pixel_size = 0.0022
-	counter_bag = make_carry_bag(counter, "CounterBag", Vector3(-0.7, top, 0.12))
+	counter_bag = make_carry_bag(counter, "CounterBag", Vector3(0.2, top, 0.15))
 	counter_bag.hide()
+	_build_order_screen(builder)
+
+## A small tilted screen on the customer's side of the counter, facing the cashier.
+func _build_order_screen(builder: Node3D) -> void:
+	var screen := Node3D.new()
+	screen.name = "OrderScreen"
+	screen.position = Vector3(-0.75, 0.58, 0.3)
+	screen.rotation = Vector3(-0.3, PI, 0)
+	counter.add_child(screen)
+	var dark := Color(0.08, 0.1, 0.12)
+	builder._box("ScreenBase", screen, Vector3(0.26, 0.02, 0.14), Vector3(0, 0.01, 0), dark)
+	builder._box("ScreenStand", screen, Vector3(0.06, 0.1, 0.04), Vector3(0, 0.06, 0), dark)
+	builder._box("ScreenBezel", screen, Vector3(0.62, 0.32, 0.03), Vector3(0, 0.26, 0), dark)
+	var glass: MeshInstance3D = builder._box("ScreenGlass", screen, Vector3(0.58, 0.28, 0.004), Vector3(0, 0.26, 0.017), Color(0.12, 0.3, 0.62))
+	var lit := StandardMaterial3D.new()
+	lit.albedo_color = Color(0.12, 0.3, 0.62)
+	lit.emission_enabled = true
+	lit.emission = Color(0.12, 0.3, 0.62)
+	lit.emission_energy_multiplier = 0.5
+	glass.material_override = lit
+	order_title = _sign(screen, "OrderTitle", "APNA MART", Vector3(0, 0.37, 0.021))
+	order_title.font_size = 20
+	order_title.pixel_size = 0.0018
+	order_title.outline_size = 0
+	for slot in range(3):
+		var x := -0.18 + slot * 0.18
+		var icon := Sprite3D.new()
+		icon.name = "OrderIcon%d" % slot
+		icon.position = Vector3(x, 0.27, 0.021)
+		icon.pixel_size = 0.11 / 256.0
+		icon.shaded = false
+		screen.add_child(icon)
+		order_icons.append(icon)
+		var text := _sign(screen, "OrderText%d" % slot, "", Vector3(x, 0.165, 0.021))
+		text.font_size = 18
+		text.pixel_size = 0.0018
+		text.outline_size = 0
+		order_texts.append(text)
+
+func _picture(id: String) -> Texture2D:
+	if not product_pictures.has(id): product_pictures[id] = load("res://assets/ui/products/%s.png" % id)
+	return product_pictures[id]
+
+func _update_order_screen() -> void:
+	if not is_instance_valid(order_title) or Time.get_ticks_msec() < order_screen_due: return
+	order_screen_due = Time.get_ticks_msec() + 250
+	var customer := order_customer()
+	var told: bool = customer != null and customer.order_told
+	order_title.text = ("ORDER - %s" % customer.customer_name.get_slice(" - ", 0).to_upper()) if told else ("COUNTER ORDER - PRESS E" if customer != null else "APNA MART")
+	for slot in range(order_icons.size()):
+		var shown: bool = told and slot < customer.order_lines.size()
+		order_icons[slot].visible = shown
+		order_texts[slot].visible = shown
+		if not shown: continue
+		var line: Dictionary = customer.order_lines[slot]
+		var need: int = customer.still_needed(line.product)
+		order_icons[slot].texture = _picture(line.product)
+		order_icons[slot].modulate = Color(1, 1, 1, 0.45) if need == 0 else Color.WHITE
+		var code: String = furnishing.product_code(line.product) if is_instance_valid(furnishing) else ""
+		order_texts[slot].text = "DONE" if need == 0 else "%s  x%d" % [code if not code.is_empty() else "--", need]
+		order_texts[slot].modulate = Color(0.55, 1, 0.65) if need == 0 else Color.WHITE
 
 func _refresh_bag_stand() -> void:
 	if not is_instance_valid(bag_stand_label): return
@@ -583,7 +657,12 @@ func _ready() -> void:
 	carried_box.scale = Vector3.ONE * 0.85
 	carried_box.set_script(preload("res://box_carry_visual.gd"))
 	carried_box.initialize(player)
-	held_bag = make_carry_bag(player, "HeldCarryBag", Vector3(0.34, 0.2, -0.62))
+	held_bag = make_carry_bag(player, "HeldCarryBag", Vector3(0.46, 0.16, -0.82))
+	held_bag.scale = Vector3.ONE * 1.1
+	var print_label := _sign(held_bag, "BagPrint", "APNA MART\nShukriya!", Vector3(0, 0.15, 0.054))
+	print_label.font_size = 30
+	print_label.pixel_size = 0.0016
+	print_label.outline_size = 0
 	held_bag.hide()
 	for index in range(3):
 		var bottle := make_bottle(counter, "CheckoutBottle%d" % index, Vector3(-1.0 + index * 0.27, 0.59, 0.1))
@@ -1097,6 +1176,7 @@ func show_basket(customer: Node3D) -> void:
 	_update_checkout_display()
 
 func _update_checkout_display() -> void:
+	_update_order_screen()
 	if is_instance_valid(basket_customer) and basket_customer.counter_order and basket_customer.state == basket_customer.State.ORDERING:
 		checkout_display.text = "COUNTER ORDER\n%d/%d IN BAG\n%s" % [basket_customer.bag_total(), basket_customer.order_items(), "FILL THE BAG" if basket_customer.order_told else "TAKE ORDER"]
 		return

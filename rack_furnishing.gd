@@ -71,10 +71,35 @@ func _sync() -> void:
 				model.price = world.get_node("ShopPresentation").decorate_rack(model.node, record.product)
 			models[record.id] = model
 		var model: Dictionary = models[record.id]
+		_code_plate(model, record)
 		model.node.position = Store.point(record)
 		model.node.rotation.y = record.turn * PI / 2
 		if model.has("price"): model.price.text = "%s%d" % [String.chr(8377), business.product_price(record.product)]
 	refresh_stock()
+
+## Every rack wears a code (R1, R2, ...) on an orange plate at the top of its left
+## end; counter orders (order screen, order_panel.gd) say which rack has each item.
+static func code_for(id: int) -> String:
+	return "R%d" % (id + 1)
+
+## The code of a rack with this product on it (one with free units first), or "".
+func product_code(sku: String) -> String:
+	var fallback := ""
+	for record in business.racks.records:
+		if available(int(record.id), sku) > 0: return code_for(int(record.id))
+		if fallback.is_empty() and Store.count_product(record, sku) > 0: fallback = code_for(int(record.id))
+	return fallback
+
+func _code_plate(model: Dictionary, record: Dictionary) -> void:
+	var node: Node3D = model.node
+	if node.has_node("CodePlate"): return
+	var height: float = {"produce": 1.22, "fridge": 2.34}.get(record.get("display", "shelf"), 2.26)
+	operations._box(node, "CodePlate", Vector3(0.04, 0.24, 0.34), Vector3(0.3, height, -0.84), Color(0.95, 0.5, 0.1))
+	var label: Label3D = operations._sign(node, "CodeLabel", code_for(int(record.id)), Vector3(0.325, height, -0.84))
+	label.rotation.y = PI / 2
+	label.font_size = 52
+	label.pixel_size = 0.003
+	label.outline_size = 0
 
 func stock_rack(sku: String) -> int:
 	var destination: int = business.racks.restock_rack(sku)

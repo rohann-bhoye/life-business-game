@@ -105,6 +105,12 @@ board and a local suggestion form. See Farming section below for controls and li
   Wholesale > Supplies sells packs of 25 for Rs50 (buy_carry_bags). Bag stand with
   count on the counter (BagLayer*, BagStandLabel), CounterBag shown at payment.
   How to Play has a Counter orders page. Off in co-op.
+  Polish from the owner's video reference: every rack wears an orange code plate
+  (rack_furnishing.gd code_for -> "R1".., product_code finds the rack holding a
+  product); OrderScreen on the counter (tilted, faces the cashier) shows each listed
+  product's picture, rack code and how many are still needed; order_panel.gd rows
+  have the picture + rack code; the bags sit in a white box on the counter; the held
+  bag is bigger with an APNA MART / Shukriya print. Screen and list refresh 4x/s.
 - Startup check (2026-10-20): the player spawns beside the bed from frame 0; only the
   very first frame (behind the loading screen) shows the home without its walls
   (HomeDecor is added deferred). One replay showed a ~2 m slide toward the door just
