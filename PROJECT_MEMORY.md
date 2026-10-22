@@ -170,6 +170,16 @@ board and a local suggestion form. See Farming section below for controls and li
   an OUTBOUND floor bay, lights. _at_table() = shop table or terminal station.
   Shop: the left paint band/stripe and skirting stop at the packing room doorway
   (shop_decor SIDE_DOOR, DoorSkirting); a DoorThreshold floor strip fills the wall gap.
+- Licences (2026-10-22): business LICENCES basics (bottle, snack, soap; free),
+  dairy (milk, bread; Rs2000), packaged (oil, chocolate, honey; Rs3500), fresh (5
+  produce; Rs5000, shop level 2). licences {id: paid} + licence_expenses saved and in
+  the money check; a fresh Backend owns all (tests), game_session new games call
+  start_with_licences(); old saves get basics + groups they bought. can_order_stock /
+  order_cart need the licence; pc_store shows "Needs licence". licence_page.gd = PC
+  app "Licences" (7th tile, tiles at 64%). Export offers only use licensed products
+  on the shelves (export_prices -> {price, stock}), counts capped by stock; opening
+  APNA Export withdraws offers that no longer fit; accepted orders can be cancelled
+  (export_cancel). Held carton/parcel smaller, low on the right.
 - Startup check (2026-10-20): the player spawns beside the bed from frame 0; only the
   very first frame (behind the loading screen) shows the home without its walls
   (HomeDecor is added deferred). One replay showed a ~2 m slide toward the door just

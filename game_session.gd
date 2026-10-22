@@ -24,6 +24,8 @@ static func new_game(path: String, difficulty := 1) -> String:
 	state.money = state.starting_money
 	# One free rack (cold drinks); more racks are bought on the shop PC.
 	state.start_with_one_rack()
+	# Licences: Kirana Basics to start; more on the shop PC (Licences).
+	state.start_with_licences()
 	return "" if state.save_progress() else "Could not create a new save."
 
 static func launch_game(tree: SceneTree, path: String, settings_path: String) -> Error:

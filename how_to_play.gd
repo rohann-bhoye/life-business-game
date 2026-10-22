@@ -20,7 +20,7 @@ const PAGES := [
 	{"picture": "pc", "title": "Carry bags", "text": "Every order uses one carry bag from the box on the counter. You start with 20. Buy more on the PC: Wholesale > Supplies, 25 bags for a small price.", "keys": ["E"]},
 	{"picture": "move", "title": "Arrange your shop", "text": "Aim at a rack, the counter or the PC desk and press G. Move it, turn it with R or the wheel, and click to place it. Q packs a bought rack into its box.", "keys": ["G", "R", "LMB", "Q"]},
 	{"picture": "tablet", "title": "Your tablet", "text": "Press Tab for the tablet: money, stock, staff, goals and the farm. Talk to staff and customers with E; reply with 1-4.", "keys": ["TAB", "1-4"]},
-	{"picture": "grow", "title": "Grow the business", "text": "On the PC, APNA Builders sells shop expansions and makeovers, and Wholesale > Furniture sells more racks. Hire Ramesh and Sunil on the Staff page.", "keys": ["E"]},
+	{"picture": "grow", "title": "Grow the business", "text": "On the PC, APNA Builders sells shop expansions and makeovers, and Wholesale > Furniture sells more racks. Licences open more kinds of products. Hire Ramesh and Sunil on the Staff page.", "keys": ["E"]},
 	{"picture": "night", "title": "End of the day", "text": "The shop is open 08:00 - 20:00. After 20:00 go home and sleep (E at the bed) to start a new day and see your day report.", "keys": ["E", "ESC"]},
 ]
 var page := 0

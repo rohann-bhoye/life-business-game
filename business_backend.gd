@@ -44,6 +44,19 @@ var carry_bags := STARTER_BAGS
 var bag_expenses := 0
 const FarmStore := preload("res://farm_store.gd")
 var farm := FarmStore.new()
+## Product licences (PC: Licences): a group of products can be ordered on APNA
+## Wholesale, and asked for by buyers abroad, once its licence is owned. New games
+## own Kirana Basics only; older saves keep the groups they already stocked.
+const LICENCES := [
+	{"id": "basics", "name": "Kirana Basics", "products": ["bottle", "snack", "soap"], "price": 0, "level": 1},
+	{"id": "dairy", "name": "Dairy & Bakery", "products": ["milk", "bread"], "price": 2000, "level": 1},
+	{"id": "packaged", "name": "Packaged Food", "products": ["oil", "chocolate", "honey"], "price": 3500, "level": 1},
+	{"id": "fresh", "name": "Fresh Produce", "products": ["tomato", "carrot", "cabbage", "corn", "apple"], "price": 5000, "level": 2},
+]
+## Licence id -> rupees paid (0 when given). A fresh business (tests, old fixtures)
+## owns every licence; game_session.gd new games call start_with_licences().
+var licences := {"basics": 0, "dairy": 0, "packaged": 0, "fresh": 0}
+var licence_expenses := 0
 ## International orders (export_store.gd): offers, parcels and what was shipped.
 const ExportStore := preload("res://export_store.gd")
 var exports := ExportStore.new()
@@ -486,7 +499,7 @@ func supply_box_count() -> int:
 	return logistics.ground_boxes.size() + incoming_boxes.size() + queued_boxes.size() + (1 if boxed_stock + carried_stock + worker_carried_stock > 0 else 0)
 
 func can_order_stock(id := "bottle", boxes := 1) -> bool:
-	return id in Catalog.IDS and boxes >= 1 and boxes <= 10 and supply_box_count() + boxes <= MAX_SUPPLY_BOXES and money >= order_cost(id, boxes)
+	return id in Catalog.IDS and has_licence(id) and boxes >= 1 and boxes <= 10 and supply_box_count() + boxes <= MAX_SUPPLY_BOXES and money >= order_cost(id, boxes)
 
 ## Bulk orders of BULK_BOXES or more boxes get BULK_DISCOUNT_PERCENT off.
 const BULK_BOXES := 5
@@ -504,7 +517,7 @@ func order_cart(cart: Dictionary) -> bool:
 	var boxes := 0
 	for id in cart:
 		var count := int(cart[id])
-		if id not in Catalog.IDS or count < 1 or count > 10: return false
+		if id not in Catalog.IDS or not has_licence(id) or count < 1 or count > 10: return false
 		total += order_cost(id, count)
 		boxes += count
 	if supply_box_count() + boxes > MAX_SUPPLY_BOXES or money < total: return false
@@ -1168,7 +1181,7 @@ func finish_marketing() -> void:
 	_commit()
 
 func total_expenses() -> int:
-	return restocking_expenses + marketing_expenses + hiring_expenses + operating_expenses + wage_expenses + upgrade_expenses + overtime_expenses + furnishing_expenses + expansion_expenses + bag_expenses + farm.expenses() + loan_interest_paid
+	return restocking_expenses + marketing_expenses + hiring_expenses + operating_expenses + wage_expenses + upgrade_expenses + overtime_expenses + furnishing_expenses + expansion_expenses + bag_expenses + licence_expenses + farm.expenses() + loan_interest_paid
 
 func place_rack(product: String, position: Vector2, turn: int, id := -1, from_delivery := false) -> bool:
 	if product not in Catalog.IDS or not position.is_finite() or turn < 0 or turn > 3: return false
@@ -1280,11 +1293,50 @@ func buy_carry_bags() -> bool:
 	changed.emit()
 	return true
 
-## Shop prices of every product, for the buyers abroad (export_store.gd).
+## What buyers abroad can ask for (export_store.gd): licensed products that are on
+## the shelves now, with their shop price and how many there are.
 func export_prices() -> Dictionary:
-	var prices := {}
-	for id in Catalog.IDS: prices[id] = product_price(id)
-	return prices
+	var products := {}
+	for id in Catalog.IDS:
+		if has_licence(id) and product_stock(id) > 0: products[id] = {"price": product_price(id), "stock": product_stock(id)}
+	return products
+
+func licence(id: String) -> Dictionary:
+	for entry in LICENCES:
+		if entry.id == id: return entry
+	return {}
+
+func licence_for(product: String) -> Dictionary:
+	for entry in LICENCES:
+		if product in entry.products: return entry
+	return {}
+
+func has_licence(product: String) -> bool:
+	var entry := licence_for(product)
+	return not entry.is_empty() and licences.has(entry.id)
+
+func can_buy_licence(id: String) -> bool:
+	var entry := licence(id)
+	return not entry.is_empty() and not licences.has(id) and money >= int(entry.price) and shop_level >= int(entry.level)
+
+## PC Licences: pays for a licence; its products can be ordered from now on.
+func buy_licence(id: String) -> bool:
+	if not can_buy_licence(id): return false
+	var price := int(licence(id).price)
+	money -= price
+	licence_expenses += price
+	licences[id] = price
+	if not save_progress():
+		money += price
+		licence_expenses -= price
+		licences.erase(id)
+		return false
+	changed.emit()
+	return true
+
+## New games (game_session.gd) start with the Kirana Basics licence only.
+func start_with_licences() -> void:
+	licences = {"basics": 0}
 
 ## Fills the offers on the APNA Export page (also done each new day).
 func refresh_export_offers() -> void:
@@ -1326,6 +1378,17 @@ func export_pack(id: int, picked: Array) -> bool:
 		inventory = old_inventory
 		stock = old_stock
 		order.state = "accepted"
+		return false
+	changed.emit()
+	return true
+
+## An accepted order that has not been packed yet can be cancelled (APNA Export).
+func export_cancel(id: int) -> bool:
+	var order: Dictionary = exports.find(id)
+	if order.is_empty() or order.state != "accepted": return false
+	exports.orders.erase(order)
+	if not save_progress():
+		exports.orders.append(order)
 		return false
 	changed.emit()
 	return true
@@ -1474,6 +1537,8 @@ func snapshot() -> Dictionary:
 	data["expansion_expenses"] = expansion_expenses
 	data["carry_bags"] = carry_bags
 	data["export"] = exports.snapshot()
+	data["licences"] = licences.duplicate()
+	data["licence_expenses"] = licence_expenses
 	data["bag_expenses"] = bag_expenses
 	data["stock_collection_assigned"] = stock_collection_assigned
 	data["logistics"] = logistics.snapshot()
@@ -1566,6 +1631,18 @@ func restore(data: Dictionary) -> void:
 	expansion_expenses = int(data.get("expansion_expenses", 0))
 	carry_bags = int(data.get("carry_bags", STARTER_BAGS))
 	exports.restore(data.get("export", {}))
+	licence_expenses = int(data.get("licence_expenses", 0))
+	licences.clear()
+	if data.has("licences"):
+		for id in data.licences: licences[str(id)] = int(data.licences[id])
+	else:
+		# Older saves: Kirana Basics, and every group they already bought stock of.
+		licences["basics"] = 0
+		var bought: Dictionary = data.get("inventory", {})
+		for entry in LICENCES:
+			for product in entry.products:
+				var item = bought.get(product, {})
+				if item is Dictionary and (int(item.get("purchased", 0)) > 0 or int(item.get("stock", 0)) > 0): licences[entry.id] = 0
 	bag_expenses = int(data.get("bag_expenses", 0))
 	racks.expansion = shop_expansion
 
@@ -1758,6 +1835,16 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	var expected_expansion := 0
 	for index in range(int(expansion)): expected_expansion += EXPANSION_COSTS[index]
 	if not EmployeeRelations.whole(data.get("expansion_expenses", 0), MAX_SAVED_VALUE) or int(data.get("expansion_expenses", 0)) != expected_expansion: return false
+	# Licences: known ones, paid at most their price, adding up to the licence spend.
+	var owned = data.get("licences", {})
+	var licence_cost = data.get("licence_expenses", 0)
+	if not owned is Dictionary or not EmployeeRelations.whole(licence_cost, MAX_SAVED_VALUE): return false
+	var licence_paid := 0
+	for id in owned:
+		var entry := licence(str(id))
+		if entry.is_empty() or not EmployeeRelations.whole(owned[id], int(entry.price)): return false
+		licence_paid += int(owned[id])
+	if licence_paid != int(licence_cost): return false
 	# Carry bags: whole packs paid for, never more bags than the starter ones plus the packs.
 	var bags = data.get("carry_bags", STARTER_BAGS)
 	var bag_cost = data.get("bag_expenses", 0)
@@ -1941,7 +2028,7 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	if extra_sold > sold or extra_stock > data.stock: return false
 	if revenue % 10 != 0 or revenue < sold * 50 or revenue > sold * 200:
 		return false
-	var expenses := int(data["restocking_expenses"]) + int(data["marketing_expenses"]) + int(data["hiring_expenses"]) + int(data["operating_expenses"]) + int(data["wage_expenses"]) + int(data["upgrade_expenses"]) + int(data.overtime_expenses) + int(furnishing) + expected_expansion + int(bag_cost) + farm_state.expenses() + int(data.get("loan_interest_paid", 0))
+	var expenses := int(data["restocking_expenses"]) + int(data["marketing_expenses"]) + int(data["hiring_expenses"]) + int(data["operating_expenses"]) + int(data["wage_expenses"]) + int(data["upgrade_expenses"]) + int(data.overtime_expenses) + int(furnishing) + expected_expansion + int(bag_cost) + int(licence_cost) + farm_state.expenses() + int(data.get("loan_interest_paid", 0))
 	# Loans: money received minus principal paid back.
 	if not _valid_loan(data): return false
 	expenses -= int(data.get("loan_received", 0)) - int(data.get("loan_principal_repaid", 0))

@@ -67,11 +67,14 @@ func _ready() -> void:
 	_build_packing_room()
 	_build_airport()
 	_build_plane()
-	held_carton = _prop(player, "HeldCarton", "carton_open", Vector3(0.0, 0.05, -0.85))
-	held_carton.scale = Vector3.ONE * 0.6
+	# Held low on the right, so the view stays clear.
+	held_carton = _prop(player, "HeldCarton", "carton_open", Vector3(0.34, 0.02, -0.72))
+	held_carton.scale = Vector3.ONE * 0.45
+	held_carton.rotation.y = -0.35
 	held_carton.hide()
-	held_parcel = _prop(player, "HeldParcel", "parcel", Vector3(0.0, 0.05, -0.85))
-	held_parcel.scale = Vector3.ONE * 0.6
+	held_parcel = _prop(player, "HeldParcel", "parcel", Vector3(0.34, 0.02, -0.72))
+	held_parcel.scale = Vector3.ONE * 0.45
+	held_parcel.rotation.y = -0.35
 	held_parcel.hide()
 	for slot in SHELF_SLOTS:
 		var parcel := _prop(self, "ShelfParcel", "parcel", slot)

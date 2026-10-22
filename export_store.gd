@@ -47,10 +47,13 @@ func in_state(state: String) -> Array:
 	return orders.filter(func(order): return order.state == state)
 
 ## New day: offers and accepted orders past their day go; fresh offers fill up to
-## MAX_OFFERS. `prices` is product -> shop price for the products on sale.
-func refresh(day: int, prices: Dictionary) -> void:
+## MAX_OFFERS. `available` is product -> {price, stock} for licensed products on the
+## shelves: buyers only ask for those, never more than there are.
+func refresh(day: int, available: Dictionary) -> void:
 	orders = orders.filter(func(order): return order.state in ["packed", "on_pad"] or int(order.expires) >= day)
-	var products: Array = prices.keys()
+	# Offers for goods no longer on the shelves (or no longer enough) are withdrawn.
+	orders = orders.filter(func(order): return order.state != "offer" or order.lines.all(func(line): return available.has(line.product) and int(available[line.product].stock) >= int(line.count)))
+	var products: Array = available.keys()
 	if products.is_empty(): return
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
@@ -63,8 +66,8 @@ func refresh(day: int, prices: Dictionary) -> void:
 		var lines: Array = []
 		var value := 0
 		for product in products.slice(0, mini(rng.randi_range(1, 3), products.size())):
-			var count := rng.randi_range(1, 3)
-			var unit := unit_price(int(prices[product]))
+			var count := rng.randi_range(1, mini(3, int(available[product].stock)))
+			var unit := unit_price(int(available[product].price))
 			lines.append({"product": product, "count": count, "unit": unit})
 			value += unit * count
 		orders.append({"id": next_id, "country": buyer[0], "city": buyer[1], "buyer": buyer[2], "note": buyer[3], "lines": lines, "value": value, "expires": day + OFFER_DAYS, "state": "offer"})

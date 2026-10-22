@@ -336,6 +336,13 @@ func refresh() -> void:
 		entry.stock.add_theme_color_override("font_color", KenneyTheme.MUTED if fits else Color("b91c1c"))
 		if not fits: entry.stock.text = {"fridge": "Needs a fridge", "produce": "Needs a produce table"}.get(store.display_for(id), "Needs a shelf rack")
 		entry.add.text = "In cart: %d  +1" % cart[id] if cart.has(id) else "Add to cart"
+		# Products need their licence (PC: Licences) before they can be ordered.
+		var licensed: bool = business.has_licence(id)
+		entry.add.disabled = not licensed
+		if not licensed:
+			entry.stock.text = "Licence: " + business.licence_for(id).name
+			entry.stock.add_theme_color_override("font_color", Color("b91c1c"))
+			entry.add.text = "Needs licence"
 	var owned: int = business.racks.records.size() + business.logistics.rack_count()
 	for id in furniture_cards:
 		var entry: Dictionary = furniture_cards[id]

@@ -17,6 +17,7 @@ var store: Panel
 var bank: Panel
 var builders: Panel
 var export_page: Panel
+var licence_page: Panel
 var staff: Panel
 var desktop: Control
 ## Which desktop app fills the screen: home, store, staff, manager or bank.
@@ -220,15 +221,16 @@ func _build_desktop() -> void:
 		["bank", "Bank", Color("2563eb"), ""],
 		["builders", "Builders", Color("c2410c"), ""],
 		["export", "Export", Color("1e3a8a"), ""],
+		["licences", "Licences", Color("7c3aed"), ""],
 	]
 	for index in range(apps.size()):
 		var entry: Array = apps[index]
 		var tile := Button.new()
 		tile.name = "App_" + entry[0]
-		# Six tiles fit beside the Today card at 72% size.
-		tile.position = Vector2(40 + index * 90, 108)
+		# Seven tiles fit beside the Today card at 64% size.
+		tile.position = Vector2(40 + index * 78, 108)
 		tile.size = Vector2(116, 116)
-		tile.scale = Vector2.ONE * 0.72
+		tile.scale = Vector2.ONE * 0.64
 		tile.focus_mode = Control.FOCUS_NONE
 		tile.clip_contents = true
 		tile.tooltip_text = "Open " + entry[1]
@@ -246,6 +248,27 @@ func _build_desktop() -> void:
 			for item in [["milk", Rect2(-2, 6, 76, 96)], ["bottle", Rect2(44, 4, 76, 96)], ["snack", Rect2(16, 26, 84, 90)]]:
 				_picture(tile, "res://assets/ui/products/%s.png" % item[0], item[1])
 		elif entry[0] == "bank": _text(tile, String.chr(8377), Vector2(0, 14), 116, 56, Color.WHITE).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		elif entry[0] == "licences":
+			# A white certificate with text lines and an orange seal.
+			var paper := Panel.new()
+			paper.position = Vector2(20, 22)
+			paper.size = Vector2(76, 64)
+			paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			paper.add_theme_stylebox_override("panel", _round(Color.WHITE, 8))
+			tile.add_child(paper)
+			for line in range(3):
+				var stroke := ColorRect.new()
+				stroke.color = Color("c4b5fd")
+				stroke.position = Vector2(30, 34 + line * 12)
+				stroke.size = Vector2(44 - line * 10, 5)
+				stroke.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				tile.add_child(stroke)
+			var seal := Panel.new()
+			seal.position = Vector2(70, 66)
+			seal.size = Vector2(28, 28)
+			seal.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			seal.add_theme_stylebox_override("panel", _round(Color("f97316"), 14))
+			tile.add_child(seal)
 		elif entry[0] == "export":
 			# A white globe with a little orange plane over it.
 			var globe := Panel.new()
@@ -288,7 +311,7 @@ func _build_desktop() -> void:
 					box.size = Vector2(16, 14)
 					box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 					tile.add_child(box)
-		var label := _text(desktop, entry[1], Vector2(tile.position.x - 8, 196), 100, 14, Color.WHITE)
+		var label := _text(desktop, entry[1], Vector2(tile.position.x - 8, 186), 90, 13, Color.WHITE)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		tile.pressed.connect(show_app.bind(entry[0]))
 	# Shelf stock card: the products on the racks with the fewest items left.
@@ -425,6 +448,13 @@ func _build_store(_desktop: Control) -> void:
 	export_page.setup(ui.shop.business, ui.shop._format_money)
 	export_page.hide()
 	export_page.back_requested.connect(show_home)
+	licence_page = Panel.new()
+	licence_page.set_script(preload("res://licence_page.gd"))
+	licence_page.position = Vector2(24, 12)
+	screen_viewport.add_child(licence_page)
+	licence_page.setup(ui.shop.business, ui.shop._format_money)
+	licence_page.hide()
+	licence_page.back_requested.connect(show_home)
 	staff = Panel.new()
 	staff.set_script(preload("res://staff_page.gd"))
 	staff.position = Vector2(24, 12)
@@ -452,6 +482,9 @@ func show_app(target: String) -> void:
 	if is_instance_valid(builders):
 		builders.visible = target == "builders"
 		if builders.visible: builders.refresh()
+	if is_instance_valid(licence_page):
+		licence_page.visible = target == "licences"
+		if licence_page.visible: licence_page.refresh()
 	if is_instance_valid(export_page):
 		export_page.visible = target == "export"
 		if export_page.visible: export_page.open()

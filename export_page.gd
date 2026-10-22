@@ -13,13 +13,16 @@ const ExportStore = preload("res://export_store.gd")
 const SIZE := Vector2(912, 468)
 const BRAND := Color("1e3a8a")
 const STATE_COLOURS := {"offer": Color("2563eb"), "accepted": Color("ea580c"), "packed": Color("16a34a"), "on_pad": Color("7c3aed")}
-const STATE_TEXT := {"accepted": "PACK IT: PACKING ROOM", "packed": "TAKE TO THE AIRPORT", "on_pad": "WAITING FOR THE PLANE"}
+const STATE_TEXT := {"accepted": "CANCEL ORDER", "packed": "TAKE TO THE AIRPORT", "on_pad": "WAITING FOR THE PLANE"}
 var business
 var format_money: Callable
 var summary: Label
 var money_label: Label
 var status_label: Label
 var cards: Array = []
+var flow_label: Label
+## The order to plane flow, shown along the bottom.
+const FLOW := "1 Accept here   >   2 Carton at a packing table   >   3 Fill it at the racks   >   4 Seal   >   5 Export platform   >   6 Plane flies, buyer pays"
 
 func setup(business_ref, money_formatter: Callable) -> void:
 	business = business_ref
@@ -57,6 +60,7 @@ func setup(business_ref, money_formatter: Callable) -> void:
 	summary = _label("", Vector2(14, 8), 844, 14, KenneyTheme.TEXT, strip)
 	for index in range(ExportStore.MAX_OFFERS + ExportStore.MAX_ACTIVE): cards.append(_card(Vector2(20 + index * 175, 118)))
 	status_label = _label("", Vector2(20, 442), 872, 13, KenneyTheme.GREEN)
+	flow_label = _label(FLOW, Vector2(20, 442), 872, 12, KenneyTheme.MUTED)
 	business.changed.connect(refresh)
 	refresh()
 
@@ -115,7 +119,7 @@ func _card(at: Vector2) -> Dictionary:
 	button.add_theme_font_size_override("font_size", 12)
 	card.add_child(button)
 	var entry := {"card": card, "band": band, "city": city, "country": country, "buyer": buyer, "note": note, "items": items, "reward": reward, "ends": ends, "button": button, "id": -1}
-	button.pressed.connect(func(): _accept(int(entry.id)))
+	button.pressed.connect(func(): _press(int(entry.id)))
 	return entry
 
 func _money(value: int) -> String:
@@ -123,9 +127,18 @@ func _money(value: int) -> String:
 
 ## Opening the page fills the offers on a new game (later, each morning does).
 func open() -> void:
-	if business.exports.in_state("offer").is_empty(): business.refresh_export_offers()
+	business.refresh_export_offers()
 	status_label.text = ""
 	refresh()
+
+func _press(id: int) -> void:
+	var order: Dictionary = business.exports.find(id)
+	if order.get("state") == "accepted":
+		var cancelled: bool = business.export_cancel(id)
+		status_label.text = "Order for %s cancelled." % order.city if cancelled else ""
+		status_label.add_theme_color_override("font_color", Color("b91c1c"))
+		refresh()
+	else: _accept(id)
 
 func _accept(id: int) -> void:
 	var success: bool = business.export_accept(id)
@@ -167,8 +180,9 @@ func refresh() -> void:
 			item.icon.texture = load("res://assets/ui/products/%s.png" % line.product)
 			item.text.text = "x%d  %s" % [line.count, Catalog.NAMES[line.product]]
 		entry.reward.text = _money(int(order.value))
-		entry.ends.text = "Offer ends after day %d" % int(order.expires) if order.state in ["offer", "accepted"] else "%d items packed" % ExportStore.units(order)
+		entry.ends.text = {"offer": "Offer ends after day %d" % int(order.expires), "accepted": "Pack it at a packing table", "packed": "Sealed: %d items" % ExportStore.units(order), "on_pad": "On the export platform"}[order.state]
 		entry.button.text = "ACCEPT ORDER" if order.state == "offer" else STATE_TEXT[order.state]
-		entry.button.theme_type_variation = "PrimaryButton" if order.state == "offer" else ""
-		entry.button.disabled = order.state != "offer" or busy
-	if shown.is_empty(): summary.text += "\nNo orders today. New buyers write every morning."
+		entry.button.theme_type_variation = "PrimaryButton" if order.state == "offer" else ("DangerButton" if order.state == "accepted" else "")
+		entry.button.disabled = order.state in ["packed", "on_pad"] or order.state == "offer" and busy
+	flow_label.visible = status_label.text.is_empty()
+	if shown.is_empty(): summary.text = "No orders right now. Buyers ask only for licensed products on your shelves: stock up (or buy licences), new buyers write every morning."
