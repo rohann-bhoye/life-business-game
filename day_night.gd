@@ -100,13 +100,15 @@ func _refresh() -> void:
 	environment.fog_enabled = not low_quality
 	environment.fog_light_color = Color(0.18, 0.23, 0.31).lerp(Color(0.52, 0.69, 0.85), daylight)
 	environment.fog_light_energy = lerpf(0.35, 0.7, daylight)
-	environment.fog_density = lerpf(0.003, 0.0006, daylight)
+	environment.fog_density = lerpf(0.003, 0.0016, daylight)
 	sky_material.sky_top_color = Color(0.03, 0.06, 0.16).lerp(Color(0.3, 0.52, 0.75), daylight)
 	var horizon := Color(0.1, 0.15, 0.27).lerp(Color(0.77, 0.86, 0.9), daylight)
 	horizon = horizon.lerp(Color(0.88, 0.43, 0.26), twilight * 0.65)
 	sky_material.sky_horizon_color = horizon
 	sky_material.ground_horizon_color = horizon
-	sky_material.ground_bottom_color = Color(0.045, 0.065, 0.075).lerp(Color(0.2, 0.28, 0.24), daylight)
+	# Below the horizon the sky is the same haze, so any gap past the land reads as
+	# distance, never as a green wall.
+	sky_material.ground_bottom_color = horizon
 	sky_material.sun_angle_max = lerpf(2.0, 1.0, daylight)
 	sky_material.sun_curve = 0.08
 	if business.is_raining():

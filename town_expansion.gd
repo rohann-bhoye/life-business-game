@@ -121,11 +121,12 @@ func _slope_strip(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float, y
 	IndianHouse._quad(st, Vector3(x0, y0, z0), Vector3(x1, y1, z0), Vector3(x1, y1, z1), Vector3(x0, y0, z1), normal, colour)
 
 ## The land round the town (the Landscape Terrain3D), shaped at load: rolling
-## foothills (about 2-11 m) just past the flat town, then a ring of ridged mountains
-## up to about 60 m; the main road keeps its valley pass both ways (_lower_valley).
+## foothills (about 2-9 m) starting a few metres past the flat town along a wavy
+## line, then broad rounded mountains (a smooth mass plus gentle ridges, up to about
+## 55 m); the main road keeps its valley pass both ways (_lower_valley).
 ## The colour map follows height and steepness: the lawn's own colours low down
 ## (grass_ground.gdshader, the terrain texture is about 0.92 bright), darker forest
-## green up the slopes, bare rock where it is high or steep, and snow on the peaks.
+## green up the slopes, rock only where it is high or steep, and snow on the peaks.
 ## Pines cover the lower slopes as one MultiMesh.
 const FLAT_TOWN := Rect2(-74.0, -56.0, 148.0, 116.0)
 ## Heights of the 256 x 256 terrain points (x, z from -128), kept while shaping so
@@ -148,38 +149,54 @@ func _shape_land() -> void:
 	land_heights = PackedFloat32Array()
 	print_verbose("Land shaped in %d ms" % (Time.get_ticks_msec() - started))
 
-func _land_height(x: float, z: float, ridges: FastNoiseLite, rolling: FastNoiseLite) -> float:
+func _land_height(x: float, z: float, mass: FastNoiseLite, ridges: FastNoiseLite, rolling: FastNoiseLite) -> float:
 	var out := maxf(maxf(FLAT_TOWN.position.x - x, x - FLAT_TOWN.end.x), maxf(FLAT_TOWN.position.y - z, z - FLAT_TOWN.end.y))
+	var bumps := rolling.get_noise_2d(x, z) * 0.5 + 0.5
+	out -= bumps * 7.0
 	if out <= 0.0: return 0.08
-	var t := clampf(out / 54.0, 0.0, 1.0)
+	var t := clampf(out / 56.0, 0.0, 1.0)
 	var ridge := 1.0 - absf(ridges.get_noise_2d(x, z))
 	ridge *= ridge
-	var bumps := rolling.get_noise_2d(x, z) * 0.5 + 0.5
-	return 0.08 + smoothstep(0.0, 0.35, t) * (2.0 + bumps * 9.0) + smoothstep(0.3, 1.0, t) * (ridge * 46.0 + bumps * 12.0)
+	var body := mass.get_noise_2d(x, z) * 0.5 + 0.5
+	# The last 12 m before the end of the land slope down behind the outer crest, so
+	# the edge (where Terrain3D blends towards its blank white colour) is never on
+	# the skyline seen from the town.
+	var edge := minf(minf(x + 128.0, 127.0 - x), minf(z + 128.0, 127.0 - z))
+	var height := smoothstep(0.0, 0.35, t) * (1.5 + bumps * 7.0) + smoothstep(0.25, 1.0, t) * (body * 32.0 + ridge * 15.0 + bumps * 5.0)
+	return 0.08 + height * smoothstep(0.0, 12.0, edge)
 
 func _mountains(data) -> void:
+	var mass := FastNoiseLite.new()
+	mass.seed = 3
+	mass.frequency = 0.011
+	mass.fractal_octaves = 3
 	var ridges := FastNoiseLite.new()
 	ridges.seed = 7
-	ridges.frequency = 0.018
-	ridges.fractal_octaves = 4
+	ridges.frequency = 0.013
+	ridges.fractal_octaves = 3
+	ridges.fractal_gain = 0.4
 	var rolling := FastNoiseLite.new()
 	rolling.seed = 19
-	rolling.frequency = 0.04
+	rolling.frequency = 0.035
+	rolling.fractal_octaves = 3
 	land_heights.resize(256 * 256)
 	for z in range(-128, 128):
 		for x in range(-128, 128):
-			var height := _land_height(x, z, ridges, rolling)
+			var height := _land_height(x, z, mass, ridges, rolling)
 			land_heights[_land_index(x, z)] = height
 			data.set_height(Vector3(x, 0, z), height)
 
 ## Lowers the land along the road into the valley, blending back to the hills and
-## mountains 45 m to each side.
+## mountains 45 m to each side. Past x 100 (where the road is already out of sight
+## behind the crest) the mountains close the valley again, so the far end shows a
+## mountain and never the empty sky past the edge of the land.
 func _lower_valley(data) -> void:
 	for side in [-1, 1]:
 		for step in range(53):
 			var x: float = side * (Horizon.START + step)
+			var closing := 1.0 - smoothstep(100.0, 122.0, absf(x))
 			for z in range(int(ROAD_Z) - 45, int(ROAD_Z) + 46):
-				var weight := 1.0 - smoothstep(6.0, 45.0, absf(z - ROAD_Z))
+				var weight := (1.0 - smoothstep(6.0, 45.0, absf(z - ROAD_Z))) * closing
 				var index := _land_index(int(x), z)
 				land_heights[index] = lerpf(land_heights[index], 0.06 + Horizon.height(x), weight)
 				data.set_height(Vector3(x, 0, z), land_heights[index])
@@ -193,7 +210,7 @@ func _paint_land(data) -> void:
 	var fresh := Color(0.32, 0.44, 0.15) / 0.92
 	var dry := Color(0.5, 0.5, 0.26) / 0.92
 	var forest := Color(0.14, 0.26, 0.11) / 0.92
-	var rock := Color(0.45, 0.42, 0.37) / 0.92
+	var rock := Color(0.4, 0.38, 0.33) / 0.92
 	var snow := Color(0.97, 0.97, 0.98)
 	var macro := FastNoiseLite.new()
 	macro.seed = 11
@@ -207,9 +224,9 @@ func _paint_land(data) -> void:
 			var height := land_heights[_land_index(x, z)]
 			var colour := lush.lerp(fresh, smoothstep(0.3, 0.72, patches.get_noise_2d(x, z) * 0.5 + 0.5))
 			colour = colour.lerp(dry, smoothstep(0.5, 0.8, macro.get_noise_2d(x, z) * 0.5 + 0.5) * 0.6)
-			colour = colour.lerp(forest, smoothstep(2.0, 9.0, height) * 0.75)
-			colour = colour.lerp(rock, clampf(smoothstep(18.0, 32.0, height) + smoothstep(0.9, 1.8, _steepness(x, z)), 0.0, 1.0))
-			colour = colour.lerp(snow, smoothstep(38.0, 46.0, height))
+			colour = colour.lerp(forest, smoothstep(2.0, 9.0, height) * 0.8)
+			colour = colour.lerp(rock, clampf(smoothstep(26.0, 40.0, height) + smoothstep(1.3, 2.4, _steepness(x, z)), 0.0, 0.85))
+			colour = colour.lerp(snow, smoothstep(44.0, 52.0, height))
 			colour.a = 1.0
 			data.set_color(point, colour)
 
@@ -218,16 +235,16 @@ func _hill_forest() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2026
 	var spots: Array[Transform3D] = []
-	for attempt in range(2000):
+	for attempt in range(3000):
 		var x := rng.randf_range(-126.0, 126.0)
 		var z := rng.randf_range(-126.0, 126.0)
 		if FLAT_TOWN.grow(3.0).has_point(Vector2(x, z)): continue
 		if absf(x) > FLAT_TOWN.end.x and absf(z - ROAD_Z) < 14.0: continue
 		var height := land_heights[_land_index(roundi(x), roundi(z))]
-		if height < 0.6 or height > 30.0 or _steepness(roundi(x), roundi(z)) > 1.4: continue
+		if height < 0.6 or height > 28.0 or _steepness(roundi(x), roundi(z)) > 1.6: continue
 		var size := rng.randf_range(1.3, 2.5)
-		spots.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(size, size * rng.randf_range(0.9, 1.3), size)), Vector3(x, height - 0.2, z)))
-		if spots.size() >= 320: break
+		spots.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(size, size * rng.randf_range(0.9, 1.3), size)), Vector3(x, height - 0.45 * size, z)))
+		if spots.size() >= 450: break
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
 	multimesh.mesh = _pine_mesh()

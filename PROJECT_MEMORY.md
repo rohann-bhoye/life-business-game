@@ -195,11 +195,17 @@ board and a local suggestion form. See Farming section below for controls and li
   South edge MAX_Z 62 (terrain flat to z 60); runway z 51.5..62.5 (RUNWAY_Z 57,
   11 m), plane drawn at 0.85. Departures board: posts behind, title band, centred lines.
 - Mountains (2026-10-22): town_expansion.gd _shape_land (deferred, about 0.9 s) sets
-  the Terrain3D heights: flat town rect (-74..74, -56..60), foothills 2-11 m, then
-  ridged mountains up to ~60 m (FastNoiseLite seeds 7/19), the road valley pass
-  (_lower_valley), colour map by height/steepness (lawn, forest green, rock, snow
-  above ~40 m) and ~320 pines as one MultiMesh (HillForest). Heights are kept in
-  land_heights while shaping. The terrain still has no collision (town edge stops you).
+  the Terrain3D heights: flat town rect (-74..74, -56..60), foothills 1.5-9 m from a
+  wavy line, then rounded mountains (smooth mass seed 3 + soft ridges seed 7 + bumps
+  seed 19, ~55 m max), the road valley pass (_lower_valley) which mountains close
+  again past |x| 100 (the road is hidden behind the crest there), colour map by
+  height/steepness (lawn, forest green, rock above ~26 m or steep, snow above ~44 m)
+  and ~450 pines as one MultiMesh (HillForest, sunk 0.45*size). The last 12 m before
+  the land's edge (+-128) slope down behind the outer crest: Terrain3D blends the
+  edge towards white, which showed as a white skyline line. day_night.gd: daylight
+  fog 0.0016 for haze on the hills; the sky below the horizon (ground_bottom_color)
+  is the horizon haze colour, so no green "beam" shows through any gap. Heights are
+  kept in land_heights while shaping. The terrain has no collision (town edge stops you).
 - Startup check (2026-10-20): the player spawns beside the bed from frame 0; only the
   very first frame (behind the loading screen) shows the home without its walls
   (HomeDecor is added deferred). One replay showed a ~2 m slide toward the door just
