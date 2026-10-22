@@ -1,15 +1,16 @@
 extends Node3D
 
-# Edge of the open town, the old 64 m map (the solid walls are in neighbourhood.gd).
+# Edge of the open town (the solid walls are in neighbourhood.gd).
 # A see-through blue barrier marks it (always faintly visible) and brightens as the
 # player comes close. Pushing against it starts a 3-2-1 countdown, then the player
 # is sent home: the land beyond opens with later updates. Stepping back from the
 # edge cancels the countdown.
-const MIN_X := -31.5
-const MAX_X := 31.5
-const MIN_Z := -31.5
-## Moved back from 31.5 for the airport south of the warehouse (export_world.gd).
-const MAX_Z := 70.0
+## The whole flat land round the old 64 m town is open now: the market street and
+## houses (town_expansion.gd) and the airport south of the warehouse (export_world.gd).
+const MIN_X := -72.0
+const MAX_X := 72.0
+const MIN_Z := -52.0
+const MAX_Z := 68.0
 const HEIGHT := 4.0
 const WARN_DISTANCE := 2.0
 const FADE_DISTANCE := 14.0

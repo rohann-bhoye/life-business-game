@@ -101,7 +101,11 @@ func _card(entry: Dictionary, at: Vector2) -> Dictionary:
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.position = Vector2(10 + index * 38, 58)
 		icon.size = Vector2(36, 36)
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Hovering a picture shows the product name above it.
+		icon.mouse_filter = Control.MOUSE_FILTER_STOP
+		icon.tooltip_text = Catalog.NAMES[entry.products[index]]
+		icon.mouse_entered.connect(_show_name.bind(card, icon, Catalog.NAMES[entry.products[index]]))
+		icon.mouse_exited.connect(_hide_name.bind(card))
 		card.add_child(icon)
 	var names: Array[String] = []
 	var total := 0
@@ -141,6 +145,27 @@ func _card(entry: Dictionary, at: Vector2) -> Dictionary:
 	button.pressed.connect(_buy.bind(entry.id))
 	card.add_child(button)
 	return {"entry": entry, "state": state, "price": price, "button": button}
+
+## A small dark name tag above a hovered product picture (one per card).
+func _show_name(card: Panel, icon: Control, product_name: String) -> void:
+	var tag := card.get_node_or_null("NameTag") as Label
+	if tag == null:
+		tag = Label.new()
+		tag.name = "NameTag"
+		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tag.add_theme_font_size_override("font_size", 12)
+		tag.add_theme_color_override("font_color", Color.WHITE)
+		tag.add_theme_stylebox_override("normal", _flat(Color(0.1, 0.1, 0.16, 0.92), 6))
+		card.add_child(tag)
+	tag.text = " %s " % product_name
+	tag.size = Vector2(maxf(70.0, product_name.length() * 7.5 + 16.0), 22)
+	tag.position = Vector2(clampf(icon.position.x + icon.size.x / 2.0 - tag.size.x / 2.0, 2.0, card.size.x - tag.size.x - 2.0), icon.position.y - 20)
+	tag.show()
+
+func _hide_name(card: Panel) -> void:
+	var tag := card.get_node_or_null("NameTag") as Label
+	if tag != null: tag.hide()
 
 func _buy(id: String) -> void:
 	var success: bool = business.buy_licence(id)

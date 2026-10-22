@@ -22,12 +22,13 @@ func _run() -> void:
 		assert(town.find_child(node_name, true, false) != null, "Missing town node %s" % node_name)
 	for index in range(8): assert(town.find_child("MarketShop%d" % index, true, false) != null)
 	for index in range(16): assert(town.find_child("TownHouseBody%d" % index, true, false) != null)
-	# The next phase (shops, houses, chai stall) is built but hidden and without collisions.
+	# The market street, shops, houses and chai stall are open (town edge at +-72 m).
 	var future: Node3D = town.get_node("FutureTown")
-	assert(not future.visible and future.process_mode == Node.PROCESS_MODE_DISABLED and future.is_ancestor_of(town.find_child("MarketShop0", true, false)))
+	assert(future.visible and future.process_mode == Node.PROCESS_MODE_INHERIT and future.is_ancestor_of(town.find_child("MarketShop0", true, false)))
 	await physics_frame
 	var probe: PhysicsDirectSpaceState3D = current_scene.get_world_3d().direct_space_state
-	assert(probe.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(-40, 5, -6), Vector3(-40, 0.5, -6))).is_empty(), "Hidden houses must not block anything")
+	assert(not probe.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(-40, 5, -6), Vector3(-40, 0.5, -6))).is_empty(), "Town houses are solid")
+	assert(town.find_child("AirportRoad", true, false) != null)
 	var life = town.get_node("RivalShopLife")
 	assert(not life.keeper.visible, "Sharma's shop is closed before day %d" % business.RIVAL_OPEN_DAY)
 	business.advance_clock(2 * 1440.0 + 120.0)
@@ -76,16 +77,16 @@ func _run() -> void:
 	# Town edge: see-through barrier, 3-2-1 countdown, stepping back cancels, then home.
 	var boundary = town.get_node("TownBoundary")
 	boundary.set_physics_process(false)
-	player.global_position = Vector3(30.0, 1.1, 20)
+	player.global_position = Vector3(71.0, 1.1, 20)
 	boundary._physics_process(1.0)
 	assert(boundary.walls[1].visible and boundary.material.albedo_color.a > 0.4)
 	assert(boundary.notice.visible and boundary.notice.text.contains("Returning home in 2"), boundary.notice.text)
-	player.global_position = Vector3(20, 1.1, 20)
+	player.global_position = Vector3(60, 1.1, 20)
 	boundary._physics_process(0.1)
 	assert(not boundary.notice.visible and boundary.remaining < 0.0, "Stepping back cancels the countdown")
-	player.global_position = Vector3(30.0, 1.1, 20)
+	player.global_position = Vector3(71.0, 1.1, 20)
 	for step in range(4): boundary._physics_process(1.0)
-	assert(player.indoors and player.global_position.distance_to(Vector3(30.0, 1.1, 20)) > 20.0, "Sent home after 3-2-1")
+	assert(player.indoors and player.global_position.distance_to(Vector3(71.0, 1.1, 20)) > 20.0, "Sent home after 3-2-1")
 
 	# Night: shutters down, porch lamps on, chai till 23:00, fewer people and cars, stars.
 	business.advance_clock(22 * 60.0 - business.minutes_of_day)

@@ -180,6 +180,13 @@ board and a local suggestion form. See Farming section below for controls and li
   on the shelves (export_prices -> {price, stock}), counts capped by stock; opening
   APNA Export withdraws offers that no longer fit; accepted orders can be cancelled
   (export_cancel). Held carton/parcel smaller, low on the right.
+- Bigger town (2026-10-22): town_boundary MIN_X -72, MAX_X 72, MIN_Z -52, MAX_Z 68;
+  town_expansion.gd opens FutureTown at build (market street x 50 with 8 shops, 16
+  houses, chai stall, autos) and builds Airport Road (z 45.5, x 30..47.25) from the
+  market street to the cargo terminal yard, with a footpath, 2 lamps, a car park with
+  2 parked cars and green APNA AIRPORT signs (main road x 45.2 z 12.6, turn x 46 z
+  40.2). town_life_test expects the open town and the new edge. Licence cards show a
+  product name tag on hover (and a tooltip).
 - Startup check (2026-10-20): the player spawns beside the bed from frame 0; only the
   very first frame (behind the loading screen) shows the home without its walls
   (HomeDecor is added deferred). One replay showed a ~2 m slide toward the door just

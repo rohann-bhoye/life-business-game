@@ -1,11 +1,13 @@
 extends Node3D
 
-# Land around the original 64 m town (flat out to x +-74, z -56..60). The open town
-# still ends at the old edge (town_boundary.gd); out here the main road continues
-# both ways with streetlights and trees, so traffic drives in and out of town. The
-# next phase (FutureTown, hidden for now) has a market street with Indian shops, a
-# chai stall, more houses and parked autos/scooters. The bus stop sits inside the
-# open town. Built once by neighbourhood.gd; uses its box/tree/streetlight helpers.
+# Land around the original 64 m town (flat out to x +-74, z -56..60), all open now
+# (town_boundary.gd): the main road continues both ways with streetlights and trees,
+# the market street (FutureTown, opened at build) has Indian shops, a chai stall,
+# more houses and parked autos/scooters, and Airport Road leaves the market street
+# west to the cargo terminal (export_world.gd) with a car park. The bus stop sits in
+# the old town. Built once by neighbourhood.gd; uses its box/tree/streetlight helpers.
+const Models := preload("res://vehicle_models.gd")
+const AIRPORT_ROAD_Z := 45.5
 const Kenney = preload("res://kenney_assets.gd")
 const IndianHouse := preload("res://indian_house.gd")
 const MARKET_X := 50.0
@@ -37,8 +39,9 @@ func build(neighbourhood: Node3D) -> void:
 	_bus_stop()
 	_vehicles()
 	_greenery()
-	future.visible = false
-	future.process_mode = Node.PROCESS_MODE_DISABLED
+	_airport_road()
+	# The market street and its houses are open from the start now.
+	unlock_future_town()
 
 func unlock_future_town() -> void:
 	future.visible = true
@@ -131,6 +134,54 @@ func _lower_valley() -> void:
 				var point := Vector3(x, 0, z)
 				data.set_height(point, lerpf(data.get_height(point), 0.06 + Horizon.height(x), weight))
 	data.update_maps()
+
+## Airport Road: from the market street (x 50) west to the cargo terminal yard
+## (x 30), asphalt with edge lines and dashes, a footpath with lamps on the north
+## side, green APNA AIRPORT signs on the main road and at the turn, and a small car
+## park north of the road with two parked cars.
+func _airport_road() -> void:
+	var road_material := _road_material()
+	var paving := Color(0.66, 0.69, 0.67)
+	var white := Color(0.85, 0.87, 0.83)
+	var z := AIRPORT_ROAD_Z
+	var road := _box("AirportRoad", Vector3(17.3, 0.012, 5.5), Vector3(38.6, 0.112, z), Color(0.16, 0.18, 0.19))
+	if road_material != null: road.material_override = road_material
+	for edge in [z - 2.6, z + 2.6]: _box("AirportRoadEdge%d" % roundi(edge), Vector3(17.3, 0.008, 0.08), Vector3(38.6, 0.124, edge), white)
+	for step in range(5): _box("AirportRoadDash%d" % step, Vector3(1.8, 0.008, 0.1), Vector3(32.2 + step * 3.4, 0.124, z), Color(0.88, 0.86, 0.68))
+	_box("AirportRoadPavement", Vector3(15.6, 0.014, 1.4), Vector3(37.8, 0.107, z - 3.45), paving)
+	for x in [33.0, 40.0]: town._streetlight(Vector3(x, 0.1, z - 3.5), 0.0, false)
+	# Car park north of the road, by the control tower.
+	_box("AirportCarPark", Vector3(10.0, 0.014, 6.0), Vector3(36.0, 0.109, z - 7.2), Color(0.58, 0.59, 0.58))
+	for bay in range(5): _box("ParkingLine%d" % bay, Vector3(0.1, 0.008, 4.2), Vector3(31.6 + bay * 2.2, 0.122, z - 7.5), white)
+	for car in [[Vector3(32.7, 0.1, z - 7.4), Color(0.85, 0.2, 0.18)], [Vector3(37.1, 0.1, z - 7.4), Color(0.2, 0.4, 0.8)]]:
+		var model := MeshInstance3D.new()
+		model.name = "ParkedCar"
+		model.mesh = Models.car(car[1])
+		model.position = car[0]
+		model.rotation.y = PI / 2
+		town.add_child(model)
+		town._collider("ParkedCarBody", town, Vector3(1.9, 1.5, 4.0), car[0] + Vector3(0, 0.75, 0))
+	_road_sign("AirportSignMain", Vector3(45.2, 0.1, 12.6), -PI / 2, "APNA AIRPORT\nCargo terminal - turn south")
+	_road_sign("AirportSignTurn", Vector3(46.0, 0.1, 40.2), PI, "APNA AIRPORT\nturn right")
+
+## A green road sign on two posts with white words (front +z, turned by `yaw`).
+func _road_sign(node_name: String, at: Vector3, yaw: float, words: String) -> void:
+	var sign := Node3D.new()
+	sign.name = node_name
+	sign.position = at
+	sign.rotation.y = yaw
+	town.add_child(sign)
+	for x in [-0.9, 0.9]: _box("Post", Vector3(0.08, 2.6, 0.08), Vector3(x, 1.3, 0), Color(0.6, 0.62, 0.64), false, sign)
+	_box("Board", Vector3(2.4, 1.0, 0.06), Vector3(0, 2.3, 0), Color(0.05, 0.42, 0.22), false, sign)
+	_box("Border", Vector3(2.3, 0.9, 0.01), Vector3(0, 2.3, 0.035), Color(0.92, 0.95, 0.92), false, sign)
+	_box("Inner", Vector3(2.2, 0.8, 0.01), Vector3(0, 2.3, 0.04), Color(0.05, 0.42, 0.22), false, sign)
+	var label := Label3D.new()
+	label.text = words
+	label.position = Vector3(0, 2.3, 0.05)
+	label.font_size = 44
+	label.pixel_size = 0.004
+	label.outline_size = 0
+	sign.add_child(label)
 
 func _houses() -> void:
 	var spots := [
@@ -266,5 +317,5 @@ func _vehicles() -> void:
 		_scooter(index, Vector3(MARKET_X + (-2.1 if index % 2 == 0 else 2.1), 0.1, -8.0 - index * 4.5), PI / 2 if index % 2 == 0 else -PI / 2)
 
 func _greenery() -> void:
-	for point in [Vector3(-36, 0.1, -2), Vector3(-56, 0.1, -12), Vector3(-72, 0.1, 8), Vector3(-44, 0.1, 26), Vector3(-68, 0.1, 30), Vector3(36, 0.1, -14), Vector3(60, 0.1, -30), Vector3(72, 0.1, 4), Vector3(44, 0.1, 28), Vector3(68, 0.1, 44), Vector3(-30, 0.1, -40), Vector3(10, 0.1, -40), Vector3(38, 0.1, 44), Vector3(-36, 0.1, 46), Vector3(-8, 0.1, 74)]:
+	for point in [Vector3(-36, 0.1, -2), Vector3(-56, 0.1, -12), Vector3(-72, 0.1, 8), Vector3(-44, 0.1, 26), Vector3(-68, 0.1, 30), Vector3(36, 0.1, -14), Vector3(60, 0.1, -30), Vector3(72, 0.1, 4), Vector3(44, 0.1, 28), Vector3(68, 0.1, 44), Vector3(-30, 0.1, -40), Vector3(10, 0.1, -40), Vector3(38, 0.1, 55), Vector3(-36, 0.1, 46), Vector3(-8, 0.1, 74)]:
 		town._tree(point)
