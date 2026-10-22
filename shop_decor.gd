@@ -18,6 +18,9 @@ const HouseParts = preload("res://indian_house.gd")
 const ROOM_MIN_X := -5.94
 const ROOM_MAX_X := -0.06
 const BACK_Z := -7.44
+## The doorway into the packing room in the left wall (world z), see
+## shop_operations.gd SIDE_DOOR: the paint band and stripe stop either side of it.
+const SIDE_DOOR := Vector2(0.75, 1.95)
 const FRONT_Z := 2.44
 const SHELF_HEIGHTS := [2.35, 2.85]
 # Indian shop touches: marigold torans, rangoli, tulsi planter and a small mandir.
@@ -72,8 +75,10 @@ func set_back(back_z: float) -> void:
 	back_wall.position.z = back_z - BACK_Z
 	for child in get_children():
 		if child is MeshInstance3D and (child.name.begins_with("WallPaint") or child.name.begins_with("WallStripe")):
-			child.mesh.size.z = FRONT_Z - back_z
-			child.position.z = (FRONT_Z + back_z) / 2
+			if child.name.ends_with("LeftFront"): continue
+			var front: float = SIDE_DOOR.x if child.name.ends_with("Left") else FRONT_Z
+			child.mesh.size.z = front - back_z
+			child.position.z = (front + back_z) / 2
 
 func _indian_touches() -> void:
 	for z in [FRONT_Z - 0.05, 2.62]: _toran("Toran", Vector3(DOOR_X, DOOR_TOP, z), 1.9)
@@ -349,9 +354,14 @@ func _paint_band() -> void:
 	var stripe := _material(Color(0.12, 0.3, 0.26))
 	var depth := FRONT_Z - BACK_Z
 	var mid_z := (FRONT_Z + BACK_Z) / 2
-	for side in [[ROOM_MIN_X + 0.006, mid_z, Vector3(0.012, 1.0, depth)], [ROOM_MAX_X - 0.006, mid_z, Vector3(0.012, 1.0, depth)]]:
-		_box("WallPaint", Vector3(side[0], 0.5, side[1]), side[2], paint)
-		_box("WallStripe", Vector3(side[0], 1.03, side[1]), Vector3(0.016, 0.06, depth), stripe)
+	_box("WallPaint", Vector3(ROOM_MAX_X - 0.006, 0.5, mid_z), Vector3(0.012, 1.0, depth), paint)
+	_box("WallStripe", Vector3(ROOM_MAX_X - 0.006, 1.03, mid_z), Vector3(0.016, 0.06, depth), stripe)
+	# Left wall: behind the packing room doorway (follows the back wall) and in front of it.
+	var x := ROOM_MIN_X + 0.006
+	_box("WallPaintLeft", Vector3(x, 0.5, (SIDE_DOOR.x + BACK_Z) / 2), Vector3(0.012, 1.0, SIDE_DOOR.x - BACK_Z), paint)
+	_box("WallStripeLeft", Vector3(x, 1.03, (SIDE_DOOR.x + BACK_Z) / 2), Vector3(0.016, 0.06, SIDE_DOOR.x - BACK_Z), stripe)
+	_box("WallPaintLeftFront", Vector3(x, 0.5, (SIDE_DOOR.y + FRONT_Z) / 2), Vector3(0.012, 1.0, FRONT_Z - SIDE_DOOR.y), paint)
+	_box("WallStripeLeftFront", Vector3(x, 1.03, (SIDE_DOOR.y + FRONT_Z) / 2), Vector3(0.016, 0.06, FRONT_Z - SIDE_DOOR.y), stripe)
 	_box("WallPaint", Vector3(-3.0, 0.5, BACK_Z + 0.006), Vector3(5.88, 1.0, 0.012), paint)
 	_box("WallStripe", Vector3(-3.0, 1.03, BACK_Z + 0.008), Vector3(5.88, 0.06, 0.016), stripe)
 

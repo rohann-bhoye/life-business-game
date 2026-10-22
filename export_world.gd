@@ -20,6 +20,8 @@ const Catalog := preload("res://product_catalog.gd")
 const ROOM_CENTRE := Vector3(-7.83, 0.1, -0.73)
 const TABLE_POINT := Vector3(-9.1, 0.1, -1.0)
 const SHELF_POINT := Vector3(-9.25, 0.1, 1.4)
+## The packing station inside the cargo terminal (works like the shop's table).
+const TERMINAL_TABLE := Vector3(11.5, 0.1, 38.0)
 const SHELF_SLOTS := [Vector3(-9.25, 0.49, 1.05), Vector3(-9.25, 0.49, 1.75), Vector3(-9.25, 1.04, 1.05), Vector3(-9.25, 1.04, 1.75)]
 # Airport (south of the warehouse).
 const RUNWAY_Z := 58.0
@@ -175,7 +177,9 @@ func _build_packing_room() -> void:
 	door.doorway_width = 1.2
 	door.doorway_height = 2.3
 	room.add_child(door)
-	# Pink trim round the doorway from the shop (both sides of the wall).
+	# Pink trim round the doorway from the shop (both sides of the wall), and a floor
+	# strip through the wall.
+	builder._box("DoorThreshold", room, Vector3(0.24, 0.014, 1.2), Vector3(-6.0, 0.108, 1.35), Color(0.72, 0.74, 0.76))
 	for x in [-5.92, -6.08]:
 		for z in [0.69, 2.01]: builder._box("ShopDoorPost", room, Vector3(0.04, 2.36, 0.12), Vector3(x, 1.28, z), Bricks.FRAME)
 		builder._box("ShopDoorTop", room, Vector3(0.04, 0.12, 1.44), Vector3(x, 2.36, 1.35), Bricks.FRAME)
@@ -219,7 +223,13 @@ func _build_airport() -> void:
 	builder._box("TerminalYard", airport, Vector3(28, 0.016, 15.0), Vector3(16, 0.108, 39.0), concrete)
 	var terminal := _prop(airport, "ExportTerminal", "export_terminal", Vector3(16, 0.1, 41.5))
 	terminal.name = "ExportTerminal"
-	builder._collider("TerminalBody", airport, Vector3(16.2, 6.0, 10.2), Vector3(16, 3.1, 41.5))
+	# Its walls (tools/blender/build_export_props.py): a walk-in door in the west wall
+	# (z 42.8..45.2) by the walkway and the open runway door (x 10.5..17.5).
+	for wall in [[Vector3(16.2, 6.0, 0.2), Vector3(16, 3.1, 36.5)], [Vector3(0.2, 6.0, 10.2), Vector3(24, 3.1, 41.5)],
+			[Vector3(0.2, 6.0, 6.4), Vector3(8, 3.1, 39.6)], [Vector3(0.2, 6.0, 1.4), Vector3(8, 3.1, 45.9)], [Vector3(0.2, 3.0, 2.4), Vector3(8, 4.6, 44.0)],
+			[Vector3(2.6, 6.0, 0.2), Vector3(9.2, 3.1, 46.5)], [Vector3(6.6, 6.0, 0.2), Vector3(20.8, 3.1, 46.5)], [Vector3(7.0, 1.0, 0.2), Vector3(14, 5.6, 46.5)]]:
+		builder._collider("TerminalWall", airport, wall[0], wall[1])
+	_terminal_inside(airport)
 	builder._collider("TerminalOfficeBody", airport, Vector3(8.2, 3.3, 3.2), Vector3(19, 1.75, 35.0))
 	for x in [19.6, 23.6]: builder._collider("CanopyPost%d" % roundi(x), airport, Vector3(0.2, 3.6, 0.2), Vector3(x, 1.9, 48.75))
 	_prop(airport, "ControlTower", "control_tower", Vector3(28.2, 0.1, 40.0))
@@ -263,6 +273,72 @@ func _build_airport() -> void:
 	path_dots.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	path_dots.hide()
 	airport.add_child(path_dots)
+
+## Inside the cargo terminal: pallet racks along the walls full of stored parcels (one
+## MultiMesh), the packing station with its supplies, lights and the name.
+func _terminal_inside(airport: Node3D) -> void:
+	var rack_model: Node3D = (load("res://assets/props/warehouse/storage_rack.glb") as PackedScene).instantiate()
+	var parcel_model: Node3D = (load("res://assets/props/export/parcel.glb") as PackedScene).instantiate()
+	var rack_spots: Array[Transform3D] = []
+	for z in [38.2, 41.0, 43.8]: rack_spots.append(Transform3D(Basis(Vector3.UP, PI / 2), Vector3(23.3, 0.1, z)))
+	for x in [17.0, 19.8]: rack_spots.append(Transform3D(Basis(Vector3.UP, PI), Vector3(x, 0.1, 37.25)))
+	var parcels: Array[Transform3D] = []
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 41
+	for spot in rack_spots:
+		_body(airport, "TerminalRackBody", Vector3(2.7, 4.2, 1.1), spot.translated_local(Vector3(0, 2.1, 0)))
+		for level in range(4):
+			for slot in range(3):
+				if rng.randf() < 0.25: continue
+				var lift := 0.0 if level == 0 else 0.1 + level * 0.95 + 0.085
+				parcels.append(spot * Transform3D(Basis(Vector3.UP, rng.randf_range(-0.2, 0.2)), Vector3(-0.85 + slot * 0.85, lift, rng.randf_range(-0.08, 0.08))))
+	airport.add_child(_batch("TerminalRacks", rack_model, rack_spots))
+	airport.add_child(_batch("StoredParcels", parcel_model, parcels))
+	rack_model.free()
+	parcel_model.free()
+	_prop(airport, "PackingStation", "packing_table", TERMINAL_TABLE)
+	builder._collider("PackingStationBody", airport, Vector3(1.8, 0.95, 0.8), TERMINAL_TABLE + Vector3(0, 0.47, 0))
+	_text(airport, "StationSign", "PACKING STATION", TERMINAL_TABLE + Vector3(0, 2.2, -1.3), 40, Color(0.98, 0.62, 0.15))
+	var supplies := _prop(airport, "StationSupplies", "supply_shelf", Vector3(13.6, 0.1, 37.0))
+	builder._collider("StationSuppliesBody", airport, Vector3(1.02, 1.8, 0.46), Vector3(13.6, 1.0, 37.0))
+	_text(airport, "TerminalName", "APNA EXPORT  -  CARGO", Vector3(16, 4.7, 36.62), 90, Color.WHITE)
+	_text(airport, "OutboundSign", "OUTBOUND", Vector3(14, 0.14, 44.6), 120, Color(0.98, 0.78, 0.12)).rotation.x = -PI / 2
+	for x in [12.0, 20.0]:
+		var lamp := OmniLight3D.new()
+		lamp.name = "TerminalLight"
+		lamp.position = Vector3(x, 4.6, 41.5)
+		lamp.light_energy = 1.2
+		lamp.omni_range = 10.0
+		lamp.shadow_enabled = false
+		airport.add_child(lamp)
+
+## Many copies of a one-mesh Blender prop as a single MultiMesh.
+func _batch(node_name: String, model: Node3D, transforms: Array[Transform3D]) -> MultiMeshInstance3D:
+	var source: MeshInstance3D = model.find_children("*", "MeshInstance3D", true, false)[0]
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = source.mesh
+	multimesh.instance_count = transforms.size()
+	for index in range(transforms.size()): multimesh.set_instance_transform(index, transforms[index])
+	var batch := MultiMeshInstance3D.new()
+	batch.name = node_name
+	batch.multimesh = multimesh
+	return batch
+
+## A box collider at any transform (the turned racks).
+func _body(parent: Node3D, node_name: String, size: Vector3, at: Transform3D) -> void:
+	var body := StaticBody3D.new()
+	body.name = node_name
+	body.transform = at
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	collision.shape = shape
+	body.add_child(collision)
+	parent.add_child(body)
+
+func _at_table() -> bool:
+	return _near(TABLE_POINT, 1.5) or _near(TERMINAL_TABLE, 1.5)
 
 func _build_plane() -> void:
 	plane = _prop(self, "CargoPlane", "cargo_plane")
@@ -346,7 +422,7 @@ func try_interact() -> bool:
 	if carton_order >= 0: return _with_carton()
 	if carrying_parcel >= 0: return _with_parcel()
 	var free_hands: bool = business.carried_stock == 0 and not ops.holding_bag
-	if _near(TABLE_POINT, 1.5):
+	if _at_table():
 		if not free_hands:
 			ui.show_feedback("Your hands are full. Put that down first.", true)
 			return true
@@ -372,7 +448,7 @@ func _with_carton() -> bool:
 	if order.is_empty():
 		_put_away_carton()
 		return true
-	if _near(TABLE_POINT, 1.5):
+	if _at_table():
 		var missing := _still_needed(order)
 		if not missing.is_empty():
 			ui.show_feedback("Still missing: %s." % ", ".join(missing), true)
@@ -475,7 +551,7 @@ func hint() -> String:
 	if carton_order >= 0:
 		var order := picking_order()
 		if order.is_empty(): return ""
-		if _near(TABLE_POINT, 1.5): return "Seal the parcel for %s" % order.city if _still_needed(order).is_empty() else "Still missing: %s" % ", ".join(_still_needed(order))
+		if _at_table(): return "Seal the parcel for %s" % order.city if _still_needed(order).is_empty() else "Still missing: %s" % ", ".join(_still_needed(order))
 		var record: Dictionary = ops.furnishing.near_any_rack() if is_instance_valid(ops.furnishing) else {}
 		if record.is_empty(): return ""
 		for line in order.lines:
@@ -486,7 +562,7 @@ func hint() -> String:
 		if _near(PAD, 2.3): return "Put the parcel on the export platform"
 		if _near(SHELF_POINT, 1.3): return "Put the parcel back on the shelf"
 		return ""
-	if _near(TABLE_POINT, 1.5): return "Take a carton for an export order"
+	if _at_table(): return "Take a carton for an export order"
 	if _near(SHELF_POINT, 1.3) and not business.exports.in_state("packed").is_empty(): return "Pick up the parcel"
 	return ""
 

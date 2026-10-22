@@ -118,6 +118,8 @@ func _cctv(shop: Node3D, at: Vector3) -> void:
 func _interior(shop: Node3D) -> void:
 	for x in [-2.92, 2.92]:
 		builder._box("WallSkirting%s" % x, shop, Vector3(0.03, 0.16, 9.75), Vector3(x, -1.25, -2.5), Color(0.26, 0.32, 0.34))
+	# In front of the packing room doorway (shop_operations.gd SIDE_DOOR).
+	builder._box("DoorSkirting", shop, Vector3(0.03, 0.16, 2.34 - 1.95), Vector3(-2.92, -1.25, (2.34 + 1.95) / 2.0), Color(0.26, 0.32, 0.34))
 	var light = ops.get_node("ShopLight")
 	light.light_color = Color(0.93, 0.97, 1.0)
 	light.light_energy = 0.8

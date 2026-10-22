@@ -98,8 +98,8 @@ def draw_print(s):
 	s.rect(x - 6, y + h - 8, w + 12, 14, ORANGE, 0.02)
 	# Ribbed cladding.
 	x, y, w, h = CLADDING
-	s.rect(x - 6, y - 6, w + 12, h + 12, "D7DEE3")
-	s.rects([(x + k * 10, y - 6, 4, h + 12) for k in range(int(w / 10) + 1)], "B9C3CA", 0.01)
+	s.rect(x - 6, y - 6, w + 12, h + 12, "BCC6CE")
+	s.rects([(x + k * 10, y - 6, 4, h + 12) for k in range(int(w / 10) + 1)], "A3AEB7", 0.01)
 	s.rect(x - 6, y + h - 10, w + 12, 16, "8F9AA3", 0.02)
 	# Tower glass.
 	x, y, w, h = TOWER_GLASS
@@ -238,10 +238,29 @@ def propeller(b):
 	tube_x(b, [(0.35, 0, 0, 0), (0.1, 0.16, 0.16, 0), (-0.05, 0.16, 0.16, 0)], ["orange", "orange"], 8)
 
 def export_terminal(b):
-	# Walls: ribbed cladding, the roller door toward the runway (-y here = game +z).
-	b.box((0, 0, 3.0), (16.0, 10.0, 6.0), {"+z": None, "-z": None, "rest": CLADDING})
-	b.box((-2.0, -5.03, 2.6), (7.0, 0.06, 5.2), {"-y": ROLLER, "rest": "steel"})
-	b.box((-2.0, -5.2, 5.45), (7.6, 0.4, 0.5), "steel")
+	# Walls 0.2 thick, ribbed cladding outside and in: a walk-in door in the west wall
+	# (toward the walkway, y -3.7..-1.3) and the big runway door (-y here = game +z,
+	# x -5.5..1.5) rolled up and open.
+	wall = {"rest": CLADDING}
+	b.box((0, 5.0, 3.0), (16.2, 0.2, 6.0), wall)
+	b.box((8.0, 0, 3.0), (0.2, 10.2, 6.0), wall)
+	b.box((-8.0, 1.9, 3.0), (0.2, 6.4, 6.0), wall)
+	b.box((-8.0, -4.4, 3.0), (0.2, 1.4, 6.0), wall)
+	b.box((-8.0, -2.5, 4.5), (0.2, 2.4, 3.0), wall)
+	b.box((-6.8, -5.0, 3.0), (2.6, 0.2, 6.0), wall)
+	b.box((4.8, -5.0, 3.0), (6.6, 0.2, 6.0), wall)
+	b.box((-2.0, -5.0, 5.5), (7.0, 0.2, 1.0), wall)
+	b.box((-2.0, -5.35, 5.25), (7.6, 0.5, 0.55), "steel")
+	for x in (-5.58, 1.58): b.box((x, -5.12, 2.5), (0.16, 0.16, 5.0), "orange")
+	b.box((-2.0, -5.0, 0.015), (7.0, 0.3, 0.03), "yellow")
+	for k in range(8): b.box((-5.2 + k * 0.9, -5.0, 0.03), (0.4, 0.31, 0.01), "steel")
+	for y in (-3.75, -1.25): b.box((-8.12, y, 1.55), (0.16, 0.14, 3.1), "orange")
+	b.box((-8.12, -2.5, 3.08), (0.16, 2.64, 0.16), "orange")
+	# Inside: a concrete floor with a yellow outbound bay by the runway door.
+	b.box((0, 0, 0.01), (15.8, 9.8, 0.02), "concrete")
+	for corners in (((-5.5, -4.8), (1.5, -4.8)), ((-5.5, -1.8), (1.5, -1.8))):
+		b.box(((corners[0][0] + corners[1][0]) / 2, corners[0][1], 0.025), (7.0, 0.12, 0.01), "yellow")
+	for x in (-5.5, 1.5): b.box((x, -3.3, 0.025), (0.12, 3.0, 0.01), "yellow")
 	# Arched roof over the hangar, gable ends in cladding.
 	arc = [(-5.3 + 10.6 * k / 10, 6.0 + 1.7 * math.sin(math.pi * k / 10)) for k in range(11)]
 	for k in range(10):
@@ -252,13 +271,13 @@ def export_terminal(b):
 		b.swatch_face(under, "roof")
 	for x, sign in ((8.0, 1), (-8.0, -1)):
 		pts = [(y, z) for y, z in arc[::-1]] if sign > 0 else [(y, z) for y, z in arc]
-		idx = [b.vert((x, y, z)) for y, z in pts]
-		b.swatch_face(idx, "cladding")
+		b.swatch_face([b.vert((x + sign * 0.1, y, z)) for y, z in pts], "cladding")
+		b.swatch_face([b.vert((x - sign * 0.1, y, z)) for y, z in pts[::-1]], "cladding")
 	# Office toward the town (+y here = game -z) with the big sign above it.
 	b.box((3.0, 6.5, 1.6), (8.0, 3.0, 3.2), {"+y": OFFICE, "-z": None, "rest": "white"})
-	b.box((3.0, 6.5, 3.3), (8.4, 3.4, 0.2), "navy")
+	b.box((3.0, 6.6, 3.3), (8.4, 3.2, 0.2), "navy")
 	b.box((3.0, 8.05, 3.2), (8.4, 0.12, 0.25), "orange")
-	b.box((-2.0, 5.06, 4.7), (9.0, 0.1, 1.6), {"+y": TERMINAL_SIGN, "rest": "navy"})
+	b.box((-2.0, 5.16, 4.7), (9.0, 0.1, 1.6), {"+y": TERMINAL_SIGN, "rest": "navy"})
 	# A loading canopy over the apron side.
 	b.box((5.6, -6.2, 3.6), (4.6, 2.4, 0.16), "orange")
 	for x in (3.6, 7.6): b.box((x, -7.25, 1.8), (0.14, 0.14, 3.6), "steel")

@@ -162,6 +162,14 @@ board and a local suggestion form. See Farming section below for controls and li
   colliders stay) and keeps doors, lights, floor, labels, planters. Packing room:
   sliding glass street door, pink trim on the shop doorway, supply_shelf.glb,
   stacked parcels; streetlight -8 moved to -12.6, dog to -14.4.
+- Cargo terminal inside (2026-10-22): export_terminal.glb has real 0.2 m walls, a
+  walk-in door in the west wall (world x 8, z 42.8..45.2, off the walkway) and the
+  runway door open (x 10.5..17.5); export_world.gd builds matching wall colliders, 5
+  pallet racks (warehouse storage_rack.glb) full of stored parcels as MultiMeshes, a
+  second working packing station at TERMINAL_TABLE (11.5, 38) with a supply shelf,
+  an OUTBOUND floor bay, lights. _at_table() = shop table or terminal station.
+  Shop: the left paint band/stripe and skirting stop at the packing room doorway
+  (shop_decor SIDE_DOOR, DoorSkirting); a DoorThreshold floor strip fills the wall gap.
 - Startup check (2026-10-20): the player spawns beside the bed from frame 0; only the
   very first frame (behind the loading screen) shows the home without its walls
   (HomeDecor is added deferred). One replay showed a ~2 m slide toward the door just

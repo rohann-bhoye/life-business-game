@@ -517,8 +517,10 @@ func follow_back_wall() -> void:
 	var back := back_z()
 	if decor != null: decor.set_back(back)
 	for skirting in building.find_children("WallSkirting*", "MeshInstance3D", false, false):
-		skirting.mesh.size.z = 2.44 - back - 0.2
-		skirting.position.z = (2.44 + back) / 2.0
+		# The left skirting stops at the packing room doorway (the rest is DoorSkirting).
+		var front: float = SIDE_DOOR.x if skirting.position.x < 0.0 else 2.44
+		skirting.mesh.size.z = front - back - 0.2
+		skirting.position.z = (front + back) / 2.0
 	var sign := building.get_node_or_null("InteriorCategory") as Node3D
 	if sign != null: sign.position.z = back + 0.02
 	# Store-room door and clock inside, back door and vent outside (shop_presentation.gd).
