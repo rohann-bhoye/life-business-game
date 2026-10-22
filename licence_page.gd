@@ -93,13 +93,14 @@ func _card(entry: Dictionary, at: Vector2) -> Dictionary:
 	var title := _label(entry.name.to_upper(), Vector2(12, 6), 190, 16, Color.WHITE, band)
 	title.add_theme_font_override("font", KenneyTheme.heading_font())
 	var state := _label("", Vector2(12, 28), 190, 11, Color("f0fdf4"), band)
+	# One row of product pictures, their names under it (up to three lines).
 	for index in range(entry.products.size()):
 		var icon := TextureRect.new()
 		icon.texture = load("res://assets/ui/products/%s.png" % entry.products[index])
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.position = Vector2(12 + (index % 3) * 64, 60 + (index / 3) * 58)
-		icon.size = Vector2(56, 52)
+		icon.position = Vector2(10 + index * 38, 58)
+		icon.size = Vector2(36, 36)
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(icon)
 	var names: Array[String] = []
@@ -107,19 +108,33 @@ func _card(entry: Dictionary, at: Vector2) -> Dictionary:
 	for product in entry.products:
 		names.append(Catalog.NAMES[product])
 		total += business.product_price(product)
-	var list := _label(", ".join(names), Vector2(12, 178), 190, 11, KenneyTheme.MUTED, card)
-	list.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	list.clip_text = false
-	list.size.y = 30
-	_label("Items included", Vector2(12, 212), 120, 13, KenneyTheme.TEXT, card)
-	_label(str(entry.products.size()), Vector2(140, 212), 60, 13, KenneyTheme.TEXT, card).horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_label("Average price", Vector2(12, 232), 120, 13, KenneyTheme.TEXT, card)
-	var average := _label(_money(total / entry.products.size()), Vector2(140, 232), 60, 13, KenneyTheme.TEXT, card)
+	var list := Label.new()
+	var rows: Array[String] = []
+	for index in range(0, names.size(), 2): rows.append(", ".join(names.slice(index, index + 2)))
+	list.text = ",\n".join(rows)
+	list.position = Vector2(12, 100)
+	list.custom_minimum_size = Vector2(188, 0)
+	list.size = Vector2(188, 48)
+	list.clip_text = true
+	list.add_theme_font_size_override("font_size", 11)
+	list.add_theme_color_override("font_color", KenneyTheme.MUTED)
+	list.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(list)
+	_label("Items included", Vector2(12, 158), 120, 13, KenneyTheme.TEXT, card)
+	_label(str(entry.products.size()), Vector2(140, 158), 60, 13, KenneyTheme.TEXT, card).horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_label("Average price", Vector2(12, 180), 120, 13, KenneyTheme.TEXT, card)
+	var average := _label(_money(total / entry.products.size()), Vector2(140, 180), 60, 13, KenneyTheme.TEXT, card)
 	average.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	var price := _label("", Vector2(12, 252), 190, 18, KenneyTheme.GREEN, card)
+	var divider := ColorRect.new()
+	divider.color = Color("e5e7eb")
+	divider.position = Vector2(12, 206)
+	divider.size = Vector2(188, 1)
+	card.add_child(divider)
+	_label("Licence price", Vector2(12, 216), 120, 12, KenneyTheme.MUTED, card)
+	var price := _label("", Vector2(12, 232), 188, 20, KenneyTheme.GREEN, card)
 	price.add_theme_font_override("font", KenneyTheme.heading_font())
 	var button := Button.new()
-	button.position = Vector2(12, 272)
+	button.position = Vector2(12, 270)
 	button.size = Vector2(188, 36)
 	button.focus_mode = Control.FOCUS_NONE
 	button.add_theme_font_size_override("font_size", 13)

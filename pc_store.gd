@@ -7,6 +7,8 @@ extends Panel
 # furniture truck brings the package to the warehouse; unpack it there with E).
 # Supplies sells packs of carry bags for counter orders (straight onto the stand).
 signal back_requested
+## A product without its licence: Get licence opens APNA Licences (computer_terminal.gd).
+signal licence_requested
 
 const Catalog = preload("res://product_catalog.gd")
 const KenneyTheme = preload("res://kenney_theme.gd")
@@ -19,7 +21,7 @@ const CATEGORIES := [
 	["Supplies", ["carry_bags"]],
 ]
 ## Furniture cards: [id, name, what it holds].
-const FURNITURE := [["rack_shelf", "Shelf rack", "3 rows, any product"], ["rack_produce", "Produce table", "12 veg baskets"], ["rack_fridge", "Cold-drink fridge", "Drinks + milk, sells more"]]
+const FURNITURE := [["rack_shelf", "Shelf rack", "3 rows, any product"], ["rack_produce", "Produce table", "12 veg baskets"], ["rack_fridge", "Cold-drink fridge", "Cold drinks + milk"]]
 ## The rack product each furniture card orders (a shelf takes the first product
 ## without its own restock rack; see _shelf_product).
 const FURNITURE_PRODUCT := {"rack_produce": "tomato", "rack_fridge": "bottle"}
@@ -161,7 +163,7 @@ func _build_products() -> void:
 		stock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		var add := _button("Add to cart", Rect2(12, 158, 126, 32), "PrimaryButton", card)
 		add.name = "AddButton"
-		add.pressed.connect(add_to_cart.bind(id))
+		add.pressed.connect(_add_pressed.bind(id))
 		cards[id] = {"card": card, "price": price, "stock": stock, "add": add}
 	for entry in FURNITURE:
 		var card := Panel.new()
@@ -200,7 +202,7 @@ func _build_products() -> void:
 	bags.add_child(picture)
 	var bag_title := _label("Carry bags", Vector2(8, 88), 134, 15, KenneyTheme.TEXT, bags)
 	bag_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var bag_about := _label("Pack of %d | counter orders" % business.BAG_PACK_SIZE, Vector2(8, 108), 134, 11, KenneyTheme.MUTED, bags)
+	var bag_about := _label("%d bags a pack" % business.BAG_PACK_SIZE, Vector2(8, 108), 134, 11, KenneyTheme.MUTED, bags)
 	bag_about.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var bag_price := _label("", Vector2(8, 124), 134, 14, KenneyTheme.GREEN, bags)
 	bag_price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -290,6 +292,10 @@ func order_furniture(kind: String) -> bool:
 	refresh()
 	return success
 
+func _add_pressed(id: String) -> void:
+	if business.has_licence(id): add_to_cart(id)
+	else: licence_requested.emit()
+
 func add_to_cart(id: String, boxes := 1) -> void:
 	cart[id] = clampi(int(cart.get(id, 0)) + boxes, 0, 10)
 	if cart[id] == 0: cart.erase(id)
@@ -338,11 +344,11 @@ func refresh() -> void:
 		entry.add.text = "In cart: %d  +1" % cart[id] if cart.has(id) else "Add to cart"
 		# Products need their licence (PC: Licences) before they can be ordered.
 		var licensed: bool = business.has_licence(id)
-		entry.add.disabled = not licensed
+		entry.add.theme_type_variation = "PrimaryButton" if licensed else "InfoButton"
 		if not licensed:
 			entry.stock.text = "Licence: " + business.licence_for(id).name
 			entry.stock.add_theme_color_override("font_color", Color("b91c1c"))
-			entry.add.text = "Needs licence"
+			entry.add.text = "Get licence"
 	var owned: int = business.racks.records.size() + business.logistics.rack_count()
 	for id in furniture_cards:
 		var entry: Dictionary = furniture_cards[id]

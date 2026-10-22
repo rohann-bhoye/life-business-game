@@ -374,7 +374,7 @@ func _build_desktop() -> void:
 	taskbar.position = Vector2(0, 500)
 	taskbar.size = Vector2(SCREEN.x, 40)
 	desktop.add_child(taskbar)
-	var buttons := [["home", "APNA", 70], ["store", "Wholesale", 124], ["staff", "Staff", 74], ["manager", "Shop", 74], ["bank", "Bank", 74], ["builders", "Build", 74], ["export", "Export", 84]]
+	var buttons := [["home", "APNA", 60], ["store", "Wholesale", 108], ["staff", "Staff", 66], ["manager", "Shop", 62], ["bank", "Bank", 62], ["builders", "Build", 66], ["export", "Export", 74], ["licences", "Licences", 90]]
 	var x := 8.0
 	for entry in buttons:
 		var button := Button.new()
@@ -383,7 +383,7 @@ func _build_desktop() -> void:
 		button.position = Vector2(x, 504)
 		button.size = Vector2(entry[2], 32)
 		button.focus_mode = Control.FOCUS_NONE
-		button.add_theme_font_size_override("font_size", 14)
+		button.add_theme_font_size_override("font_size", 12)
 		button.pressed.connect(show_app.bind(entry[0]))
 		desktop.add_child(button)
 		task_buttons[entry[0]] = button
@@ -395,7 +395,7 @@ func _build_desktop() -> void:
 	exit.position = Vector2(x + 18, 504)
 	exit.size = Vector2(104, 32)
 	exit.focus_mode = Control.FOCUS_NONE
-	exit.add_theme_font_size_override("font_size", 14)
+	exit.add_theme_font_size_override("font_size", 12)
 	exit.tooltip_text = "Leave the computer (E / Esc)"
 	exit.pressed.connect(close)
 	desktop.add_child(exit)
@@ -417,6 +417,7 @@ func _build_store(_desktop: Control) -> void:
 	store.setup(ui.shop.business, ui.shop._format_money)
 	store.hide()
 	store.back_requested.connect(show_home)
+	store.licence_requested.connect(show_app.bind("licences"))
 	var shop_online := Button.new()
 	shop_online.name = "ShopOnlineButton"
 	shop_online.text = "Shop online"
