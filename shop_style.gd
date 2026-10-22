@@ -232,7 +232,7 @@ func _bunting() -> void:
 func _ac_unit() -> void:
 	var unit := Node3D.new()
 	unit.name = "AcUnit"
-	unit.position = Vector3(-6.22, 2.5, 0.6)
+	unit.position = Vector3(-9.88, 2.5, -2.8)
 	extras.add_child(unit)
 	_box("Case", Vector3(0.3, 0.55, 0.8), Vector3.ZERO, _plain(Color(0.86, 0.87, 0.86)), unit)
 	var grill := CylinderMesh.new()

@@ -44,6 +44,9 @@ var carry_bags := STARTER_BAGS
 var bag_expenses := 0
 const FarmStore := preload("res://farm_store.gd")
 var farm := FarmStore.new()
+## International orders (export_store.gd): offers, parcels and what was shipped.
+const ExportStore := preload("res://export_store.gd")
+var exports := ExportStore.new()
 
 func farm_time() -> int:
 	return day * 1440 + int(minutes_of_day)
@@ -954,6 +957,7 @@ func _bill_new_day() -> void:
 	_pay_loan_installments(elapsed_days)
 	_rain_waters_farm()
 	_collect_udhaar()
+	exports.refresh(day, export_prices())
 
 func advance_clock(minutes: float) -> void:
 	if not is_finite(minutes) or minutes <= 0.0:
@@ -1276,6 +1280,93 @@ func buy_carry_bags() -> bool:
 	changed.emit()
 	return true
 
+## Shop prices of every product, for the buyers abroad (export_store.gd).
+func export_prices() -> Dictionary:
+	var prices := {}
+	for id in Catalog.IDS: prices[id] = product_price(id)
+	return prices
+
+## Fills the offers on the APNA Export page (also done each new day).
+func refresh_export_offers() -> void:
+	exports.refresh(day, export_prices())
+	_commit()
+
+func export_accept(id: int) -> bool:
+	var order: Dictionary = exports.find(id)
+	if order.is_empty() or order.state != "offer" or exports.active().size() >= ExportStore.MAX_ACTIVE: return false
+	order.state = "accepted"
+	if not save_progress():
+		order.state = "offer"
+		return false
+	changed.emit()
+	return true
+
+## Seals an accepted order at the prepare-order table: `picked` ({product, rack,
+## count}) must match the order; those units leave the racks and ride in the parcel.
+func export_pack(id: int, picked: Array) -> bool:
+	var order: Dictionary = exports.find(id)
+	if order.is_empty() or order.state != "accepted": return false
+	var wanted := {}
+	for line in order.lines: wanted[line.product] = int(wanted.get(line.product, 0)) + int(line.count)
+	var got := {}
+	for line in picked: got[line.product] = int(got.get(line.product, 0)) + int(line.count)
+	if wanted != got: return false
+	var old_layout: Array = racks.records.duplicate(true)
+	var old_inventory: Dictionary = inventory.duplicate(true)
+	var old_stock := stock
+	for line in picked:
+		if not racks.remove_stock(line.product, int(line.count), int(line.rack)):
+			racks.records = old_layout
+			return false
+		stock -= int(line.count)
+		if inventory.has(line.product): inventory[line.product].stock -= int(line.count)
+	order.state = "packed"
+	if not save_progress():
+		racks.records = old_layout
+		inventory = old_inventory
+		stock = old_stock
+		order.state = "accepted"
+		return false
+	changed.emit()
+	return true
+
+## The sealed parcel is put down on the export platform for the next flight.
+func export_to_pad(id: int) -> bool:
+	var order: Dictionary = exports.find(id)
+	if order.is_empty() or order.state != "packed": return false
+	order.state = "on_pad"
+	if not save_progress():
+		order.state = "packed"
+		return false
+	changed.emit()
+	return true
+
+## The cargo plane takes every parcel on the platform: the buyers pay (as sales).
+## Returns the shipped orders.
+func export_ship() -> Array:
+	var leaving: Array = exports.in_state("on_pad")
+	if leaving.is_empty(): return []
+	var old := {"money": money, "sales_revenue": sales_revenue, "items_sold": items_sold, "inventory": inventory.duplicate(true), "export": exports.snapshot()}
+	for order in leaving:
+		var count := ExportStore.units(order)
+		money += int(order.value)
+		sales_revenue += int(order.value)
+		items_sold += count
+		for line in order.lines:
+			if inventory.has(line.product): inventory[line.product].sold += int(line.count)
+		exports.shipped += 1
+		exports.earned += int(order.value)
+		exports.orders.erase(order)
+	if not save_progress():
+		money = old.money
+		sales_revenue = old.sales_revenue
+		items_sold = old.items_sold
+		inventory = old.inventory
+		exports.restore(old.export)
+		return []
+	changed.emit()
+	return leaving
+
 ## Takes one carry bag from the stand for a counter order.
 func use_carry_bag() -> bool:
 	if carry_bags <= 0: return false
@@ -1382,6 +1473,7 @@ func snapshot() -> Dictionary:
 	data["udhaar_collected"] = udhaar_collected
 	data["expansion_expenses"] = expansion_expenses
 	data["carry_bags"] = carry_bags
+	data["export"] = exports.snapshot()
 	data["bag_expenses"] = bag_expenses
 	data["stock_collection_assigned"] = stock_collection_assigned
 	data["logistics"] = logistics.snapshot()
@@ -1473,6 +1565,7 @@ func restore(data: Dictionary) -> void:
 	udhaar_collected = int(data.get("udhaar_collected", 0))
 	expansion_expenses = int(data.get("expansion_expenses", 0))
 	carry_bags = int(data.get("carry_bags", STARTER_BAGS))
+	exports.restore(data.get("export", {}))
 	bag_expenses = int(data.get("bag_expenses", 0))
 	racks.expansion = shop_expansion
 
@@ -1722,6 +1815,14 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 		if not EmployeeRelations.whole(box.get("amount"), STOCK_AMOUNT) or box.amount < 1: return false
 		supply_by_product[box.product] += int(box.amount)
 		stored_supply += int(box.amount)
+	# Export parcels (sealed, not flown yet) hold their units like boxes in hand.
+	var export_data = data.get("export", {})
+	if not ExportStore.valid(export_data, Catalog.IDS): return false
+	for order in export_data.get("orders", []):
+		if order.state in ["packed", "on_pad"]:
+			for line in order.lines:
+				supply_by_product[line.product] += int(line.count)
+				stored_supply += int(line.count)
 	# Missing manifests are permitted only for the old single-box snapshot format.
 	if not data.has("incoming_boxes") and not data.has("queued_boxes"):
 		incoming_amount = int(data.supply_in_transit)

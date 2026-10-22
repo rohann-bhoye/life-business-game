@@ -16,6 +16,7 @@ var desktop_theme: Theme
 var store: Panel
 var bank: Panel
 var builders: Panel
+var export_page: Panel
 var staff: Panel
 var desktop: Control
 ## Which desktop app fills the screen: home, store, staff, manager or bank.
@@ -218,15 +219,16 @@ func _build_desktop() -> void:
 		["manager", "Shop Manager", Color("d97706"), ""],
 		["bank", "Bank", Color("2563eb"), ""],
 		["builders", "Builders", Color("c2410c"), ""],
+		["export", "Export", Color("1e3a8a"), ""],
 	]
 	for index in range(apps.size()):
 		var entry: Array = apps[index]
 		var tile := Button.new()
 		tile.name = "App_" + entry[0]
-		# Five tiles fit beside the Today card at 80% size.
-		tile.position = Vector2(40 + index * 104, 108)
+		# Six tiles fit beside the Today card at 72% size.
+		tile.position = Vector2(40 + index * 90, 108)
 		tile.size = Vector2(116, 116)
-		tile.scale = Vector2.ONE * 0.8
+		tile.scale = Vector2.ONE * 0.72
 		tile.focus_mode = Control.FOCUS_NONE
 		tile.clip_contents = true
 		tile.tooltip_text = "Open " + entry[1]
@@ -244,6 +246,21 @@ func _build_desktop() -> void:
 			for item in [["milk", Rect2(-2, 6, 76, 96)], ["bottle", Rect2(44, 4, 76, 96)], ["snack", Rect2(16, 26, 84, 90)]]:
 				_picture(tile, "res://assets/ui/products/%s.png" % item[0], item[1])
 		elif entry[0] == "bank": _text(tile, String.chr(8377), Vector2(0, 14), 116, 56, Color.WHITE).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		elif entry[0] == "export":
+			# A white globe with a little orange plane over it.
+			var globe := Panel.new()
+			globe.position = Vector2(22, 20)
+			globe.size = Vector2(72, 72)
+			globe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			globe.add_theme_stylebox_override("panel", _round(Color("bfdbfe"), 36))
+			tile.add_child(globe)
+			for part in [Rect2(52, 34, 12, 40), Rect2(36, 48, 44, 9), Rect2(48, 70, 20, 6)]:
+				var piece := ColorRect.new()
+				piece.color = Color("f97316")
+				piece.position = part.position
+				piece.size = part.size
+				piece.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				tile.add_child(piece)
 		elif entry[0] == "builders":
 			# The shop front from the site, framed like a photo.
 			var photo_frame := Panel.new()
@@ -271,7 +288,7 @@ func _build_desktop() -> void:
 					box.size = Vector2(16, 14)
 					box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 					tile.add_child(box)
-		var label := _text(desktop, entry[1], Vector2(tile.position.x - 12, 204), 117, 14, Color.WHITE)
+		var label := _text(desktop, entry[1], Vector2(tile.position.x - 8, 196), 100, 14, Color.WHITE)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		tile.pressed.connect(show_app.bind(entry[0]))
 	# Shelf stock card: the products on the racks with the fewest items left.
@@ -334,7 +351,7 @@ func _build_desktop() -> void:
 	taskbar.position = Vector2(0, 500)
 	taskbar.size = Vector2(SCREEN.x, 40)
 	desktop.add_child(taskbar)
-	var buttons := [["home", "APNA", 90], ["store", "Wholesale", 140], ["staff", "Staff", 92], ["manager", "Shop", 92], ["bank", "Bank", 92], ["builders", "Build", 92]]
+	var buttons := [["home", "APNA", 70], ["store", "Wholesale", 124], ["staff", "Staff", 74], ["manager", "Shop", 74], ["bank", "Bank", 74], ["builders", "Build", 74], ["export", "Export", 84]]
 	var x := 8.0
 	for entry in buttons:
 		var button := Button.new()
@@ -401,6 +418,13 @@ func _build_store(_desktop: Control) -> void:
 	builders.setup(ui.shop.business, ui.shop._format_money)
 	builders.hide()
 	builders.back_requested.connect(show_home)
+	export_page = Panel.new()
+	export_page.set_script(preload("res://export_page.gd"))
+	export_page.position = Vector2(24, 12)
+	screen_viewport.add_child(export_page)
+	export_page.setup(ui.shop.business, ui.shop._format_money)
+	export_page.hide()
+	export_page.back_requested.connect(show_home)
 	staff = Panel.new()
 	staff.set_script(preload("res://staff_page.gd"))
 	staff.position = Vector2(24, 12)
@@ -428,6 +452,9 @@ func show_app(target: String) -> void:
 	if is_instance_valid(builders):
 		builders.visible = target == "builders"
 		if builders.visible: builders.refresh()
+	if is_instance_valid(export_page):
+		export_page.visible = target == "export"
+		if export_page.visible: export_page.open()
 	if is_instance_valid(staff):
 		staff.visible = target == "staff"
 		if staff.visible: staff.select_role(staff.selected)

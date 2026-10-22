@@ -35,12 +35,13 @@ func _ready() -> void:
 	world_audio.set_script(preload("res://world_audio.gd"))
 	get_parent().add_child.call_deferred(world_audio)
 	add_child(street_life)
-	# Edge of the open town (the old 64 m map); town_boundary.gd shows the see-through
-	# barrier and sends the player home. The land beyond opens in a later phase.
-	for x in [-31.5, 31.5]:
-		_collider("BoundaryX%s" % x, self, Vector3(0.3, 5, 64), Vector3(x, 2.5, 0))
-	for z in [-31.5, 31.5]:
-		_collider("BoundaryZ%s" % z, self, Vector3(64, 5, 0.3), Vector3(0, 2.5, z))
+	# Edge of the open town (town_boundary.gd shows the see-through barrier and sends
+	# the player home); the south edge was moved back for the airport (export_world.gd).
+	var middle_z: float = (Edge.MIN_Z + Edge.MAX_Z) / 2.0
+	for x in [Edge.MIN_X, Edge.MAX_X]:
+		_collider("BoundaryX%s" % x, self, Vector3(0.3, 5, Edge.MAX_Z - Edge.MIN_Z + 1.0), Vector3(x, 2.5, middle_z))
+	for z in [Edge.MIN_Z, Edge.MAX_Z]:
+		_collider("BoundaryZ%s" % z, self, Vector3(Edge.MAX_X - Edge.MIN_X + 1.0, 5, 0.3), Vector3(0, 2.5, z))
 
 func set_quality(quality: int) -> void:
 	var show_scenery := quality > 0
@@ -370,9 +371,11 @@ func _build_background() -> void:
 # the home. South: a path round the bus stop to the corner house, and corridors
 # between the front houses to lanes along the back row.
 const BlockPath := preload("res://block_path.gd")
+const Edge := preload("res://town_boundary.gd")
 const LANES := [
 	["BackLane", Vector2(-16.0, -13.6), Vector2(14.0, -13.6), 3],
-	["BackLaneWest", Vector2(-7.0, -12.97), Vector2(-7.0, 2.6), 3],
+	# West of the packing room (export_world.gd) built onto the shop.
+	["BackLaneWest", Vector2(-10.6, -12.97), Vector2(-10.6, 2.6), 3],
 	["BackLaneEast", Vector2(13.4, -12.97), Vector2(13.4, 2.6), 3],
 	["BusStopPath", Vector2(-26.6, 11.4), Vector2(-26.6, 13.47), 3],
 	["CornerHousePath", Vector2(-27.23, 14.1), Vector2(-24.1, 14.1), 3],

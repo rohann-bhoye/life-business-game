@@ -78,9 +78,11 @@ func _exterior(shop: Node3D) -> void:
 	# Clear glass in the real window openings (shop_operations.gd _window_wall).
 	for x in [-2.0, 2.0]:
 		Bricks.framed_window(shop, "ShopWindow%d" % int(x), Vector3(x, -0.85, 2.5), 0.0, 1.6, 1.7, Bricks.FRAME, 1, Color.TRANSPARENT)
-	Bricks.shutter(shop, "GoodsShutter", Vector3(-3.06, -1.4, -3.5), -PI / 2, 2.2, 2.4)
-	Bricks.poster(shop, "SidePoster", Vector3(-3.08, 0.2, -1.2), -PI / 2, Vector2(0.9, 1.1), Color(0.12, 0.36, 0.62), "BETTER\nCHOICES\nEVERYDAY!")
-	_cctv(shop, Vector3(-3.08, 2.1, 2.3))
+	# On the packing room built onto the left wall (export_world.gd): its outer wall is
+	# at world x -9.72, shop-local -6.72.
+	Bricks.shutter(shop, "GoodsShutter", Vector3(-6.72, -1.4, -1.0), -PI / 2, 2.2, 2.4)
+	Bricks.poster(shop, "SidePoster", Vector3(-6.74, 0.2, 1.3), -PI / 2, Vector2(0.9, 1.1), Color(0.12, 0.36, 0.62), "BETTER\nCHOICES\nEVERYDAY!")
+	_cctv(shop, Vector3(-6.74, 2.1, 2.3))
 	shop.get_node("RoofTrim").material_override = builder._material(Color(0.24, 0.26, 0.29))
 	Bricks.i_beams(shop, "CeilingBeams", -2.94, 2.94, [1.9, -0.4, -4.2, -6.5], 2.41)
 	_label(shop, "WindowHours", "OPEN  08:00 - 20:00", Vector3(2, -0.68, 2.57), 22, 0.003)

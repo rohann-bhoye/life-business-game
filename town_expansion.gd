@@ -266,5 +266,5 @@ func _vehicles() -> void:
 		_scooter(index, Vector3(MARKET_X + (-2.1 if index % 2 == 0 else 2.1), 0.1, -8.0 - index * 4.5), PI / 2 if index % 2 == 0 else -PI / 2)
 
 func _greenery() -> void:
-	for point in [Vector3(-36, 0.1, -2), Vector3(-56, 0.1, -12), Vector3(-72, 0.1, 8), Vector3(-44, 0.1, 26), Vector3(-68, 0.1, 30), Vector3(36, 0.1, -14), Vector3(60, 0.1, -30), Vector3(72, 0.1, 4), Vector3(44, 0.1, 28), Vector3(68, 0.1, 44), Vector3(-30, 0.1, -40), Vector3(10, 0.1, -40), Vector3(30, 0.1, 44), Vector3(-20, 0.1, 46), Vector3(0, 0.1, 50)]:
+	for point in [Vector3(-36, 0.1, -2), Vector3(-56, 0.1, -12), Vector3(-72, 0.1, 8), Vector3(-44, 0.1, 26), Vector3(-68, 0.1, 30), Vector3(36, 0.1, -14), Vector3(60, 0.1, -30), Vector3(72, 0.1, 4), Vector3(44, 0.1, 28), Vector3(68, 0.1, 44), Vector3(-30, 0.1, -40), Vector3(10, 0.1, -40), Vector3(38, 0.1, 44), Vector3(-36, 0.1, 46), Vector3(-8, 0.1, 74)]:
 		town._tree(point)

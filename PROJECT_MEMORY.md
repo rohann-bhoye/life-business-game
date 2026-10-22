@@ -136,6 +136,22 @@ board and a local suggestion form. See Farming section below for controls and li
   spring_length 0 and hides the body indoors and out, no wheel zoom, look limit
   +-70 deg, small head bob on camera_pivot (EYE_HEIGHT 0.7); box_carry_visual.gd
   always uses the first-person arms. Tests updated (business_backend, box_carry).
+- APNA EXPORT (2026-10-22, international orders): export_store.gd (business.exports,
+  saved as "export"): daily offers from 7 cities (one per city), unit price = shop
+  price x1.5 (Rs50-200), states offer -> accepted -> packed -> on_pad -> shipped;
+  max 2 active. Packed/on_pad units count as supply in the save check; shipping adds
+  to sales_revenue/items_sold/money. export_page.gd = PC app "Export" (6th tile,
+  taskbar button). export_world.gd (child of the world, made by shop_operations):
+  packing room on the shop's left (x -9.72..-6.06, z -4.02..2.56; doorway in the
+  shop's left wall z 0.75..1.95 via shop_operations _left_wall_with_door, which also
+  splits its collider), prepare-order table (E: carton / seal), outgoing shelf,
+  street door + APNA EXPORT fascia; airport south of the warehouse (town edge
+  MAX_Z 70): runway z 51-65, terminal (16, 41.5), tower (28.2, 40), export platform
+  (7.2, 47.4) with flight board, walkway x 7.2; cargo plane flies at 10/13/16/19 h
+  when parcels are on the pad (dotted path shown 1 h before). Carton items are
+  reserved via export_world.bag_lines. Props: tools/blender/build_export_props.py ->
+  assets/props/export/*.glb. Moved: BackLaneWest x -10.6, sleeping dog, goods
+  shutter/poster/CCTV/AC onto the packing room, 3 far trees off the airport.
 - Startup check (2026-10-20): the player spawns beside the bed from frame 0; only the
   very first frame (behind the loading screen) shows the home without its walls
   (HomeDecor is added deferred). One replay showed a ~2 m slide toward the door just

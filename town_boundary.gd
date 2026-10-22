@@ -8,7 +8,8 @@ extends Node3D
 const MIN_X := -31.5
 const MAX_X := 31.5
 const MIN_Z := -31.5
-const MAX_Z := 31.5
+## Moved back from 31.5 for the airport south of the warehouse (export_world.gd).
+const MAX_Z := 70.0
 const HEIGHT := 4.0
 const WARN_DISTANCE := 2.0
 const FADE_DISTANCE := 14.0

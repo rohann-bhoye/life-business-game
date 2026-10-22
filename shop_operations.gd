@@ -19,6 +19,11 @@ var carried_box: Node3D
 ## Counter orders (customer.gd counter_order): the carry bag in the player's hand,
 ## the stand of folded bags on the counter and the filled bag shown at payment.
 var holding_bag := false
+## APNA EXPORT: packing room, airport and cargo plane (export_world.gd).
+var export_world: Node3D
+## The doorway from the shop into the packing room, in the left wall (world z).
+const SIDE_DOOR := Vector2(0.75, 1.95)
+const SIDE_DOOR_HEIGHT := 2.2
 var held_bag: Node3D
 var counter_bag: Node3D
 var bag_layers: Array[Node3D] = []
@@ -441,8 +446,8 @@ func _update_room_size() -> void:
 	var extension := depth - 5.0
 	var center_z := -extension / 2.0
 	_resize_room_box(building, "BackWall", Vector3(6, ROOM_HEIGHT, 0.12), Vector3(0, 0.5, -2.5 - extension))
-	for x in [-3.0, 3.0]:
-		_resize_room_box(building, "SideWall%s" % x, Vector3(0.12, ROOM_HEIGHT, depth), Vector3(x, 0.5, center_z))
+	_resize_room_box(building, "SideWall%s" % 3.0, Vector3(0.12, ROOM_HEIGHT, depth), Vector3(3.0, 0.5, center_z))
+	_left_wall_with_door(building, depth, center_z)
 	_resize_room_box(building, "DoorLintel", Vector3(2, 1.4, 0.12), Vector3(0, 1.7, 2.5))
 	_resize_room_box(building, "RoofTrim", Vector3(6.3, 0.18, depth + 0.3), Vector3(0, 2.5, center_z))
 	_resize_room_box(building, "ParapetFront", Vector3(6.3, 0.3, 0.16), Vector3(0, 2.55, 2.66))
@@ -460,6 +465,41 @@ func _update_room_size() -> void:
 	if is_instance_valid(player):
 		var point: Vector3 = building.to_local(player.global_position)
 		player.shop_indoors = absf(point.x) < 2.9 and point.z > -2.5 - extension and point.z < 2.4 and point.y < 2.4
+
+## The left wall (any depth) with the doorway into the packing room: the mesh gets a
+## hole and the collider is split into the parts behind, in front of and above it.
+func _left_wall_with_door(building: Node3D, depth: float, center_z: float) -> void:
+	var wall: MeshInstance3D = building.get_node(("SideWall%s" % -3.0).validate_node_name())
+	wall.position = Vector3(-3.0, 0.5, center_z)
+	var back := center_z - depth / 2.0
+	var front := center_z + depth / 2.0
+	var bottom := -ROOM_HEIGHT / 2.0
+	var door_top := bottom + SIDE_DOOR_HEIGHT
+	var pieces := [
+		[Vector3(0.12, ROOM_HEIGHT, SIDE_DOOR.x - back), Vector3(0, 0, (back + SIDE_DOOR.x) / 2.0 - center_z)],
+		[Vector3(0.12, ROOM_HEIGHT, front - SIDE_DOOR.y), Vector3(0, 0, (SIDE_DOOR.y + front) / 2.0 - center_z)],
+		[Vector3(0.12, ROOM_HEIGHT / 2.0 - door_top, SIDE_DOOR.y - SIDE_DOOR.x), Vector3(0, (door_top + ROOM_HEIGHT / 2.0) / 2.0, (SIDE_DOOR.x + SIDE_DOOR.y) / 2.0 - center_z)],
+	]
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for piece in pieces: IndianHouse.box(st, piece[1], piece[0], Color.WHITE)
+	wall.mesh = st.commit()
+	if wall.material_override == null: wall.material_override = (get_parent().get_node("Neighbourhood") as Node)._material(Color(0.78, 0.83, 0.8))
+	for index in range(pieces.size()):
+		var body_name: String = ("SideWall%sBody" % -3.0).validate_node_name() if index == 0 else "SideDoorBody%d" % index
+		var body := building.get_node_or_null(body_name) as StaticBody3D
+		if body == null:
+			body = StaticBody3D.new()
+			body.name = body_name
+			var collision := CollisionShape3D.new()
+			collision.name = "CollisionShape3D"
+			collision.shape = BoxShape3D.new()
+			body.add_child(collision)
+			building.add_child(body)
+		body.position = wall.position + pieces[index][1]
+		var shape := BoxShape3D.new()
+		shape.size = pieces[index][0]
+		body.get_node("CollisionShape3D").shape = shape
 
 ## World z of the inside of the back wall.
 func back_z() -> float:
@@ -562,6 +602,8 @@ func _ready() -> void:
 		set_process(false)
 		set_process_unhandled_input(false)
 		return
+	export_world = preload("res://export_world.gd").new()
+	get_parent().add_child.call_deferred(export_world)
 	var audio := Node.new()
 	audio.name = "ShopAudio"
 	audio.set_script(load("res://shop_audio.gd"))
@@ -875,6 +917,7 @@ func release_held_item() -> bool:
 	if is_instance_valid(furnishing) and furnishing.active:
 		furnishing.cancel()
 		return true
+	if is_instance_valid(export_world) and export_world.release(): return true
 	if holding_bag:
 		var customer := order_customer()
 		var product: String = customer.take_from_bag() if customer != null else ""
@@ -1020,7 +1063,8 @@ func available_stock(product := "bottle") -> int:
 		if child.has_method("resolve_bargain") and child.has_product and child.state != child.State.LEAVING and not child.is_queued_for_deletion():
 			for line in child.extra_lines:
 				if line.taken and line.product == product: reserved += int(line.count)
-		if child.has_method("resolve_bargain"):
+		# Items in a counter order's carry bag or an export carton.
+		if child.get("bag_lines") is Array:
 			for line in child.bag_lines:
 				if line.product == product: reserved += int(line.count)
 	return maxi(0, shop.business.product_stock(product) - reserved)
@@ -1168,7 +1212,9 @@ func _try_counter_order() -> bool:
 			customer.tell_order()
 			ui.show_feedback("%s's list is on the right. Take a carry bag (E) and fill it at the racks." % name)
 		elif not holding_bag:
-			if shop.business.carried_stock > 0:
+			if is_instance_valid(export_world) and export_world.holding():
+				ui.show_feedback("Your hands are full with the export parcel. Put it down first.", true)
+			elif shop.business.carried_stock > 0:
 				ui.show_feedback("Put the box down first (Q), then take a carry bag.", true)
 			elif shop.business.use_carry_bag():
 				holding_bag = true
@@ -1276,6 +1322,8 @@ func delivery_box_target() -> int:
 
 func interaction_hint() -> String:
 	if is_instance_valid(furnishing) and furnishing.active: return "Place %s" % furnishing.target_name().to_lower()
+	var export_hint: String = export_world.hint() if is_instance_valid(export_world) else ""
+	if not export_hint.is_empty(): return export_hint
 	var order_hint := _counter_order_hint() if enabled else ""
 	if not order_hint.is_empty(): return order_hint
 	if shop.business.carried_stock == 0 and ground_box_target() >= 0: return "Pick up ground box"
@@ -1316,6 +1364,7 @@ func interaction_hint() -> String:
 func try_interact() -> bool:
 	if not enabled or player._menu_is_open():
 		return false
+	if is_instance_valid(export_world) and export_world.try_interact(): return true
 	if _try_counter_order(): return true
 	if shop.business.carried_stock == 0:
 		var ground_index := ground_box_target()
