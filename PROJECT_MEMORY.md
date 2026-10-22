@@ -194,6 +194,12 @@ board and a local suggestion form. See Farming section below for controls and li
   _grass_hills paints the Terrain3D colour map with the lawn colours (sRGB / 0.92).
   South edge MAX_Z 62 (terrain flat to z 60); runway z 51.5..62.5 (RUNWAY_Z 57,
   11 m), plane drawn at 0.85. Departures board: posts behind, title band, centred lines.
+- Mountains (2026-10-22): town_expansion.gd _shape_land (deferred, about 0.9 s) sets
+  the Terrain3D heights: flat town rect (-74..74, -56..60), foothills 2-11 m, then
+  ridged mountains up to ~60 m (FastNoiseLite seeds 7/19), the road valley pass
+  (_lower_valley), colour map by height/steepness (lawn, forest green, rock, snow
+  above ~40 m) and ~320 pines as one MultiMesh (HillForest). Heights are kept in
+  land_heights while shaping. The terrain still has no collision (town edge stops you).
 - Startup check (2026-10-20): the player spawns beside the bed from frame 0; only the
   very first frame (behind the loading screen) shows the home without its walls
   (HomeDecor is added deferred). One replay showed a ~2 m slide toward the door just
