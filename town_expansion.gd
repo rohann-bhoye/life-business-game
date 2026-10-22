@@ -105,6 +105,7 @@ func _horizon_road() -> void:
 			mesh.material_override = part[1]
 			town.add_child(mesh)
 	call_deferred("_lower_valley")
+	call_deferred("_grass_hills")
 
 ## The town road's asphalt (shop_presentation.gd builds it; the main Road node only
 ## gets it later in that node's _ready, so ask the builder directly).
@@ -122,6 +123,32 @@ func _slope_strip(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float, y
 
 ## Lowers the landscape along the road into the valley, blending back to the
 ## original hills 45 m to each side.
+## The land round the town (Terrain3D colour map) gets the lawn colours of
+## grass_ground.gdshader: big lush and sun-dried areas with fresher patches, so the
+## lawn and the hills meet without a seam (the terrain grass texture is about 0.92
+## bright, so the colours are lifted a little).
+func _grass_hills() -> void:
+	var landscape := town.get_parent().get_node_or_null("Landscape")
+	if landscape == null or landscape.get_class() != "Terrain3D": return
+	var data = landscape.data
+	var lush := Color(0.2, 0.31, 0.1) / 0.92
+	var fresh := Color(0.32, 0.44, 0.15) / 0.92
+	var dry := Color(0.5, 0.5, 0.26) / 0.92
+	var macro := FastNoiseLite.new()
+	macro.seed = 11
+	macro.frequency = 0.05
+	var patches := FastNoiseLite.new()
+	patches.seed = 29
+	patches.frequency = 0.25
+	for z in range(-128, 128):
+		for x in range(-128, 128):
+			var point := Vector3(x, 0, z)
+			var colour := lush.lerp(fresh, smoothstep(0.3, 0.72, patches.get_noise_2d(x, z) * 0.5 + 0.5))
+			colour = colour.lerp(dry, smoothstep(0.5, 0.8, macro.get_noise_2d(x, z) * 0.5 + 0.5) * 0.6)
+			colour.a = 1.0
+			data.set_color(point, colour)
+	data.update_maps()
+
 func _lower_valley() -> void:
 	var landscape := town.get_parent().get_node_or_null("Landscape")
 	if landscape == null or landscape.get_class() != "Terrain3D": return

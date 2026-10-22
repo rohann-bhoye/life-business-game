@@ -187,6 +187,13 @@ board and a local suggestion form. See Farming section below for controls and li
   2 parked cars and green APNA AIRPORT signs (main road x 45.2 z 12.6, turn x 46 z
   40.2). town_life_test expects the open town and the new edge. Licence cards show a
   product name tag on hover (and a tooltip).
+- Ground and grass for the bigger town (2026-10-22): environment_details.gd stretches
+  the lawn ground mesh and its collider to 150 x 176 m at z 2 (into the hills, the
+  Landscape Terrain3D has no collision), grows grass blades over the whole town
+  edge rect (mask MASK_WIDTH x MASK_HEIGHT from town_boundary), and town_expansion
+  _grass_hills paints the Terrain3D colour map with the lawn colours (sRGB / 0.92).
+  South edge MAX_Z 62 (terrain flat to z 60); runway z 51.5..62.5 (RUNWAY_Z 57,
+  11 m), plane drawn at 0.85. Departures board: posts behind, title band, centred lines.
 - Startup check (2026-10-20): the player spawns beside the bed from frame 0; only the
   very first frame (behind the loading screen) shows the home without its walls
   (HomeDecor is added deferred). One replay showed a ~2 m slide toward the door just

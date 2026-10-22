@@ -24,7 +24,9 @@ const SHELF_POINT := Vector3(-9.25, 0.1, 1.4)
 const TERMINAL_TABLE := Vector3(11.5, 0.1, 38.0)
 const SHELF_SLOTS := [Vector3(-9.25, 0.49, 1.05), Vector3(-9.25, 0.49, 1.75), Vector3(-9.25, 1.04, 1.05), Vector3(-9.25, 1.04, 1.75)]
 # Airport (south of the warehouse).
-const RUNWAY_Z := 58.0
+const RUNWAY_Z := 57.0
+## The plane is drawn at 85% so its wings clear the terminal canopy on the roll.
+const PLANE_SCALE := 0.85
 const PAD := Vector3(7.2, 0.1, 47.4)
 const PAD_SLOTS := [Vector3(6.6, 0.32, 47.0), Vector3(7.8, 0.32, 47.0), Vector3(6.6, 0.32, 47.8), Vector3(7.8, 0.32, 47.8)]
 const STOP_X := -2.0
@@ -209,11 +211,11 @@ func _build_airport() -> void:
 	var asphalt := Color(0.18, 0.19, 0.2)
 	var concrete := Color(0.62, 0.62, 0.6)
 	var white := Color(0.92, 0.93, 0.9)
-	builder._box("Runway", airport, Vector3(60, 0.02, 14), Vector3(0, 0.112, RUNWAY_Z), asphalt)
-	for z in [RUNWAY_Z - 6.7, RUNWAY_Z + 6.7]: builder._box("RunwayEdge%d" % roundi(z), airport, Vector3(60, 0.012, 0.25), Vector3(0, 0.124, z), white)
+	builder._box("Runway", airport, Vector3(60, 0.02, 11), Vector3(0, 0.112, RUNWAY_Z), asphalt)
+	for z in [RUNWAY_Z - 5.2, RUNWAY_Z + 5.2]: builder._box("RunwayEdge%d" % roundi(z), airport, Vector3(60, 0.012, 0.25), Vector3(0, 0.124, z), white)
 	for step in range(9): builder._box("RunwayDash%d" % step, airport, Vector3(3.2, 0.012, 0.35), Vector3(-24 + step * 6, 0.124, RUNWAY_Z), white)
 	for side in [-1, 1]:
-		for bar in range(8): builder._box("Threshold%d_%d" % [side, bar], airport, Vector3(3.0, 0.012, 0.6), Vector3(side * 27.6, 0.124, RUNWAY_Z - 5.25 + bar * 1.5), white)
+		for bar in range(6): builder._box("Threshold%d_%d" % [side, bar], airport, Vector3(3.0, 0.012, 0.6), Vector3(side * 27.6, 0.124, RUNWAY_Z - 3.75 + bar * 1.5), white)
 		_text(airport, "RunwayNumber%d" % side, "27" if side > 0 else "09", Vector3(side * 23.4, 0.13, RUNWAY_Z), 160, white, PI / 2 * -side).rotation.x = -PI / 2
 	var lit := StandardMaterial3D.new()
 	lit.albedo_color = Color(1, 0.86, 0.4)
@@ -221,7 +223,7 @@ func _build_airport() -> void:
 	lit.emission = Color(1, 0.8, 0.35)
 	lit.emission_energy_multiplier = 1.4
 	for x in range(-28, 30, 7):
-		for z in [RUNWAY_Z - 7.3, RUNWAY_Z + 7.3]: builder._box("RunwayLight", airport, Vector3(0.18, 0.2, 0.18), Vector3(x, 0.2, z), Color.WHITE).material_override = lit
+		for z in [RUNWAY_Z - 5.8, RUNWAY_Z + 5.8]: builder._box("RunwayLight", airport, Vector3(0.18, 0.2, 0.18), Vector3(x, 0.2, z), Color.WHITE).material_override = lit
 	builder._box("Apron", airport, Vector3(24, 0.018, 4.6), Vector3(16, 0.11, 48.8), concrete)
 	builder._box("TerminalYard", airport, Vector3(28, 0.016, 15.0), Vector3(16, 0.108, 39.0), concrete)
 	var terminal := _prop(airport, "ExportTerminal", "export_terminal", Vector3(16, 0.1, 41.5))
@@ -247,10 +249,17 @@ func _build_airport() -> void:
 	builder._box("ExportPad", airport, Vector3(2.8, 0.2, 2.2), PAD + Vector3(0, 0.1, 0), concrete.darkened(0.08))
 	for edge in [[Vector3(2.8, 0.03, 0.12), Vector3(0, 0.215, -1.06)], [Vector3(2.8, 0.03, 0.12), Vector3(0, 0.215, 1.06)], [Vector3(0.12, 0.03, 2.2), Vector3(-1.36, 0.215, 0)], [Vector3(0.12, 0.03, 2.2), Vector3(1.36, 0.215, 0)]]:
 		builder._box("PadEdge", airport, edge[0], PAD + edge[1], Color(0.98, 0.78, 0.12))
-	builder._box("BoardPost", airport, Vector3(0.12, 2.2, 0.12), PAD + Vector3(-1.9, 1.1, -0.6), Color(0.3, 0.33, 0.37))
-	builder._box("BoardPanel", airport, Vector3(1.6, 1.0, 0.06), PAD + Vector3(-1.9, 2.0, -0.6), Color(0.1, 0.16, 0.3))
-	flight_board = _text(airport, "FlightBoard", "", PAD + Vector3(-1.9, 2.0, -0.64), 26, Color.WHITE, PI)
+	# Departures board facing the walkway (-z): two posts behind it, a dark frame, an
+	# orange title band and the live flight lines.
+	var board := PAD + Vector3(-2.2, 0, -0.6)
+	for x in [-0.95, 0.95]: builder._box("BoardPost", airport, Vector3(0.1, 2.9, 0.1), board + Vector3(x, 1.45, 0.1), Color(0.3, 0.33, 0.37))
+	builder._box("BoardFrame", airport, Vector3(2.2, 1.4, 0.08), board + Vector3(0, 2.15, 0), Color(0.12, 0.13, 0.15))
+	builder._box("BoardScreen", airport, Vector3(2.04, 1.0, 0.01), board + Vector3(0, 2.05, -0.045), Color(0.06, 0.1, 0.22))
+	builder._box("BoardTitle", airport, Vector3(2.04, 0.22, 0.01), board + Vector3(0, 2.71, -0.045), Color(0.95, 0.55, 0.12))
+	_text(airport, "BoardTitleText", "APNA AIR CARGO  -  DEPARTURES", board + Vector3(0, 2.71, -0.055), 30, Color.WHITE, PI).pixel_size = 0.0028
+	flight_board = _text(airport, "FlightBoard", "", board + Vector3(0, 2.02, -0.055), 40, Color(0.75, 0.95, 1.0), PI)
 	flight_board.pixel_size = 0.0028
+	flight_board.line_spacing = 6.0
 	_text(airport, "PadSign", "EXPORT PLATFORM", PAD + Vector3(0, 0.6, -1.15), 40, Color(0.98, 0.78, 0.12), PI).rotation.x = 0.0
 	# Dotted flight path in the sky (shown before and during a flight).
 	var dot := SphereMesh.new()
@@ -346,6 +355,7 @@ func _at_table() -> bool:
 func _build_plane() -> void:
 	plane = _prop(self, "CargoPlane", "cargo_plane")
 	plane.rotation.y = PI
+	plane.scale = Vector3.ONE * PLANE_SCALE
 	for side in [-1, 1]:
 		var prop := _prop(plane, "Propeller%d" % side, "propeller", Vector3(2.05, 3.4, side * 3.6))
 		propellers.append(prop)
@@ -587,7 +597,7 @@ func _process(delta: float) -> void:
 	if Time.get_ticks_msec() >= board_due:
 		board_due = Time.get_ticks_msec() + 1000
 		var waiting: int = business.exports.in_state("on_pad").size()
-		flight_board.text = "APNA AIR CARGO\n%s\n%d parcel%s on the platform" % ["PLANE ON THE WAY" if flight_time >= 0.0 else "Next flight " + next_flight(), waiting, "" if waiting == 1 else "s"]
+		flight_board.text = "Next flight  %s\nOn the platform  %d parcel%s\n%s" % [next_flight(), waiting, "" if waiting == 1 else "s", "PLANE ON THE WAY" if flight_time >= 0.0 else ("BOARDING SOON" if path_dots.visible else ("WAITING FOR PARCELS" if waiting == 0 else "ON TIME"))]
 
 func _start_flight() -> void:
 	flight_time = 0.0
@@ -602,7 +612,7 @@ func _fly(delta: float) -> void:
 	var loading_at: float = LEGS[0] + LEGS[1]
 	if flight_time >= loading_at and flight_time < loading_at + LEGS[2]:
 		# Parcels float from the platform into the plane's cargo door.
-		var door: Vector3 = plane.position + Vector3(5.4, 1.4, 0)
+		var door: Vector3 = plane.position + Vector3(5.4, 1.4, 0) * PLANE_SCALE
 		var u := clampf((flight_time - loading_at) / 2.0, 0.0, 1.0)
 		var waiting: Array = business.exports.in_state("on_pad")
 		for index in range(pad_parcels.size()):

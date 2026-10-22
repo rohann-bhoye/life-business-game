@@ -8,7 +8,14 @@ const GRASS_SHADER := preload("res://assets/materials/grass_blades.gdshader")
 const GRASS_CELL := 8.0
 const GRASS_DENSITY := 9.0
 const MASK_STEP := 0.25
-const MASK_SIZE := 256
+## Grass grows over the whole open town (town_boundary.gd), masked in 0.25 m cells.
+const Edge := preload("res://town_boundary.gd")
+const MASK_WIDTH := int((Edge.MAX_X - Edge.MIN_X) / MASK_STEP)
+const MASK_HEIGHT := int((Edge.MAX_Z - Edge.MIN_Z) / MASK_STEP)
+## The lawn ground (and its collider) reaches into the hills all round, so the open
+## town is solid everywhere and the lawn meets the hills along their foot.
+const GROUND_SIZE := Vector3(150, 0.2, 176)
+const GROUND_Z := 2.0
 var grass_chunks: Array[MultiMeshInstance3D] = []
 var grass_level := 3
 
@@ -42,14 +49,14 @@ func _build_grass() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 481516
 	var holder := get_node("WindGrass")
-	for cell_x in range(-4, 4):
-		for cell_z in range(-4, 4):
+	for cell_x in range(floori(Edge.MIN_X / GRASS_CELL), ceili(Edge.MAX_X / GRASS_CELL)):
+		for cell_z in range(floori(Edge.MIN_Z / GRASS_CELL), ceili(Edge.MAX_Z / GRASS_CELL)):
 			var transforms: Array[Transform3D] = []
 			for index in range(int(GRASS_CELL * GRASS_CELL * GRASS_DENSITY)):
 				var x := (cell_x + rng.randf()) * GRASS_CELL
 				var z := (cell_z + rng.randf()) * GRASS_CELL
-				if absf(x) > 31.2 or absf(z) > 31.2: continue
-				if mask[int((z + 32.0) / MASK_STEP) * MASK_SIZE + int((x + 32.0) / MASK_STEP)]: continue
+				if x < Edge.MIN_X + 0.3 or x > Edge.MAX_X - 0.3 or z < Edge.MIN_Z + 0.3 or z > Edge.MAX_Z - 0.3: continue
+				if mask[int((z - Edge.MIN_Z) / MASK_STEP) * MASK_WIDTH + int((x - Edge.MIN_X) / MASK_STEP)]: continue
 				var size := rng.randf_range(0.8, 1.25)
 				var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(size, size * rng.randf_range(0.75, 1.35), size))
 				transforms.append(Transform3D(basis, Vector3(x, 0.1, z)))
@@ -99,10 +106,10 @@ func _grass_clump() -> ArrayMesh:
 	mesh.surface_set_material(0, material)
 	return mesh
 
-## 0.25 m cells over the town (-32..32): 1 where grass must not grow.
+## 0.25 m cells over the open town: 1 where grass must not grow.
 func _grass_mask() -> PackedByteArray:
 	var mask := PackedByteArray()
-	mask.resize(MASK_SIZE * MASK_SIZE)
+	mask.resize(MASK_WIDTH * MASK_HEIGHT)
 	var world := get_tree().current_scene
 	var ground := world.get_node("MeshInstance3D")
 	# Visibility is ignored on purpose: Low Fast hides the pond, but grass must stay
@@ -123,14 +130,14 @@ func _grass_mask() -> PackedByteArray:
 	return mask
 
 func _mark(mask: PackedByteArray, box: AABB, margin: float) -> void:
-	if box.end.x < -32.0 or box.position.x > 32.0 or box.end.z < -32.0 or box.position.z > 32.0: return
-	var first_x := clampi(int((box.position.x - margin + 32.0) / MASK_STEP), 0, MASK_SIZE - 1)
-	var last_x := clampi(int((box.end.x + margin + 32.0) / MASK_STEP), 0, MASK_SIZE - 1)
-	var first_z := clampi(int((box.position.z - margin + 32.0) / MASK_STEP), 0, MASK_SIZE - 1)
-	var last_z := clampi(int((box.end.z + margin + 32.0) / MASK_STEP), 0, MASK_SIZE - 1)
+	if box.end.x < Edge.MIN_X or box.position.x > Edge.MAX_X or box.end.z < Edge.MIN_Z or box.position.z > Edge.MAX_Z: return
+	var first_x := clampi(int((box.position.x - margin - Edge.MIN_X) / MASK_STEP), 0, MASK_WIDTH - 1)
+	var last_x := clampi(int((box.end.x + margin - Edge.MIN_X) / MASK_STEP), 0, MASK_WIDTH - 1)
+	var first_z := clampi(int((box.position.z - margin - Edge.MIN_Z) / MASK_STEP), 0, MASK_HEIGHT - 1)
+	var last_z := clampi(int((box.end.z + margin - Edge.MIN_Z) / MASK_STEP), 0, MASK_HEIGHT - 1)
 	for z in range(first_z, last_z + 1):
 		for x in range(first_x, last_x + 1):
-			mask[z * MASK_SIZE + x] = 1
+			mask[z * MASK_WIDTH + x] = 1
 
 ## Settings > Grass: 0 off, 1 light (a quarter of the blades, close by), 2 medium
 ## (half), 3 full (every blade, drawn further out).
@@ -180,7 +187,16 @@ func _build_ground() -> void:
 	var material := ShaderMaterial.new()
 	material.shader = preload("res://assets/materials/grass_ground.gdshader")
 	detailed_ground = material
-	get_tree().current_scene.get_node("MeshInstance3D").material_override = material
+	var scene := get_tree().current_scene
+	var ground_mesh: MeshInstance3D = scene.get_node("MeshInstance3D")
+	ground_mesh.material_override = material
+	if ground_mesh.mesh is BoxMesh: ground_mesh.mesh.size = GROUND_SIZE
+	ground_mesh.position.z = GROUND_Z
+	var body := scene.get_node_or_null("Ground") as Node3D
+	if body != null:
+		body.position.z = GROUND_Z
+		var shape := body.get_node("CollisionShape3D") as CollisionShape3D
+		if shape.shape is BoxShape3D: shape.shape.size = GROUND_SIZE
 
 ## Effects tier from the graphics preset (0 Low, 1 Normal, 2 High); the grass has
 ## its own setting (set_grass).

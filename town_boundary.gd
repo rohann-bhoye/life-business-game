@@ -10,7 +10,7 @@ extends Node3D
 const MIN_X := -72.0
 const MAX_X := 72.0
 const MIN_Z := -52.0
-const MAX_Z := 68.0
+const MAX_Z := 62.0
 const HEIGHT := 4.0
 const WARN_DISTANCE := 2.0
 const FADE_DISTANCE := 14.0
