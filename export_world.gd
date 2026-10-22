@@ -167,12 +167,31 @@ func _build_packing_room() -> void:
 	for y in [0.46, 1.01]: builder._box("ShelfBoard%s" % y, room, Vector3(0.6, 0.03, 1.4), Vector3(-9.25, y, 1.4), Color(0.76, 0.78, 0.8))
 	builder._collider("OutgoingShelfBody", room, Vector3(0.62, 1.1, 1.42), Vector3(-9.25, 0.65, 1.4))
 	_text(room, "ShelfSign", "OUTGOING", Vector3(-8.94, 1.32, 1.4), 26, Color(0.55, 1.0, 0.65), PI / 2)
+	# Sliding glass street door, as at the shop.
+	var door := Node3D.new()
+	door.name = "PackingRoomDoor"
+	door.set_script(preload("res://sliding_door.gd"))
+	door.doorway_position = Vector3(-8.0, 0.1, 2.5)
+	door.doorway_width = 1.2
+	door.doorway_height = 2.3
+	room.add_child(door)
+	# Pink trim round the doorway from the shop (both sides of the wall).
+	for x in [-5.92, -6.08]:
+		for z in [0.69, 2.01]: builder._box("ShopDoorPost", room, Vector3(0.04, 2.36, 0.12), Vector3(x, 1.28, z), Bricks.FRAME)
+		builder._box("ShopDoorTop", room, Vector3(0.04, 0.12, 1.44), Vector3(x, 2.36, 1.35), Bricks.FRAME)
+	# Packing supplies against the shop wall, and stock boxes stacked in the corner.
+	var supplies := _prop(room, "SupplyShelf", "supply_shelf", Vector3(-6.32, 0.1, -3.2))
+	supplies.rotation.y = -PI / 2
+	builder._collider("SupplyShelfBody", room, Vector3(0.46, 1.8, 1.02), Vector3(-6.32, 1.0, -3.2))
+	for stack in [[Vector3(-9.2, 0.1, -3.4), 0.1], [Vector3(-9.2, 0.5, -3.4), -0.15], [Vector3(-8.55, 0.1, -3.45), 0.4]]:
+		_prop(room, "StockParcel", "parcel", stack[0]).rotation.y = stack[1]
+	builder._collider("StockParcelsBody", room, Vector3(1.3, 0.9, 0.6), Vector3(-8.9, 0.55, -3.45))
 	# World map on the back wall, orders board on the shop's wall.
 	_prop(room, "WorldPoster", "world_poster", Vector3(-7.85, 1.95, -3.88))
 	builder._box("OrdersBoard", room, Vector3(0.03, 0.9, 1.3), Vector3(-6.08, 1.8, -1.7), Color(0.1, 0.16, 0.24))
-	orders_board = _text(room, "OrdersBoardText", "", Vector3(-6.1, 1.8, -1.7), 22, Color.WHITE, -PI / 2)
-	orders_board.pixel_size = 0.0028
-	orders_board.width = 400
+	orders_board = _text(room, "OrdersBoardText", "", Vector3(-6.1, 1.8, -1.7), 34, Color.WHITE, -PI / 2)
+	orders_board.pixel_size = 0.0026
+	orders_board.width = 460
 	orders_board.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 # ---------------------------------------------------------------- airport

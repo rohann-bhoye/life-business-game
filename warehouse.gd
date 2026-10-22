@@ -144,29 +144,27 @@ func _build_room() -> void:
 		if body == player: player.warehouse_indoors = false)
 	_brick_details(shell)
 
-## The brick building's details (brick_works.gd): an orange stripe under the
-## fascia, a pink-framed office window, two blue roller shutters, downpipes,
-## hedge planters clear of the delivery bays and doors, roof skylights (pale
-## panels under the roof show them inside) and two steel roof trusses.
+## The building itself is our Blender model (tools/blender/build_warehouse.py), laid
+## exactly on this layout: brick facade and plinth (world-mapped brick), ribbed steel
+## walls, the pitched roof with skylights, the APNA STORAGE parapet, the entrance
+## canopy, office door and window, loading bays with bumpers and bollards, lamps,
+## columns and roof trusses. The boxes above stay as invisible colliders; the doors,
+## lights, floor, forecourt and labels stay as they are. Hedge planters out front.
 func _brick_details(shell: Node3D) -> void:
-	builder._box("FasciaStripe", shell, Vector3(22.7, 0.08, 0.06), Vector3(-5.05, 4.21, FRONT - 0.2), Color(0.95, 0.55, 0.12))
-	Bricks.framed_window(shell, "OfficeWindow", Vector3(-9.3, 1.1, FRONT - 0.1), PI, 6.0, 2.3)
-	Bricks.framed_window(shell, "OfficeWindowInside", Vector3(-9.3, 1.1, FRONT + 0.1), 0.0, 6.0, 2.3, Bricks.FRAME, 3, Color(0.66, 0.8, 0.9))
-	for x in [0.9, 3.7]: Bricks.shutter(shell, "LoadingShutter%d" % roundi(x * 10), Vector3(x, 0.1, FRONT - 0.1), PI, 2.4, 3.1)
-	for x in [-16.35, 6.25]: builder._box("Downpipe%d" % roundi(x), shell, Vector3(0.12, 5.2, 0.12), Vector3(x, 2.7, FRONT - 0.17), Bricks.STEEL)
+	for name in ["SideWall-16.5", "SideWall6.4", "BackWall", "OfficeFrontWallLeft", "OfficeFrontWallRight", "OfficeDoorHeader", "FrontWall2.7", "DoorLintel", "Roof", "Fascia", "DoorFrame-1", "DoorFrame1", "OfficeDoorFrame-14.85", "OfficeDoorFrame-13.55", "OfficeDoorFrameTop", "StorageSign"]:
+		var part := shell.get_node_or_null(name.validate_node_name()) as Node3D
+		if part != null: part.hide()
+	for piece in ["warehouse_brick", "warehouse_cladding", "warehouse_shell"]:
+		var model: Node3D = (load("res://assets/props/warehouse/%s.glb" % piece) as PackedScene).instantiate()
+		model.name = piece.to_pascal_case()
+		model.position = Vector3(0, 0.1, 0)
+		shell.add_child(model)
+		var material: Material = Bricks.brick_material() if piece == "warehouse_brick" else (Bricks.cladding_material() if piece == "warehouse_cladding" else null)
+		if material != null:
+			for mesh in model.find_children("*", "MeshInstance3D", true, false): mesh.material_override = material
 	for spot in [Vector2(-12.35, 1.5), Vector2(-6.25, 2.0), Vector2(5.65, 1.2)]:
 		Bricks.planter(shell, "Planter%d" % roundi(spot.x), Vector3(spot.x, 0.1, FRONT - 0.45), 0.0, spot.y)
 		builder._collider("Planter%dBody" % roundi(spot.x), shell, Vector3(spot.y, 1.16, 0.6), Vector3(spot.x, 0.68, FRONT - 0.45))
-	var daylight := StandardMaterial3D.new()
-	daylight.albedo_color = Color(0.8, 0.9, 1.0)
-	daylight.emission_enabled = true
-	daylight.emission = Color(0.75, 0.86, 1.0)
-	daylight.emission_energy_multiplier = 0.35
-	for x in [-7.8, -3.0, 1.8]:
-		for z in [20.5, 26.5]:
-			Bricks.skylight(shell, "Skylight%d_%d" % [roundi(x), roundi(z)], Vector3(x, 5.5, z), Vector2(2.0, 1.4))
-			builder._box("SkylightPanel%d_%d" % [roundi(x), roundi(z)], shell, Vector3(2.0, 0.02, 1.4), Vector3(x, 5.29, z), Color.WHITE).material_override = daylight
-	for z in [19, 25]: Bricks.truss(shell, "RoofTruss%d" % z, -16.41, 6.31, z, 5.3)
 
 func _build_racks() -> void:
 	for id in range(Logistics.STORAGE_RACKS):
@@ -175,10 +173,10 @@ func _build_racks() -> void:
 		rack.position = rack_point(id)
 		add_child(rack)
 		racks.append(rack)
-		for x in [-1.3, 1.3]: builder._box("Upright%s" % x, rack, Vector3(0.1, 4.2, 1.1), Vector3(x, 2.1, 0), Color(0.16, 0.3, 0.4), true)
-		for level in range(4):
-			builder._box("Shelf%d" % level, rack, Vector3(2.6, 0.08, 1.1), Vector3(0, 0.1 + level * 0.95, 0), Color(0.65, 0.69, 0.72), true)
-			builder._box("Rail%d" % level, rack, Vector3(2.6, 0.08, 0.06), Vector3(0, 0.12 + level * 0.95, -0.58), Color(0.88, 0.56, 0.13))
+		# Colliders here; the rack you see is the Blender pallet rack, all 16 drawn as one
+		# MultiMesh (_rack_models).
+		for x in [-1.3, 1.3]: builder._collider("Upright%sBody" % x, rack, Vector3(0.1, 4.2, 1.1), Vector3(x, 2.1, 0))
+		for level in range(4): builder._collider("Shelf%dBody" % level, rack, Vector3(2.6, 0.08, 1.1), Vector3(0, 0.1 + level * 0.95, 0))
 		var label: Label3D = operations._sign(rack, "SlotLabel", "", Vector3(0, 4.3, -0.6))
 		label.rotation.y = PI
 		label.pixel_size = 0.0035
@@ -218,11 +216,18 @@ func _build_computer() -> void:
 	computer.add_child(terminal)
 
 func _batch_racks() -> void:
-	var sources: Array = []
-	for rack in racks:
-		for child in rack.get_children():
-			if child is MeshInstance3D: sources.append(child)
-	preload("res://scenery_batch.gd").build(self, sources, "RackBatch")
+	var model: Node3D = (load("res://assets/props/warehouse/storage_rack.glb") as PackedScene).instantiate()
+	var source: MeshInstance3D = model.find_children("*", "MeshInstance3D", true, false)[0]
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = source.mesh
+	multimesh.instance_count = racks.size()
+	for index in range(racks.size()): multimesh.set_instance_transform(index, racks[index].transform)
+	var batch := MultiMeshInstance3D.new()
+	batch.name = "RackBatch"
+	batch.multimesh = multimesh
+	add_child(batch)
+	model.free()
 
 func _build_navigation() -> void:
 	navigation = AStarGrid2D.new()

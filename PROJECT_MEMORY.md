@@ -152,6 +152,16 @@ board and a local suggestion form. See Farming section below for controls and li
   reserved via export_world.bag_lines. Props: tools/blender/build_export_props.py ->
   assets/props/export/*.glb. Moved: BackLaneWest x -10.6, sleeping dog, goods
   shutter/poster/CCTV/AC onto the packing room, 3 far trees off the airport.
+- Warehouse model (2026-10-22): tools/blender/build_warehouse.py builds APNA STORAGE
+  in world coordinates (origin = game origin at floor, placed at y 0.1):
+  warehouse_brick.glb (facade + plinth, given Bricks.brick_material), warehouse_cladding
+  (ribbed walls + gables, Bricks.cladding_material), warehouse_shell (pitched roof,
+  skylights, parapet sign, entrance canopy, office door/window, loading bays, lamps,
+  columns, 5 trusses at x -14/-9/-4/1/5) and storage_rack.glb (one MultiMesh
+  RackBatch for all 16 racks). warehouse.gd hides the old wall/roof boxes (their
+  colliders stay) and keeps doors, lights, floor, labels, planters. Packing room:
+  sliding glass street door, pink trim on the shop doorway, supply_shelf.glb,
+  stacked parcels; streetlight -8 moved to -12.6, dog to -14.4.
 - Startup check (2026-10-20): the player spawns beside the bed from frame 0; only the
   very first frame (behind the loading screen) shows the home without its walls
   (HomeDecor is added deferred). One replay showed a ~2 m slide toward the door just

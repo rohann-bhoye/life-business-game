@@ -14,7 +14,8 @@ func _ready() -> void:
 	_build_garden()
 	for point in [Vector3(-11, 0.1, -8), Vector3(-18, 0.1, 12), Vector3(11, 0.1, -11), Vector3(12, 0.1, 0), Vector3(17.8, 0.1, 13.4), Vector3(-17, 0.1, 0), Vector3(-21, 0.1, -14), Vector3(25.5, 0.1, -9.5), Vector3(25, 0.1, 3), Vector3(-24, 0.1, 16)]:
 		_tree(point)
-	for x in [-18.0, -8.0, 8.0, 18.0]:
+	# Not at -8: that is the packing room door (export_world.gd).
+	for x in [-18.0, -12.6, 8.0, 18.0]:
 		_streetlight(Vector3(x, 0.1, 3.3))
 		_streetlight(Vector3(x + 1.0, 0.1, 10.7), PI)
 	_build_background()

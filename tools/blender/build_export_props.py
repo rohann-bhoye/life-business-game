@@ -10,6 +10,8 @@
 #   parcel.glb          sealed export parcel with the air cargo label (bottom centre)
 #   carton_open.glb     open carton with its flaps up, filled at the racks (bottom centre)
 #   world_poster.glb    "We ship worldwide" map board for the packing room (centre)
+#   supply_shelf.glb    packing supplies: tape rolls, bubble wrap, flat cartons, labels
+#                       (floor centre, front toward -y here = the game +z)
 # Blender axes: x as in the game, -y = the game's +z, z up.
 #
 # Run (Blender 5.2):
@@ -305,12 +307,24 @@ def carton_open(b):
 		b.swatch_face([b.vert(c) for c in corners], "kraft")
 		b.swatch_face([b.vert(c) for c in corners[::-1]], "kraft")
 
+def supply_shelf(b):
+	for x in (-0.48, 0.48):
+		for y in (-0.2, 0.2): b.box((x, y, 0.9), (0.04, 0.04, 1.8), "steel")
+	for z in (0.1, 0.6, 1.1, 1.6): b.box((0, 0, z), (1.0, 0.44, 0.03), "steel_light")
+	# Bottom: flat cartons; then tape rolls and label rolls; then bubble wrap and a box of stickers.
+	for k in range(5): b.box((0.02 * (k % 2), 0, 0.13 + k * 0.025), (0.9, 0.4, 0.022), "kraft")
+	for k in range(4): b.lathe((-0.36 + k * 0.16, -0.05, 0.615), [(0.06, 0.0), (0.06, 0.05), (0.0, 0.05)], ["tape", "tape"], seg=10)
+	for k in range(3): b.lathe((0.08 + k * 0.13, 0.08, 0.615), [(0.045, 0.0), (0.045, 0.08), (0.0, 0.08)], ["white", "white"], seg=8)
+	b.lathe((-0.22, 0.0, 1.115), [(0.17, 0.0), (0.17, 0.42), (0.05, 0.42), (0.0, 0.42)], ["steel_light", "white", "white"], seg=12)
+	b.box((0.25, 0.0, 1.2), (0.36, 0.3, 0.18), {"-y": PARCEL_SIDE, "rest": "kraft"})
+	b.box((0.0, -0.02, 1.7), (0.7, 0.36, 0.17), {"-y": PARCEL_LABEL, "rest": "kraft"})
+
 def world_poster(b):
 	b.box((0, 0, 0), (0.94, 0.03, 0.64), {"-y": "white", "rest": "navy"})
 	b.box((0, -0.017, 0), (0.9, 0.005, 0.6), {"-y": WORLD, "rest": "navy"})
 
 MODELS = {"cargo_plane": cargo_plane, "propeller": propeller, "export_terminal": export_terminal, "control_tower": control_tower,
-	"packing_table": packing_table, "parcel": parcel, "carton_open": carton_open, "world_poster": world_poster}
+	"packing_table": packing_table, "parcel": parcel, "carton_open": carton_open, "world_poster": world_poster, "supply_shelf": supply_shelf}
 
 project, render = project_args()
 out_dir = os.path.join(project, "assets", "props", "export")

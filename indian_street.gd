@@ -39,7 +39,7 @@ func build(neighbourhood: Node3D) -> void:
 	_mandir(st, MANDIR)
 	_commit(st, self, "StreetMesh")
 	_cow(Vector3(15.6, 0.1, 1.5), 0.35)
-	sleeping_dog = _sleeping_dog(Vector3(-11.3, 0.1, 2.75), 0.6)
+	sleeping_dog = _sleeping_dog(Vector3(-14.4, 0.1, 2.75), 0.6)
 	_sitting_dog(Vector3(-21.1, 0.1, 12.4), PI + 0.5)
 
 func set_quality(quality: int) -> void:

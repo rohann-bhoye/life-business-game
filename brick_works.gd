@@ -39,6 +39,26 @@ static func brick_material() -> StandardMaterial3D:
 	bricks.roughness = 0.9
 	return bricks
 
+static var ribs: StandardMaterial3D
+
+## Ribbed steel wall cladding: light grey-blue sheet with a rib every 0.2 m.
+static func cladding_material() -> StandardMaterial3D:
+	if ribs != null: return ribs
+	var image := Image.create(64, 16, false, Image.FORMAT_RGB8)
+	for x in range(64):
+		var shade := Color(0.78, 0.82, 0.85) if x % 16 > 3 else Color(0.62, 0.67, 0.71)
+		if x % 16 == 4: shade = Color(0.88, 0.9, 0.92)
+		for y in range(16): image.set_pixel(x, y, shade)
+	image.generate_mipmaps()
+	ribs = StandardMaterial3D.new()
+	ribs.albedo_texture = ImageTexture.create_from_image(image)
+	ribs.uv1_triplanar = true
+	ribs.uv1_world_triplanar = true
+	ribs.uv1_scale = Vector3(1.25, 1.25, 1.25)
+	ribs.roughness = 0.55
+	ribs.metallic = 0.3
+	return ribs
+
 static func glass_material() -> StandardMaterial3D:
 	if glass != null: return glass
 	glass = StandardMaterial3D.new()
