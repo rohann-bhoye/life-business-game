@@ -2,6 +2,9 @@ extends Node3D
 
 var clouds: Array[Node3D] = []
 var cloud_material: StandardMaterial3D
+## Clouds drift east over the whole sky and wrap round past x +-CLOUD_REACH.
+const CLOUD_REACH := 160.0
+var cloud_speeds: Array[float] = []
 var detailed_ground: ShaderMaterial
 
 const GRASS_SHADER := preload("res://assets/materials/grass_blades.gdshader")
@@ -33,9 +36,10 @@ func _ready() -> void:
 	_update_clouds()
 
 func _process(delta: float) -> void:
-	for cloud in clouds:
-		cloud.position.x += delta * 0.34
-		if cloud.position.x > 48.0: cloud.position.x = -48.0
+	for index in range(clouds.size()):
+		var cloud := clouds[index]
+		cloud.position.x += delta * cloud_speeds[index]
+		if cloud.position.x > CLOUD_REACH: cloud.position.x = -CLOUD_REACH
 
 ## Dense lawn on every open patch of the town: clumps of thin curved blades, kept off
 ## anything solid or flat on the ground (roads, paths, floors, soil, buildings, found
@@ -152,30 +156,66 @@ func _apply_grass_quality() -> void:
 		chunk.multimesh.visible_instance_count = -1 if grass_level >= 3 else count / (2 if grass_level == 2 else 4)
 		chunk.visibility_range_end = [24.0, 24.0, 38.0, 45.0][grass_level]
 
+## About 36 clouds spread over the whole sky (x and z +-150, 28-48 m up), kept apart
+## from each other: small, medium and big ones, each one merged mesh (one of five
+## puff shapes) with white tops and soft grey-blue undersides.
 func _build_clouds() -> void:
 	cloud_material = StandardMaterial3D.new()
 	cloud_material.albedo_color = Color(0.92, 0.95, 0.97)
 	cloud_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	for index in range(8):
-		var cloud := Node3D.new()
+	cloud_material.vertex_color_use_as_albedo = true
+	var shapes: Array[ArrayMesh] = []
+	for shape in range(5): shapes.append(_cloud_mesh(shape))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242
+	var spots: Array[Vector2] = []
+	for attempt in range(400):
+		var spot := Vector2(rng.randf_range(-150.0, 150.0), rng.randf_range(-150.0, 150.0))
+		if spots.any(func(other: Vector2) -> bool: return other.distance_to(spot) < 34.0): continue
+		spots.append(spot)
+		if spots.size() >= 36: break
+	for index in range(spots.size()):
+		var size: float = [rng.randf_range(0.7, 1.0), rng.randf_range(1.3, 1.8), rng.randf_range(2.1, 2.8)][index % 3]
+		var cloud := MeshInstance3D.new()
 		cloud.name = "Cloud%d" % index
-		cloud.position = Vector3(-42 + index * 12, 18 + (index % 3) * 2.2, -36 - (index % 2) * 12)
-		cloud.scale = Vector3(1.8 + (index % 3) * 0.4, 0.65, 1.0)
+		cloud.mesh = shapes[index % shapes.size()]
+		cloud.material_override = cloud_material
+		cloud.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		cloud.position = Vector3(spots[index].x, rng.randf_range(28.0, 48.0), spots[index].y)
+		cloud.rotation.y = rng.randf_range(-0.4, 0.4)
+		cloud.scale = Vector3(size, size * rng.randf_range(0.55, 0.75), size)
 		add_child(cloud)
 		clouds.append(cloud)
-		for puff in range(4):
-			var mesh := MeshInstance3D.new()
-			mesh.name = "Puff%d" % puff
-			var sphere := SphereMesh.new()
-			sphere.radius = 1.5
-			sphere.height = 2.2
-			sphere.radial_segments = 12
-			sphere.rings = 6
-			sphere.material = cloud_material
-			mesh.mesh = sphere
-			mesh.position = Vector3((puff - 1.5) * 1.5, absf(puff - 1.5) * -0.25, sin(puff * 2.0) * 0.5)
-			mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			cloud.add_child(mesh)
+		cloud_speeds.append(rng.randf_range(0.3, 0.55))
+
+## One cloud: 7-10 low-poly puffs along an ellipse, bigger in the middle, with flat
+## bottoms; vertex colours go from a grey-blue underside to a white top.
+static func _cloud_mesh(shape: int) -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 900 + shape
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var sphere := SphereMesh.new()
+	sphere.radial_segments = 10
+	sphere.rings = 5
+	var arrays := sphere.get_mesh_arrays()
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	var puffs := rng.randi_range(7, 10)
+	for puff in range(puffs):
+		var along := (puff / float(puffs - 1)) * 2.0 - 1.0
+		var radius := lerpf(2.6, 1.3, absf(along)) * rng.randf_range(0.8, 1.15)
+		var centre := Vector3(along * 5.0, rng.randf_range(0.0, 1.0) * (1.0 - absf(along)) * 1.4, rng.randf_range(-1.6, 1.6))
+		for index in indices:
+			var point := vertices[index] * radius * 2.0
+			point.y = maxf(point.y, -radius * 0.35)
+			var normal := normals[index]
+			var height := (centre.y + point.y) / 3.5
+			st.set_color(Color(0.74, 0.79, 0.87).lerp(Color.WHITE, smoothstep(-0.4, 0.7, normal.y * 0.6 + height)))
+			st.set_normal(normal)
+			st.add_vertex(centre + point)
+	return st.commit()
 
 func _update_clouds() -> void:
 	var business = get_tree().current_scene.get_node("Shop/ShopArea").business

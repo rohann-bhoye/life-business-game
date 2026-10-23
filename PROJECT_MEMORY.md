@@ -194,6 +194,11 @@ board and a local suggestion form. See Farming section below for controls and li
   _grass_hills paints the Terrain3D colour map with the lawn colours (sRGB / 0.92).
   South edge MAX_Z 62 (terrain flat to z 60); runway z 51.5..62.5 (RUNWAY_Z 57,
   11 m), plane drawn at 0.85. Departures board: posts behind, title band, centred lines.
+- Clouds (2026-10-23, environment_details.gd _build_clouds): ~36 clouds spread over the
+  whole sky (x/z +-150, 28-48 m, at least 34 m apart), small/medium/big, each one merged
+  mesh (5 puff shapes from _cloud_mesh, flat bottoms, grey-blue underside to white top
+  by vertex colour, unshaded; day/night tint via albedo_color). They drift east at
+  0.3-0.55 m/s and wrap at x +-160. Hidden on Fastest (set_quality).
 - Town name (2026-10-23): Dholkarpur Gaon (town_boundary.gd TOWN_NAME): top-centre HUD
   label (game_ui.gd TownLabel), welcome gates over the main road at x +-66
   (town_expansion.gd _welcome_gates: sandstone pillars, saffron domes, maroon board,
