@@ -10,7 +10,7 @@ signal closed
 const KenneyTheme = preload("res://kenney_theme.gd")
 const SEEN_FILE := "user://help.cfg"
 const PAGES := [
-	{"picture": "shop", "title": "Your own kirana shop", "text": "Welcome to Apna Mart! Buy stock, fill the shelves, serve customers and grow a small kirana into a Mega Mart.", "keys": []},
+	{"picture": "shop", "title": "Your own kirana shop", "text": "Welcome to Apna Mart in Dholkarpur Gaon! Buy stock, fill the shelves, serve customers and grow a small kirana into a Mega Mart.", "keys": []},
 	{"picture": "controls", "title": "Moving around", "text": "Walk with W A S D and look with the mouse. The + in the middle shows what you are aiming at; the hint under it says what E or Q will do.", "keys": ["W A S D", "MOUSE", "E", "Q"]},
 	{"picture": "pc", "title": "Order stock on the PC", "text": "Aim at the PC on the desk and press E. Open Wholesale, add boxes to the cart and press Place order. Right click leaves the PC.", "keys": ["E", "RMB"]},
 	{"picture": "boxes", "title": "Pick up the boxes", "text": "The van brings your boxes to APNA STORAGE across the road. Aim at a box and press E to carry it. Q puts it down.", "keys": ["E", "Q"]},

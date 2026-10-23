@@ -340,7 +340,7 @@ func _new_game(difficulty := 1) -> void:
 		_cancel_new()
 		status_label.text = error
 		return
-	_start_game("New shop  |  Slot %d  |  Day 1  |  %s%s  |  %s" % [slot, String.chr(8377), _money(Session.Backend.DIFFICULTY_MONEY[difficulty]), Session.Backend.DIFFICULTY_NAMES[difficulty]], "Welcome to your new shop! Follow the First Day guide to get started.")
+	_start_game("New shop  |  Slot %d  |  Day 1  |  %s%s  |  %s" % [slot, String.chr(8377), _money(Session.Backend.DIFFICULTY_MONEY[difficulty]), Session.Backend.DIFFICULTY_NAMES[difficulty]], "Welcome to your new shop in Dholkarpur Gaon! Follow the First Day guide to get started.")
 
 static func _money(value: int) -> String:
 	var digits := str(absi(value))

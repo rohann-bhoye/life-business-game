@@ -33,6 +33,8 @@ const TAB_CONTROLS := [
 
 var tabs: TabBar
 var hud_money: Label
+## The town's name, top centre of the HUD.
+var town_label: Label
 var interaction_label: Label
 var feedback_label: Label
 var controls_panel: Panel
@@ -71,6 +73,11 @@ func _ready() -> void:
 		for state in ["normal", "hover", "pressed"]:
 			button.remove_theme_stylebox_override(state)
 	hud_money = _label("HudMoneyLabel", self)
+	town_label = _label("TownLabel", self)
+	town_label.text = preload("res://town_boundary.gd").TOWN_NAME
+	town_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	town_label.add_theme_font_size_override("font_size", 16)
+	town_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.5))
 	crosshair = preload("res://crosshair.gd").new()
 	crosshair.name = "Crosshair"
 	add_child(crosshair)
@@ -468,6 +475,7 @@ func _layout() -> void:
 	house.close_house_button.size.x = 80.0
 	_place(hud_money, 16, 12, maxf(120, viewport_size.x - 240), 28)
 	_place($ClockLabel, viewport_size.x - 256, 12, 240, 28)
+	_place(town_label, (viewport_size.x - 240) / 2.0, 12, 240, 28)
 	$ClockLabel.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_place(first_day_panel, viewport_size.x - 276, 50, 260, 156)
 	_place(first_day_panel.get_node("Title"), 12, 8, 236, 20)

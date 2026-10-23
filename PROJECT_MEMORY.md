@@ -194,8 +194,15 @@ board and a local suggestion form. See Farming section below for controls and li
   _grass_hills paints the Terrain3D colour map with the lawn colours (sRGB / 0.92).
   South edge MAX_Z 62 (terrain flat to z 60); runway z 51.5..62.5 (RUNWAY_Z 57,
   11 m), plane drawn at 0.85. Departures board: posts behind, title band, centred lines.
-- Mountains (2026-10-22): town_expansion.gd _shape_land (deferred, about 0.9 s) sets
-  the Terrain3D heights: flat town rect (-74..74, -56..60), foothills 1.5-9 m from a
+- Town name (2026-10-23): Dholkarpur Gaon (town_boundary.gd TOWN_NAME): top-centre HUD
+  label (game_ui.gd TownLabel), welcome gates over the main road at x +-66
+  (town_expansion.gd _welcome_gates: sandstone pillars, saffron domes, maroon board,
+  one merged mesh each plus pillar colliders), the edge notice, guide and new-game text.
+- Mountains (2026-10-22, baked 2026-10-23): land_shape.gd shape(data) sets the
+  Terrain3D heights; tools/bake_land.gd saves them into assets/terrain/neighbourhood
+  (re-run it after changing land_shape.gd, then tools/bake_editor_preview.gd), so the
+  game does no shaping at load and the editor shows the same hills. town_expansion.gd
+  only plants the pines (deferred, heights from data.get_height). Land: flat town rect (-74..74, -56..60), foothills 1.5-9 m from a
   wavy line, then rounded mountains (smooth mass seed 3 + soft ridges seed 7 + bumps
   seed 19, ~55 m max), the road valley pass (_lower_valley) which mountains close
   again past |x| 100 (the road is hidden behind the crest there), colour map by

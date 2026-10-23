@@ -7,6 +7,8 @@ extends Node3D
 # edge cancels the countdown.
 ## The whole flat land round the old 64 m town is open now: the market street and
 ## houses (town_expansion.gd) and the airport south of the warehouse (export_world.gd).
+## The town's name (welcome gates in town_expansion.gd, the top of the HUD).
+const TOWN_NAME := "Dholkarpur Gaon"
 const MIN_X := -72.0
 const MAX_X := 72.0
 const MIN_Z := -52.0
@@ -83,7 +85,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if remaining < 0.0: remaining = COUNTDOWN
 	remaining -= delta
-	notice.text = "This area opens in a future update\nReturning home in %d..." % maxi(1, ceili(remaining))
+	notice.text = "End of %s for now - more opens in a future update\nReturning home in %d..." % [TOWN_NAME, maxi(1, ceili(remaining))]
 	notice.show()
 	if remaining <= 0.0: send_home()
 

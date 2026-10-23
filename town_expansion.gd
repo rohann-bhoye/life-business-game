@@ -5,7 +5,10 @@ extends Node3D
 # the market street (FutureTown, opened at build) has Indian shops, a chai stall,
 # more houses and parked autos/scooters, and Airport Road leaves the market street
 # west to the cargo terminal (export_world.gd) with a car park. The bus stop sits in
-# the old town. Built once by neighbourhood.gd; uses its box/tree/streetlight helpers.
+# the old town. Welcome gates with the town's name (Dholkarpur Gaon) span the main
+# road at both ends. Built once by neighbourhood.gd; uses its box/tree/streetlight
+# helpers.
+const Edge := preload("res://town_boundary.gd")
 const Models := preload("res://vehicle_models.gd")
 const AIRPORT_ROAD_Z := 45.5
 const Kenney = preload("res://kenney_assets.gd")
@@ -39,6 +42,7 @@ func build(neighbourhood: Node3D) -> void:
 	_bus_stop()
 	_vehicles()
 	_greenery()
+	_welcome_gates()
 	_airport_road()
 	# The market street and its houses are open from the start now.
 	unlock_future_town()
@@ -79,8 +83,8 @@ const Horizon := preload("res://horizon.gd")
 const ROAD_Z := 7.0
 
 ## Past the future town the road, pavements and markings climb the crest and run
-## down the valley (horizon.gd) in 1 m steps; the landscape beside the road is
-## lowered to match once it has loaded.
+## down the valley (horizon.gd) in 1 m steps; the baked landscape (land_shape.gd)
+## is lowered beside the road to match.
 func _horizon_road() -> void:
 	var road_material := _road_material()
 	var paving := Color(0.66, 0.69, 0.67)
@@ -104,7 +108,7 @@ func _horizon_road() -> void:
 			mesh.mesh = part[0].commit()
 			mesh.material_override = part[1]
 			town.add_child(mesh)
-	call_deferred("_shape_land")
+	call_deferred("_hill_forest")
 
 ## The town road's asphalt (shop_presentation.gd builds it; the main Road node only
 ## gets it later in that node's _ready, so ask the builder directly).
@@ -120,128 +124,26 @@ func _slope_strip(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float, y
 	var normal := Vector3(-Horizon.slope((x0 + x1) / 2.0), 1.0, 0.0).normalized()
 	IndianHouse._quad(st, Vector3(x0, y0, z0), Vector3(x1, y1, z0), Vector3(x1, y1, z1), Vector3(x0, y0, z1), normal, colour)
 
-## The land round the town (the Landscape Terrain3D), shaped at load: rolling
-## foothills (about 2-9 m) starting a few metres past the flat town along a wavy
-## line, then broad rounded mountains (a smooth mass plus gentle ridges, up to about
-## 55 m); the main road keeps its valley pass both ways (_lower_valley).
-## The colour map follows height and steepness: the lawn's own colours low down
-## (grass_ground.gdshader, the terrain texture is about 0.92 bright), darker forest
-## green up the slopes, rock only where it is high or steep, and snow on the peaks.
-## Pines cover the lower slopes as one MultiMesh.
-const FLAT_TOWN := Rect2(-74.0, -56.0, 148.0, 116.0)
-## Heights of the 256 x 256 terrain points (x, z from -128), kept while shaping so
-## the colours need not read the terrain back.
-var land_heights := PackedFloat32Array()
+const LandShape := preload("res://land_shape.gd")
 
-func _land_index(x: int, z: int) -> int:
-	return (clampi(z, -128, 127) + 128) * 256 + clampi(x, -128, 127) + 128
-
-func _shape_land() -> void:
-	var started := Time.get_ticks_msec()
+## The hills and mountains are baked into the Landscape's data (land_shape.gd);
+## pines on their gentle lower slopes (not in the road valley) are planted at load,
+## all one MultiMesh.
+func _hill_forest() -> void:
 	var landscape := town.get_parent().get_node_or_null("Landscape")
 	if landscape == null or landscape.get_class() != "Terrain3D": return
 	var data = landscape.data
-	_mountains(data)
-	_lower_valley(data)
-	_paint_land(data)
-	data.update_maps()
-	_hill_forest()
-	land_heights = PackedFloat32Array()
-	print_verbose("Land shaped in %d ms" % (Time.get_ticks_msec() - started))
-
-func _land_height(x: float, z: float, mass: FastNoiseLite, ridges: FastNoiseLite, rolling: FastNoiseLite) -> float:
-	var out := maxf(maxf(FLAT_TOWN.position.x - x, x - FLAT_TOWN.end.x), maxf(FLAT_TOWN.position.y - z, z - FLAT_TOWN.end.y))
-	var bumps := rolling.get_noise_2d(x, z) * 0.5 + 0.5
-	out -= bumps * 7.0
-	if out <= 0.0: return 0.08
-	var t := clampf(out / 56.0, 0.0, 1.0)
-	var ridge := 1.0 - absf(ridges.get_noise_2d(x, z))
-	ridge *= ridge
-	var body := mass.get_noise_2d(x, z) * 0.5 + 0.5
-	# The last 12 m before the end of the land slope down behind the outer crest, so
-	# the edge (where Terrain3D blends towards its blank white colour) is never on
-	# the skyline seen from the town.
-	var edge := minf(minf(x + 128.0, 127.0 - x), minf(z + 128.0, 127.0 - z))
-	var height := smoothstep(0.0, 0.35, t) * (1.5 + bumps * 7.0) + smoothstep(0.25, 1.0, t) * (body * 32.0 + ridge * 15.0 + bumps * 5.0)
-	return 0.08 + height * smoothstep(0.0, 12.0, edge)
-
-func _mountains(data) -> void:
-	var mass := FastNoiseLite.new()
-	mass.seed = 3
-	mass.frequency = 0.011
-	mass.fractal_octaves = 3
-	var ridges := FastNoiseLite.new()
-	ridges.seed = 7
-	ridges.frequency = 0.013
-	ridges.fractal_octaves = 3
-	ridges.fractal_gain = 0.4
-	var rolling := FastNoiseLite.new()
-	rolling.seed = 19
-	rolling.frequency = 0.035
-	rolling.fractal_octaves = 3
-	land_heights.resize(256 * 256)
-	for z in range(-128, 128):
-		for x in range(-128, 128):
-			var height := _land_height(x, z, mass, ridges, rolling)
-			land_heights[_land_index(x, z)] = height
-			data.set_height(Vector3(x, 0, z), height)
-
-## Lowers the land along the road into the valley, blending back to the hills and
-## mountains 45 m to each side. Past x 100 (where the road is already out of sight
-## behind the crest) the mountains close the valley again, so the far end shows a
-## mountain and never the empty sky past the edge of the land.
-func _lower_valley(data) -> void:
-	for side in [-1, 1]:
-		for step in range(53):
-			var x: float = side * (Horizon.START + step)
-			var closing := 1.0 - smoothstep(100.0, 122.0, absf(x))
-			for z in range(int(ROAD_Z) - 45, int(ROAD_Z) + 46):
-				var weight := (1.0 - smoothstep(6.0, 45.0, absf(z - ROAD_Z))) * closing
-				var index := _land_index(int(x), z)
-				land_heights[index] = lerpf(land_heights[index], 0.06 + Horizon.height(x), weight)
-				data.set_height(Vector3(x, 0, z), land_heights[index])
-
-func _steepness(x: int, z: int) -> float:
-	var height := land_heights[_land_index(x, z)]
-	return absf(land_heights[_land_index(x + 1, z)] - height) + absf(land_heights[_land_index(x, z + 1)] - height)
-
-func _paint_land(data) -> void:
-	var lush := Color(0.2, 0.31, 0.1) / 0.92
-	var fresh := Color(0.32, 0.44, 0.15) / 0.92
-	var dry := Color(0.5, 0.5, 0.26) / 0.92
-	var forest := Color(0.14, 0.26, 0.11) / 0.92
-	var rock := Color(0.4, 0.38, 0.33) / 0.92
-	var snow := Color(0.97, 0.97, 0.98)
-	var macro := FastNoiseLite.new()
-	macro.seed = 11
-	macro.frequency = 0.05
-	var patches := FastNoiseLite.new()
-	patches.seed = 29
-	patches.frequency = 0.25
-	for z in range(-128, 128):
-		for x in range(-128, 128):
-			var point := Vector3(x, 0, z)
-			var height := land_heights[_land_index(x, z)]
-			var colour := lush.lerp(fresh, smoothstep(0.3, 0.72, patches.get_noise_2d(x, z) * 0.5 + 0.5))
-			colour = colour.lerp(dry, smoothstep(0.5, 0.8, macro.get_noise_2d(x, z) * 0.5 + 0.5) * 0.6)
-			colour = colour.lerp(forest, smoothstep(2.0, 9.0, height) * 0.8)
-			colour = colour.lerp(rock, clampf(smoothstep(26.0, 40.0, height) + smoothstep(1.3, 2.4, _steepness(x, z)), 0.0, 0.85))
-			colour = colour.lerp(snow, smoothstep(44.0, 52.0, height))
-			colour.a = 1.0
-			data.set_color(point, colour)
-
-## Pines on the gentle lower slopes (not in the road valley), all one MultiMesh.
-func _hill_forest() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2026
 	var spots: Array[Transform3D] = []
 	for attempt in range(3000):
 		var x := rng.randf_range(-126.0, 126.0)
 		var z := rng.randf_range(-126.0, 126.0)
-		if FLAT_TOWN.grow(3.0).has_point(Vector2(x, z)): continue
-		if absf(x) > FLAT_TOWN.end.x and absf(z - ROAD_Z) < 14.0: continue
-		var height := land_heights[_land_index(roundi(x), roundi(z))]
-		if height < 0.6 or height > 28.0 or _steepness(roundi(x), roundi(z)) > 1.6: continue
+		if LandShape.FLAT_TOWN.grow(3.0).has_point(Vector2(x, z)): continue
+		if absf(x) > LandShape.FLAT_TOWN.end.x and absf(z - ROAD_Z) < 14.0: continue
+		var height: float = data.get_height(Vector3(x, 0, z))
+		var steepness: float = absf(data.get_height(Vector3(x + 1.0, 0, z)) - height) + absf(data.get_height(Vector3(x, 0, z + 1.0)) - height)
+		if height < 0.6 or height > 28.0 or steepness > 1.6: continue
 		var size := rng.randf_range(1.3, 2.5)
 		spots.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(size, size * rng.randf_range(0.9, 1.3), size)), Vector3(x, height - 0.45 * size, z)))
 		if spots.size() >= 450: break
@@ -310,6 +212,60 @@ func _airport_road() -> void:
 		town._collider("ParkedCarBody", town, Vector3(1.9, 1.5, 4.0), car[0] + Vector3(0, 0.75, 0))
 	_road_sign("AirportSignMain", Vector3(45.2, 0.1, 12.6), -PI / 2, "APNA AIRPORT\nCargo terminal - turn south")
 	_road_sign("AirportSignTurn", Vector3(46.0, 0.1, 40.2), PI, "APNA AIRPORT\nturn right")
+
+## A sandstone welcome gate over the main road at each end of town (x +-66): two
+## pillars with white bands and saffron domes, a beam with the town's name on both
+## faces (welcome on the way in, "visit again" on the way out), all one mesh.
+func _welcome_gates() -> void:
+	var stone := Color(0.86, 0.6, 0.38)
+	var plinth := Color(0.6, 0.38, 0.26)
+	var band := Color(0.96, 0.93, 0.86)
+	var saffron := Color(0.96, 0.55, 0.14)
+	var board := Color(0.55, 0.1, 0.12)
+	for side in [-1, 1]:
+		var x: float = side * 66.0
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for z in [ROAD_Z - 5.4, ROAD_Z + 5.4]:
+			IndianHouse.box(st, Vector3(x, 0.4, z), Vector3(1.5, 0.6, 1.5), plinth)
+			IndianHouse.box(st, Vector3(x, 3.4, z), Vector3(1.1, 5.4, 1.1), stone)
+			for y in [1.2, 3.9]: IndianHouse.box(st, Vector3(x, y, z), Vector3(1.16, 0.14, 1.16), band)
+			IndianHouse.box(st, Vector3(x, 6.25, z), Vector3(1.4, 0.3, 1.4), band)
+			var bottom := Vector3(x, 6.4, z)
+			for ring in [[0.55, 0.18], [0.5, 0.16], [0.4, 0.14], [0.26, 0.12], [0.1, 0.3]]:
+				IndianHouse.cylinder(st, bottom, ring[0], ring[1], saffron, 10)
+				bottom.y += ring[1]
+			town._collider("GatePillar%d" % roundi(z), town, Vector3(1.5, 6.2, 1.5), Vector3(x, 3.2, z))
+		IndianHouse.box(st, Vector3(x, 5.25, ROAD_Z), Vector3(0.5, 1.5, 11.9), stone)
+		IndianHouse.box(st, Vector3(x, 4.45, ROAD_Z), Vector3(0.56, 0.12, 9.7), saffron)
+		IndianHouse.box(st, Vector3(x, 6.2, ROAD_Z), Vector3(0.4, 0.5, 3.6), saffron)
+		for face in [-1, 1]:
+			IndianHouse.box(st, Vector3(x + face * 0.27, 5.3, ROAD_Z), Vector3(0.04, 1.2, 8.6), board)
+			IndianHouse.box(st, Vector3(x + face * 0.28, 5.3, ROAD_Z), Vector3(0.02, 1.08, 8.44), band)
+			IndianHouse.box(st, Vector3(x + face * 0.29, 5.3, ROAD_Z), Vector3(0.02, 1.0, 8.36), board)
+			# face -side looks into the town, face +side out along the road.
+			var inward: bool = face == -side
+			var yaw: float = face * PI / 2.0
+			# Inside: the name, "visit again" under it. Outside: "welcome to" over the name.
+			_gate_words(Vector3(x + face * 0.31, 5.42 if inward else 5.2, ROAD_Z), yaw, Edge.TOWN_NAME.to_upper(), 96)
+			_gate_words(Vector3(x + face * 0.31, 4.92 if inward else 5.72, ROAD_Z), yaw, "Phir padharna  -  visit again" if inward else "Swagat hai  -  welcome to", 46)
+		var gate := MeshInstance3D.new()
+		gate.name = "WelcomeGate%d" % side
+		gate.mesh = st.commit()
+		gate.material_override = IndianHouse._material()
+		town.add_child(gate)
+
+func _gate_words(at: Vector3, yaw: float, words: String, size: int) -> void:
+	var label := Label3D.new()
+	label.name = "GateWords"
+	label.text = words
+	label.position = at
+	label.rotation.y = yaw
+	label.font_size = size
+	label.pixel_size = 0.006
+	label.outline_size = 0
+	label.modulate = Color(1.0, 0.86, 0.4)
+	town.add_child(label)
 
 ## A green road sign on two posts with white words (front +z, turned by `yaw`).
 func _road_sign(node_name: String, at: Vector3, yaw: float, words: String) -> void:
@@ -464,5 +420,5 @@ func _vehicles() -> void:
 		_scooter(index, Vector3(MARKET_X + (-2.1 if index % 2 == 0 else 2.1), 0.1, -8.0 - index * 4.5), PI / 2 if index % 2 == 0 else -PI / 2)
 
 func _greenery() -> void:
-	for point in [Vector3(-36, 0.1, -2), Vector3(-56, 0.1, -12), Vector3(-72, 0.1, 8), Vector3(-44, 0.1, 26), Vector3(-68, 0.1, 30), Vector3(36, 0.1, -14), Vector3(60, 0.1, -30), Vector3(72, 0.1, 4), Vector3(44, 0.1, 28), Vector3(68, 0.1, 44), Vector3(-30, 0.1, -40), Vector3(10, 0.1, -40), Vector3(38, 0.1, 55), Vector3(-36, 0.1, 46), Vector3(-40, 0.1, 57)]:
+	for point in [Vector3(-36, 0.1, -2), Vector3(-56, 0.1, -12), Vector3(-44, 0.1, 26), Vector3(-68, 0.1, 30), Vector3(36, 0.1, -14), Vector3(60, 0.1, -30), Vector3(44, 0.1, 28), Vector3(68, 0.1, 44), Vector3(-30, 0.1, -40), Vector3(10, 0.1, -40), Vector3(38, 0.1, 55), Vector3(-36, 0.1, 46), Vector3(-40, 0.1, 57)]:
 		town._tree(point)
