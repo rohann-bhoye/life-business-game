@@ -43,6 +43,8 @@ func build(neighbourhood: Node3D) -> void:
 	_vehicles()
 	_greenery()
 	_welcome_gates()
+	# The giant policeman watching over the north hills.
+	town.add_child(preload("res://giant_police.gd").new())
 	_airport_road()
 	# The market street and its houses are open from the start now.
 	unlock_future_town()
