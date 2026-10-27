@@ -197,7 +197,7 @@ board and a local suggestion form. See Farming section below for controls and li
 - Giant policeman (2026-10-27, giant_police.gd, added by town_expansion.gd): an 89 m
   khaki constable (tools/blender/build_giant_police.py -> assets/props/police body+head
   glb, 430+252 faces, one swatch atlas) at (-20, -10, -152) behind the north hills,
-  scale 48; the head follows the player (clamped +-0.75 rad), body turns 20%. No shadows.
+  scale 75 (~140 m, head drawn 1.4x, tilted 0.4 down, seen over the roofs from the main road); the head follows the player (clamped +-0.75 rad), body turns 20%. No shadows.
 - Clouds (2026-10-23, environment_details.gd _build_clouds): ~36 clouds spread over the
   whole sky (x/z +-150, 28-48 m, at least 34 m apart), small/medium/big, each one merged
   mesh (5 puff shapes from _cloud_mesh, flat bottoms, grey-blue underside to white top

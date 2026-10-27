@@ -1,11 +1,13 @@
 extends Node3D
 
-# The giant policeman of Dholkarpur Gaon: an 89 m constable (Blender model,
+# The giant policeman of Dholkarpur Gaon: a 140 m constable (Blender model,
 # tools/blender/build_giant_police.py) standing past the north hills. The hills hide
-# him below the chest; from the town you see his shoulders, moustache and cap over
-# the ridge. His head turns to follow the player and his body slowly turns with it,
+# him below the chest; from the town you see his chest and big-headed face over
+# the roofs and the ridge. His head turns to follow the player and his body slowly turns with it,
 # so he is always keeping an eye on the town. Added by town_expansion.gd.
-const SCALE := 48.0
+const SCALE := 75.0
+## The head is drawn 1.4x so his face reads from anywhere in town.
+const HEAD_SIZE := 1.4
 const SPOT := Vector3(-20.0, -10.0, -152.0)
 const NECK := 1.52
 const HEAD_TURN := 0.75
@@ -23,7 +25,8 @@ func _ready() -> void:
 	head = _part("Head", "giant_police_head")
 	head.position.y = NECK
 	# Looking down over the hills at the town.
-	head.rotation.x = 0.28
+	head.rotation.x = 0.4
+	head.scale = Vector3.ONE * HEAD_SIZE
 	player = get_tree().current_scene.get_node_or_null("Player")
 
 func _part(node_name: String, model: String) -> Node3D:
