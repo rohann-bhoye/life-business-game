@@ -13,6 +13,11 @@ const MIN_X := -72.0
 const MAX_X := 72.0
 const MIN_Z := -52.0
 const MAX_Z := 62.0
+## The North Road (north_river.gd) is open too: a 20 m lane from the north edge
+## through the hills, over the river bridge, to the giant policeman's meadow.
+const ROAD_MIN_X := 40.0
+const ROAD_MAX_X := 60.0
+const ROAD_END_Z := -232.0
 const HEIGHT := 4.0
 ## The see-through blue edge walls are switched off for now (the owner asked); the
 ## invisible stop and the countdown still work.
@@ -76,7 +81,9 @@ func build(neighbourhood: Node3D) -> void:
 	layer.add_child(notice)
 
 func distance_to_edge(point: Vector3) -> float:
-	return minf(minf(point.x - MIN_X, MAX_X - point.x), minf(point.z - MIN_Z, MAX_Z - point.z))
+	var town := minf(minf(point.x - MIN_X, MAX_X - point.x), minf(point.z - MIN_Z, MAX_Z - point.z))
+	var road := minf(minf(point.x - ROAD_MIN_X, ROAD_MAX_X - point.x), minf(point.z - ROAD_END_Z, MIN_Z + 10.0 - point.z))
+	return maxf(town, road)
 
 func _physics_process(delta: float) -> void:
 	if not is_instance_valid(player): return

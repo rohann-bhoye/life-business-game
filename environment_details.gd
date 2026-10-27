@@ -70,24 +70,47 @@ func _build_grass() -> void:
 				var size := rng.randf_range(0.8, 1.25)
 				var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(size, size * rng.randf_range(0.75, 1.35), size))
 				transforms.append(Transform3D(basis, Vector3(x, 0.1, z)))
-			if transforms.is_empty(): continue
-			var multimesh := MultiMesh.new()
-			multimesh.transform_format = MultiMesh.TRANSFORM_3D
-			multimesh.use_custom_data = true
-			multimesh.mesh = clump
-			multimesh.instance_count = transforms.size()
-			for index in range(transforms.size()):
-				multimesh.set_instance_transform(index, transforms[index])
-				multimesh.set_instance_custom_data(index, Color(rng.randf(), 0, 0, 0))
-			var chunk := MultiMeshInstance3D.new()
-			chunk.name = "GrassChunk%d_%d" % [cell_x, cell_z]
-			chunk.multimesh = multimesh
-			chunk.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			chunk.visibility_range_end = 38.0
-			chunk.visibility_range_end_margin = 4.0
-			holder.add_child(chunk)
-			grass_chunks.append(chunk)
+			_grass_chunk("GrassChunk%d_%d" % [cell_x, cell_z], transforms, clump, rng, holder)
+	_road_grass(clump, rng, holder)
 	_apply_grass_quality()
+
+## Grass along the North Road lane through the hills (town_boundary.gd), standing on
+## the Landscape: not on the road itself, the river banks or under the bridge.
+func _road_grass(clump: ArrayMesh, rng: RandomNumberGenerator, holder: Node) -> void:
+	var land = get_tree().current_scene.get_node_or_null("Landscape")
+	if land == null or land.get_class() != "Terrain3D": return
+	var road_x: float = preload("res://land_shape.gd").NORTH_ROAD_X
+	for cell_x in range(floori(Edge.ROAD_MIN_X / GRASS_CELL), ceili(Edge.ROAD_MAX_X / GRASS_CELL)):
+		for cell_z in range(floori(Edge.ROAD_END_Z / GRASS_CELL), ceili(Edge.MIN_Z / GRASS_CELL)):
+			var transforms: Array[Transform3D] = []
+			for index in range(int(GRASS_CELL * GRASS_CELL * GRASS_DENSITY)):
+				var x := (cell_x + rng.randf()) * GRASS_CELL
+				var z := (cell_z + rng.randf()) * GRASS_CELL
+				if x < Edge.ROAD_MIN_X or x > Edge.ROAD_MAX_X or z < Edge.ROAD_END_Z or z > Edge.MIN_Z or absf(x - road_x) < 3.6: continue
+				var y: float = land.data.get_height(Vector3(x, 0, z))
+				if is_nan(y) or y < -0.6: continue
+				var size := rng.randf_range(0.8, 1.25)
+				transforms.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(size, size * rng.randf_range(0.75, 1.35), size)), Vector3(x, y, z)))
+			_grass_chunk("RoadGrass%d_%d" % [cell_x, cell_z], transforms, clump, rng, holder)
+
+func _grass_chunk(chunk_name: String, transforms: Array[Transform3D], clump: ArrayMesh, rng: RandomNumberGenerator, holder: Node) -> void:
+	if transforms.is_empty(): return
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.use_custom_data = true
+	multimesh.mesh = clump
+	multimesh.instance_count = transforms.size()
+	for index in range(transforms.size()):
+		multimesh.set_instance_transform(index, transforms[index])
+		multimesh.set_instance_custom_data(index, Color(rng.randf(), 0, 0, 0))
+	var chunk := MultiMeshInstance3D.new()
+	chunk.name = chunk_name
+	chunk.multimesh = multimesh
+	chunk.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	chunk.visibility_range_end = 38.0
+	chunk.visibility_range_end_margin = 4.0
+	holder.add_child(chunk)
+	grass_chunks.append(chunk)
 
 ## One clump: six thin blades of different heights, each a tapered two-part blade
 ## leaning outwards. UV.y runs from root (0) to tip (1) for colour and wind.

@@ -1,9 +1,8 @@
 extends Node3D
 
 var materials: Dictionary = {}
-const WIND_SHADER := preload("res://assets/materials/foliage_wind.gdshader")
-var foliage_materials: Array[ShaderMaterial] = []
-var foliage_cache := {}
+## Where every town tree stands (_tree), planted as one MultiMesh (_plant_trees).
+var tree_spots: Array[Vector3] = []
 
 func _ready() -> void:
 	get_parent().get_node("MeshInstance3D").material_override = _material(Color(0.26, 0.46, 0.3))
@@ -41,8 +40,14 @@ func _ready() -> void:
 	var middle_z: float = (Edge.MIN_Z + Edge.MAX_Z) / 2.0
 	for x in [Edge.MIN_X, Edge.MAX_X]:
 		_collider("BoundaryX%s" % x, self, Vector3(0.3, 5, Edge.MAX_Z - Edge.MIN_Z + 1.0), Vector3(x, 2.5, middle_z))
-	for z in [Edge.MIN_Z, Edge.MAX_Z]:
-		_collider("BoundaryZ%s" % z, self, Vector3(Edge.MAX_X - Edge.MIN_X + 1.0, 5, 0.3), Vector3(0, 2.5, z))
+	_collider("BoundaryZ%s" % Edge.MAX_Z, self, Vector3(Edge.MAX_X - Edge.MIN_X + 1.0, 5, 0.3), Vector3(0, 2.5, Edge.MAX_Z))
+	# The north edge leaves a gap for the North Road; its lane has walls of its own
+	# up the hills (tall, as the land rises beside the road) and across its far end.
+	for part in [[Edge.MIN_X, Edge.ROAD_MIN_X], [Edge.ROAD_MAX_X, Edge.MAX_X]]:
+		_collider("BoundaryZ%s_%s" % [Edge.MIN_Z, part[0]], self, Vector3(part[1] - part[0] + 0.3, 5, 0.3), Vector3((part[0] + part[1]) / 2.0, 2.5, Edge.MIN_Z))
+	for x in [Edge.ROAD_MIN_X, Edge.ROAD_MAX_X]:
+		_collider("NorthRoadEdge%s" % x, self, Vector3(0.3, 14, Edge.MIN_Z - Edge.ROAD_END_Z), Vector3(x, 4, (Edge.MIN_Z + Edge.ROAD_END_Z) / 2.0))
+	_collider("NorthRoadEnd", self, Vector3(Edge.ROAD_MAX_X - Edge.ROAD_MIN_X, 14, 0.3), Vector3((Edge.ROAD_MIN_X + Edge.ROAD_MAX_X) / 2.0, 4, Edge.ROAD_END_Z))
 
 func set_quality(quality: int) -> void:
 	var show_scenery := quality > 0
@@ -208,53 +213,40 @@ func _cone(node_name: String, parent: Node3D, bottom: float, top: float, height:
 	parent.add_child(instance)
 	return instance
 
-func _foliage(color: Color) -> ShaderMaterial:
-	if foliage_cache.has(color): return foliage_cache[color]
-	var material := ShaderMaterial.new()
-	material.shader = WIND_SHADER
-	material.set_shader_parameter("base_color", color)
-	material.set_shader_parameter("wind_strength", 0.07)
-	foliage_materials.append(material)
-	foliage_cache[color] = material
-	return material
+## All town trees as one MultiMesh of the Blender neem tree, each turned and sized
+## a little differently.
+func _plant_trees() -> void:
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = preload("res://tree_models.gd").mesh("neem_tree")
+	multimesh.instance_count = tree_spots.size()
+	for index in range(tree_spots.size()):
+		var size := 0.95 + float(index % 5) * 0.05
+		multimesh.set_instance_transform(index, Transform3D(Basis(Vector3.UP, index * 2.4).scaled(Vector3.ONE * size), tree_spots[index]))
+	var trees := MultiMeshInstance3D.new()
+	trees.name = "TownTrees"
+	trees.multimesh = multimesh
+	add_child(trees)
 
 func _batch_scenery() -> void:
+	_plant_trees()
 	var sources: Array = []
 	for child in get_children():
-		if child.name.begins_with("Tree"):
-			for part in child.get_children():
-				if part is MeshInstance3D and part.mesh is SphereMesh: sources.append(part)
-		elif child is MeshInstance3D:
+		if child is MeshInstance3D:
 			# Building windows are hidden behind the Kenney houses (_dress_buildings), so skip them.
 			if not child.visible: continue
 			for prefix in ["LaneMark", "Crossing", "RoadPatch", "Drain", "Bench"]:
 				if child.name.begins_with(prefix): sources.append(child); break
 	preload("res://scenery_batch.gd").build(self, sources, "StreetBatch")
 
+## A town shade tree: its trunk and crown colliders here; the Blender neem tree
+## itself is drawn with all the others as one MultiMesh (_plant_trees).
 func _tree(offset: Vector3) -> void:
 	var tree := Node3D.new()
 	tree.name = "Tree%d" % get_child_count()
 	tree.position = offset
 	add_child(tree)
-	var variation := float(tree.get_index() % 4) * 0.025
-	_cone("Trunk", tree, 0.24, 0.15, 2.5, Vector3(0, 1.25, 0), Color(0.31, 0.22, 0.15))
-	for branch in range(4):
-		var limb := _cone("Branch%d" % branch, tree, 0.09, 0.045, 1.15, Vector3(0, 2.0 + branch * 0.18, 0), Color(0.31, 0.22, 0.15))
-		limb.rotation = Vector3(0.0, branch * TAU / 4.0, deg_to_rad(58))
-	var leaf_material := _foliage(Color(0.14 + variation, 0.36 + variation, 0.19))
-	for index in range(6):
-		var leaves := MeshInstance3D.new()
-		leaves.name = "Canopy%d" % index
-		var crown := SphereMesh.new()
-		crown.radius = 0.95 if index < 4 else 0.78
-		crown.height = crown.radius * 1.7
-		crown.radial_segments = 9
-		crown.rings = 5
-		crown.material = leaf_material
-		leaves.mesh = crown
-		var angle := index * TAU / 4.0
-		leaves.position = Vector3(cos(angle) * (0.65 if index < 4 else 0.3), 2.75 + (index / 4) * 0.85, sin(angle) * (0.65 if index < 4 else 0.3))
-		tree.add_child(leaves)
+	tree_spots.append(offset)
 	_collider("TrunkBody", tree, Vector3(0.35, 2.1, 0.35), Vector3(0, 1.05, 0))
 	_collider("CanopyBody", tree, Vector3(1.6, 2.2, 1.6), Vector3(0, 3.0, 0))
 

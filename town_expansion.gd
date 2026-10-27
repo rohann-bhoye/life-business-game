@@ -163,31 +163,9 @@ func _hill_forest() -> void:
 	forest.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	town.add_child(forest)
 
-## A low-poly pine: trunk and two cones, vertex coloured, origin at its foot.
-static func _pine_mesh() -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for part in [[0.14, 0.2, 1.4, 0.7, Color(0.36, 0.24, 0.14)], [0.0, 1.05, 2.4, 2.3, Color(0.12, 0.29, 0.13)], [0.0, 0.75, 1.9, 3.5, Color(0.16, 0.36, 0.16)]]:
-		var cone := CylinderMesh.new()
-		cone.top_radius = part[0]
-		cone.bottom_radius = part[1]
-		cone.height = part[2]
-		cone.radial_segments = 7
-		cone.rings = 1
-		var arrays := cone.surface_get_arrays(0)
-		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
-		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
-		for index in indices:
-			st.set_color(part[4])
-			st.set_normal(normals[index])
-			st.add_vertex(vertices[index] + Vector3(0, part[3], 0))
-	var mesh := st.commit()
-	var material := StandardMaterial3D.new()
-	material.vertex_color_use_as_albedo = true
-	material.roughness = 0.9
-	mesh.surface_set_material(0, material)
-	return mesh
+## The Blender pine (tools/blender/build_trees.py), origin at its foot.
+static func _pine_mesh() -> Mesh:
+	return preload("res://tree_models.gd").mesh("pine_tree")
 
 ## Airport Road: from the market street (x 50) west to the cargo terminal yard
 ## (x 30), asphalt with edge lines and dashes, a footpath with lamps on the north

@@ -202,6 +202,14 @@ board and a local suggestion form. See Farming section below for controls and li
   deck top = origin at road level) and one water strip. No traffic yet. The giant
   policeman stands on the north meadow (-20, -1, -185), scale 80. The see-through
   edge walls are hidden (town_boundary.gd SHOW_WALLS false); the stop still works.
+- North Road open (2026-10-28): town_boundary.gd ROAD_MIN_X/MAX_X 40..60 to ROAD_END_Z
+  -232 (distance_to_edge = max of town and lane); neighbourhood.gd splits the north
+  wall and walls the lane; the Landscape has collision_mode 1 (dynamic, game only);
+  north_river.gd adds bridge deck/rail colliders and bank walls. Grass along the lane
+  stands on the terrain (environment_details.gd _road_grass).
+- Blender trees (2026-10-28, tools/blender/build_trees.py, tree_models.gd): pine_tree
+  for HillForest, neem_tree for every town tree (neighbourhood.gd _tree keeps only
+  colliders; _plant_trees draws them all as one MultiMesh TownTrees).
 - Performance (2026-10-27, measured on the owner MX110): GPU-bound (sky alone ~90 fps).
   4-split sun shadows halved FPS: shadows 1 now ORTHOGONAL, 2 = 2 splits
   (game_settings.gd). draw_distance.gd gives every built mesh a draw distance by size

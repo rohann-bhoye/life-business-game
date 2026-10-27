@@ -4,7 +4,9 @@ extends RefCounted
 # pass in the hills (land_shape.gd lowers it) to the Dholkar river, crosses it on
 # the Blender arch bridge (tools/blender/build_bridge.py) and ends in the giant
 # policeman's meadow. The river is one water strip along its meander. No traffic
-# uses the road yet, and the town edge still stops the player at the hills.
+# uses the road yet. The player may walk it (town_boundary.gd opens a lane, the
+# Landscape has collision): the bridge deck and railings are solid and walls along
+# both banks keep the player out of the river.
 const LandShape := preload("res://land_shape.gd")
 const IndianHouse := preload("res://indian_house.gd")
 const ROAD_START := -47.0
@@ -36,6 +38,13 @@ func build(expansion: Node) -> void:
 	bridge.name = "DholkarBridge"
 	bridge.position = Vector3(x, ROAD_Y, bridge_z)
 	town.add_child(bridge)
+	town._collider("BridgeDeck", town, Vector3(9.6, 0.7, BRIDGE_HALF * 2.0), Vector3(x, ROAD_Y - 0.35, bridge_z))
+	for side in [-1, 1]:
+		town._collider("BridgeRail%d" % side, town, Vector3(0.3, 2.0, BRIDGE_HALF * 2.0), Vector3(x + side * 4.65, ROAD_Y + 1.0, bridge_z))
+		for bank in [-1, 1]:
+			var inner: float = x + side * 4.8
+			var outer: float = x + side * 10.5
+			town._collider("RiverBank%d_%d" % [side, bank], town, Vector3(absf(outer - inner), 8.0, 0.3), Vector3((inner + outer) / 2.0, 1.0, bridge_z + bank * (BRIDGE_HALF - 0.5)))
 	town.add_child(_river())
 
 ## The water: one strip along the river's middle line, from one end of the land to
