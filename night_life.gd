@@ -27,10 +27,10 @@ func build(neighbourhood: Node3D, business_ref) -> void:
 	if future != null: places += future.get_children()
 	for shop in places:
 		if not shop.name.begins_with("MarketShop"): continue
-		var shutter: MeshInstance3D = town._box("ClosedShutter", shop, Vector3(3.8, 2.1, 0.06), Vector3(0, 1.15, 0.6), Color(0.5, 0.53, 0.55))
+		var shutter: MeshInstance3D = town._box("ClosedShutter", shop, Vector3(4.4, 2.35, 0.06), Vector3(0, 1.3, 0.05), Color(0.5, 0.53, 0.55))
 		shutter.visible = false
 		shutters.append(shutter)
-	for person_name in ["ChaiWala", "ChaiCustomer1", "ChaiCustomer2"]:
+	for person_name in ["ChaiWala", "ChaiCustomer1", "ChaiCustomer2"] + range(8).map(func(index): return "Shopkeeper%d" % index):
 		var person := town.find_child(person_name, true, false) as Node3D
 		if person != null: chai_people.append(person)
 	lamp_material = StandardMaterial3D.new()

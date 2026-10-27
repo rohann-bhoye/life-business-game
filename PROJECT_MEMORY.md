@@ -207,6 +207,12 @@ board and a local suggestion form. See Farming section below for controls and li
   wall and walls the lane; the Landscape has collision_mode 1 (dynamic, game only);
   north_river.gd adds bridge deck/rail colliders and bank walls. Grass along the lane
   stands on the terrain (environment_details.gd _road_grass).
+- Market street (2026-10-28): 8 Blender shop-houses (tools/blender/build_market_shops.py
+  -> assets/props/market/market_shop_<i>.glb, names printed on the boards) with body and
+  counter colliders and a shopkeeper each (town_expansion.gd _shop). market_life.gd: 6
+  walkers on the pavements and 8 vehicles (scooters, autos, cars) on one loop, left-hand
+  lanes x 50 -+ 1.2, U-turns at z 1 and z -226 (past the bridge), keep 7 m gaps, stop for
+  the player. Parked scooters/auto moved to the road edge. Night shutters fit the fronts.
 - Blender trees (2026-10-28, tools/blender/build_trees.py, tree_models.gd): pine_tree
   for HillForest, neem_tree for every town tree (neighbourhood.gd _tree keeps only
   colliders; _plant_trees draws them all as one MultiMesh TownTrees).

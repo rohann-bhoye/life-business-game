@@ -5,7 +5,8 @@ extends Node3D
 # the market street (FutureTown, opened at build) has Indian shops, a chai stall,
 # more houses and parked autos/scooters, and Airport Road leaves the market street
 # west to the cargo terminal (export_world.gd) with a car park. The bus stop sits in
-# the old town. Welcome gates with the town's name (Dholkarpur Gaon) span the main
+# the old town. The market street has Blender shop-houses with shopkeepers, and
+# walkers and traffic of its own (market_life.gd). Welcome gates with the town's name (Dholkarpur Gaon) span the main
 # road at both ends. Built once by neighbourhood.gd; uses its box/tree/streetlight
 # helpers.
 const Edge := preload("res://town_boundary.gd")
@@ -289,31 +290,17 @@ func _houses() -> void:
 			_box("TownHousePath%d" % index, Vector3(1.4, 0.016, absf(front - pavement)), Vector3(spot[0], 0.108, (front + pavement) / 2.0), Color(0.72, 0.73, 0.7), false, future)
 
 ## A small Indian shop: coloured facade, half-open shutter, sign and awning.
+## A market shop: the Blender shop-house for this trade (tools/blender/build_market_shops.py,
+## its name board printed on), solid behind the counter, with its shopkeeper at work.
 func _shop(index: int, position: Vector3, facing: float) -> void:
-	var entry: Array = SHOPS[index]
-	var shop := Node3D.new()
+	var shop := (load("res://assets/props/market/market_shop_%d.glb" % index) as PackedScene).instantiate() as Node3D
 	shop.name = "MarketShop%d" % index
 	shop.position = position
 	shop.rotation.y = facing
 	future.add_child(shop)
-	var wall := Color(0.93, 0.88, 0.78) if index % 2 == 0 else Color(0.88, 0.9, 0.84)
-	town._box("Body", shop, Vector3(5.0, 3.4, 5.0), Vector3(0, 1.7, -2.5), wall, true)
-	town._box("Roof", shop, Vector3(5.3, 0.18, 5.3), Vector3(0, 3.45, -2.5), Color(0.4, 0.38, 0.36))
-	town._box("Opening", shop, Vector3(3.6, 2.2, 0.04), Vector3(0, 1.2, 0.01), Color(0.12, 0.1, 0.09))
-	town._box("Shutter", shop, Vector3(3.7, 0.7, 0.08), Vector3(0, 2.6, 0.06), Color(0.55, 0.58, 0.6))
-	town._box("Counter", shop, Vector3(3.2, 0.9, 0.5), Vector3(0, 0.55, 0.3), entry[1].darkened(0.2))
-	town._box("SignBoard", shop, Vector3(4.6, 0.6, 0.12), Vector3(0, 3.0, 0.12), entry[1])
-	for stripe in range(8):
-		town._box("Awning%d" % stripe, shop, Vector3(0.6, 0.06, 0.9), Vector3(-2.1 + stripe * 0.6, 2.25, 0.5), entry[1] if stripe % 2 == 0 else Color(0.97, 0.96, 0.92))
-	var label := Label3D.new()
-	label.name = "Name"
-	label.text = entry[0]
-	label.position = Vector3(0, 3.0, 0.2)
-	label.font_size = 52
-	label.pixel_size = 0.006
-	label.outline_size = 0
-	label.modulate = Color(1, 0.98, 0.92)
-	shop.add_child(label)
+	town._collider("Body", shop, Vector3(5.0, 6.4, 3.9), Vector3(0, 3.2, -3.05))
+	town._collider("Counter", shop, Vector3(3.4, 0.9, 0.55), Vector3(0, 0.45, -0.75))
+	_person("Shopkeeper%d" % index, ["male-a", "female-b", "male-d", "male-e", "female-c", "male-b", "female-e", "male-f"][index], position + Vector3(0, 0.02, 0) + Vector3(0, 0, -1.5).rotated(Vector3.UP, facing), facing, future)
 
 func _market() -> void:
 	# Shops line both sides of the market street, fronts facing the street.
@@ -398,9 +385,13 @@ func _scooter(index: int, position: Vector3, yaw: float) -> void:
 
 func _vehicles() -> void:
 	# Moving traffic on the main road is in traffic.gd; only the market keeps a parked auto.
-	_auto(0, Vector3(MARKET_X + 1.6, 0.1, -40.0), 0.0)
+	# Parked by the road's edge, clear of the moving market traffic (market_life.gd).
+	_auto(0, Vector3(MARKET_X + 3.4, 0.1, -40.0), 0.0)
 	for index in range(6):
-		_scooter(index, Vector3(MARKET_X + (-2.1 if index % 2 == 0 else 2.1), 0.1, -8.0 - index * 4.5), PI / 2 if index % 2 == 0 else -PI / 2)
+		_scooter(index, Vector3(MARKET_X + (-2.45 if index % 2 == 0 else 2.45), 0.1, -8.0 - index * 4.5), PI / 2 if index % 2 == 0 else -PI / 2)
+	var market_life := preload("res://market_life.gd").new()
+	market_life.build(town)
+	town.add_child(market_life)
 
 func _greenery() -> void:
 	for point in [Vector3(-36, 0.1, -2), Vector3(-56, 0.1, -12), Vector3(-44, 0.1, 26), Vector3(-68, 0.1, 30), Vector3(36, 0.1, -14), Vector3(60, 0.1, -30), Vector3(44, 0.1, 28), Vector3(68, 0.1, 44), Vector3(-30, 0.1, -40), Vector3(10, 0.1, -40), Vector3(38, 0.1, 55), Vector3(-36, 0.1, 46), Vector3(-40, 0.1, 57)]:
