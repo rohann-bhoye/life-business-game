@@ -14,6 +14,9 @@ const MAX_X := 72.0
 const MIN_Z := -52.0
 const MAX_Z := 62.0
 const HEIGHT := 4.0
+## The see-through blue edge walls are switched off for now (the owner asked); the
+## invisible stop and the countdown still work.
+const SHOW_WALLS := false
 const WARN_DISTANCE := 2.0
 const FADE_DISTANCE := 14.0
 const COUNTDOWN := 3.0
@@ -50,6 +53,7 @@ func build(neighbourhood: Node3D) -> void:
 		quad.size = Vector2(side[1], HEIGHT)
 		wall.mesh = quad
 		wall.material_override = material
+		wall.visible = SHOW_WALLS
 		wall.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		wall.position = side[0] + Vector3(0, 0.1 + HEIGHT / 2.0, 0)
 		wall.rotation.y = side[2]

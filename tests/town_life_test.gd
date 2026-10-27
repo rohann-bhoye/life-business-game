@@ -79,7 +79,7 @@ func _run() -> void:
 	boundary.set_physics_process(false)
 	player.global_position = Vector3(71.0, 1.1, 20)
 	boundary._physics_process(1.0)
-	assert(boundary.walls[1].visible and boundary.material.albedo_color.a > 0.4)
+	assert(not boundary.walls[1].visible and boundary.material.albedo_color.a > 0.4)
 	assert(boundary.notice.visible and boundary.notice.text.contains("Returning home in 2"), boundary.notice.text)
 	player.global_position = Vector3(60, 1.1, 20)
 	boundary._physics_process(0.1)

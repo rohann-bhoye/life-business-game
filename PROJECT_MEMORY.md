@@ -194,6 +194,19 @@ board and a local suggestion form. See Farming section below for controls and li
   _grass_hills paints the Terrain3D colour map with the lawn colours (sRGB / 0.92).
   South edge MAX_Z 62 (terrain flat to z 60); runway z 51.5..62.5 (RUNWAY_Z 57,
   11 m), plane drawn at 0.85. Departures board: posts behind, title band, centred lines.
+- North river (2026-10-27): land_shape.gd now covers z -256..127 (6 Terrain3D regions;
+  bake_land.gd adds the 2 north ones and regenerates mipmaps, else far land shows
+  white). RIVER_Z -146 meander, WATER_Y -3, road pass at NORTH_ROAD_X 50 to z -230.
+  north_river.gd (from town_expansion.gd): North Road boxes + one markings mesh, the
+  Blender arch bridge (tools/blender/build_bridge.py -> assets/props/bridge, 40 m,
+  deck top = origin at road level) and one water strip. No traffic yet. The giant
+  policeman stands on the north meadow (-20, -1, -185), scale 80. The see-through
+  edge walls are hidden (town_boundary.gd SHOW_WALLS false); the stop still works.
+- Performance (2026-10-27, measured on the owner MX110): GPU-bound (sky alone ~90 fps).
+  4-split sun shadows halved FPS: shadows 1 now ORTHOGONAL, 2 = 2 splits
+  (game_settings.gd). draw_distance.gd gives every built mesh a draw distance by size
+  and turns off shadows under 1 m (run from environment_details.gd). Owner saved
+  settings were Custom with far shadows/full grass (~12-20 fps); Low preset ~43 fps.
 - Giant policeman (2026-10-27, giant_police.gd, added by town_expansion.gd): an 89 m
   khaki constable (tools/blender/build_giant_police.py -> assets/props/police body+head
   glb, 430+252 faces, one swatch atlas) at (-20, -10, -152) behind the north hills,

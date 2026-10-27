@@ -130,6 +130,9 @@ func apply_graphics(world: Node) -> void:
 	if sun != null:
 		sun.shadow_enabled = chosen.shadows > 0
 		sun.directional_shadow_max_distance = 28.0 if chosen.shadows == 1 else 60.0
+		# Each shadow split draws the scene again: short shadows use one pass, far ones
+		# two (four splits halved the frame rate on a low-end GPU).
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL if chosen.shadows == 1 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	var details = world.get_node_or_null("Neighbourhood/EnvironmentDetails")
 	if is_instance_valid(details):
 		details.set_quality(quality)

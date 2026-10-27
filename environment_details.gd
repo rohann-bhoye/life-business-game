@@ -28,12 +28,18 @@ func _ready() -> void:
 	add_child(grass)
 	# Planted once the whole town (farm, warehouse, houses) exists, to keep off it.
 	call_deferred("_build_grass")
+	# Draw distances once everything (the grass too) is built: draw_distance.gd.
+	call_deferred("_limit_draw_distance")
 	_build_clouds()
 	_build_ground()
 	_build_water()
 	var business = get_tree().current_scene.get_node("Shop/ShopArea").business
 	business.clock_changed.connect(_update_clouds)
 	_update_clouds()
+
+func _limit_draw_distance() -> void:
+	for frame in range(2): await get_tree().process_frame
+	if is_inside_tree(): preload("res://draw_distance.gd").apply(get_tree().current_scene)
 
 func _process(delta: float) -> void:
 	for index in range(clouds.size()):

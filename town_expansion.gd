@@ -43,6 +43,8 @@ func build(neighbourhood: Node3D) -> void:
 	_vehicles()
 	_greenery()
 	_welcome_gates()
+	# The north road, the Dholkar river and its bridge past the town hills.
+	preload("res://north_river.gd").new().build(self)
 	# The giant policeman watching over the north hills.
 	town.add_child(preload("res://giant_police.gd").new())
 	_airport_road()
@@ -138,17 +140,18 @@ func _hill_forest() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2026
 	var spots: Array[Transform3D] = []
-	for attempt in range(3000):
+	for attempt in range(4500):
 		var x := rng.randf_range(-126.0, 126.0)
-		var z := rng.randf_range(-126.0, 126.0)
+		var z := rng.randf_range(-250.0, 126.0)
 		if LandShape.FLAT_TOWN.grow(3.0).has_point(Vector2(x, z)): continue
 		if absf(x) > LandShape.FLAT_TOWN.end.x and absf(z - ROAD_Z) < 14.0: continue
+		if z < LandShape.FLAT_TOWN.position.y and absf(x - LandShape.NORTH_ROAD_X) < 14.0: continue
 		var height: float = data.get_height(Vector3(x, 0, z))
 		var steepness: float = absf(data.get_height(Vector3(x + 1.0, 0, z)) - height) + absf(data.get_height(Vector3(x, 0, z + 1.0)) - height)
 		if height < 0.6 or height > 28.0 or steepness > 1.6: continue
 		var size := rng.randf_range(1.3, 2.5)
 		spots.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(size, size * rng.randf_range(0.9, 1.3), size)), Vector3(x, height - 0.45 * size, z)))
-		if spots.size() >= 450: break
+		if spots.size() >= 560: break
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
 	multimesh.mesh = _pine_mesh()

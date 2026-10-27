@@ -17,8 +17,11 @@ func _bake() -> void:
 	landscape.set_camera(camera)
 	await process_frame
 	var data = landscape.data
-	if data.get_region_count() != 4:
-		push_error("Expected the four 128 m landscape regions, found %d." % data.get_region_count())
+	# Two more regions north of the town hills for the river and the far meadow.
+	for location in [Vector2i(-1, -2), Vector2i(0, -2)]:
+		if not data.has_region(location): data.add_region_blank(location)
+	if data.get_region_count() != 6:
+		push_error("Expected the six 128 m landscape regions, found %d." % data.get_region_count())
 		quit(1)
 		return
 	LandShape.new().shape(data)

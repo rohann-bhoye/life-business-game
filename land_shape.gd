@@ -10,23 +10,39 @@ extends RefCounted
 # Baked into the terrain data by tools/bake_land.gd (run it after changing this), so
 # the game loads the land ready-made and the editor shows it; town_expansion.gd only
 # plants the pines at load.
+# North of the town hills (z -128..-256, two more 128 m regions) the land drops to
+# the Dholkar river (RIVER_Z, a gentle meander) and rises again into the giant
+# policeman's meadow and far mountains. A road pass (NORTH_ROAD_X) cuts through the
+# hills from the market street to the river bridge and on north.
 const Horizon := preload("res://horizon.gd")
 const ROAD_Z := 7.0
 const FLAT_TOWN := Rect2(-74.0, -56.0, 148.0, 116.0)
-## Heights of the 256 x 256 terrain points (x, z from -128), kept while shaping so
-## the colours need not read the terrain back.
+## The land runs x -128..127 and z NORTH_EDGE..127.
+const NORTH_EDGE := -256
+const RIVER_Z := -146.0
+const WATER_Y := -3.0
+const NORTH_ROAD_X := 50.0
+const NORTH_ROAD_END := -230.0
+## Heights of the 256 x 384 terrain points, kept while shaping so the colours need
+## not read the terrain back.
 var land_heights := PackedFloat32Array()
 
 func _land_index(x: int, z: int) -> int:
-	return (clampi(z, -128, 127) + 128) * 256 + clampi(x, -128, 127) + 128
+	return (clampi(z, NORTH_EDGE, 127) - NORTH_EDGE) * 256 + clampi(x, -128, 127) + 128
 
-## Shapes and paints the whole 256 x 256 m terrain in `data` (a Terrain3DData).
+## Middle of the river at `x`.
+static func river_z(x: float) -> float:
+	return RIVER_Z + 5.0 * sin((x - NORTH_ROAD_X) * 0.03)
+
+## Shapes and paints the whole terrain in `data` (a Terrain3DData).
 func shape(data) -> void:
 	_mountains(data)
 	_lower_valley(data)
 	_paint_land(data)
 	data.calc_height_range(true)
-	data.update_maps()
+	# All maps of all regions, with fresh mipmaps (distant land reads those; new
+	# regions start with blank white ones). 3 is Terrain3DRegion.TYPE_MAX.
+	data.update_maps(3, true, true)
 
 func _land_height(x: float, z: float, mass: FastNoiseLite, ridges: FastNoiseLite, rolling: FastNoiseLite) -> float:
 	var out := maxf(maxf(FLAT_TOWN.position.x - x, x - FLAT_TOWN.end.x), maxf(FLAT_TOWN.position.y - z, z - FLAT_TOWN.end.y))
@@ -40,9 +56,25 @@ func _land_height(x: float, z: float, mass: FastNoiseLite, ridges: FastNoiseLite
 	# The last 12 m before the end of the land slope down behind the outer crest, so
 	# the edge (where Terrain3D blends towards its blank white colour) is never on
 	# the skyline seen from the town.
-	var edge := minf(minf(x + 128.0, 127.0 - x), minf(z + 128.0, 127.0 - z))
+	var edge := minf(minf(x + 128.0, 127.0 - x), minf(z - NORTH_EDGE, 127.0 - z))
+	var to_river := z - river_z(x)
 	var height := smoothstep(0.0, 0.35, t) * (1.5 + bumps * 7.0) + smoothstep(0.25, 1.0, t) * (body * 32.0 + ridge * 15.0 + bumps * 5.0)
-	return 0.08 + height * smoothstep(0.0, 12.0, edge)
+	if to_river > 0.0:
+		# The town hills slope down to the river over their last 45 m.
+		height *= smoothstep(8.0, 50.0, to_river)
+	else:
+		# North bank: a low meadow (the giant policeman's) rising to far mountains.
+		var far := smoothstep(-185.0, -240.0, z)
+		height = 1.0 + bumps * 5.0 + far * (body * 30.0 + ridge * 14.0)
+	height = 0.08 + height * smoothstep(0.0, 12.0, edge)
+	# The road pass from the market street through the hills to the bridge and on.
+	var road := (1.0 - smoothstep(6.0, 30.0, absf(x - NORTH_ROAD_X))) * smoothstep(NORTH_ROAD_END - 12.0, NORTH_ROAD_END, z)
+	if z < FLAT_TOWN.position.y: height = lerpf(height, 0.08, road)
+	# The river bed and its banks.
+	var bank := absf(to_river)
+	var bed := lerpf(WATER_Y - 3.0, WATER_Y + 0.6, smoothstep(4.0, 13.0, bank))
+	# By the bridge the banks reach road level where its deck ends (19 m out).
+	return lerpf(bed, height, smoothstep(lerpf(12.0, 13.0, road), lerpf(30.0, 19.0, road), bank))
 
 func _mountains(data) -> void:
 	var mass := FastNoiseLite.new()
@@ -58,8 +90,8 @@ func _mountains(data) -> void:
 	rolling.seed = 19
 	rolling.frequency = 0.035
 	rolling.fractal_octaves = 3
-	land_heights.resize(256 * 256)
-	for z in range(-128, 128):
+	land_heights.resize(256 * (128 - NORTH_EDGE))
+	for z in range(NORTH_EDGE, 128):
 		for x in range(-128, 128):
 			var height := _land_height(x, z, mass, ridges, rolling)
 			land_heights[_land_index(x, z)] = height
@@ -97,7 +129,7 @@ func _paint_land(data) -> void:
 	var patches := FastNoiseLite.new()
 	patches.seed = 29
 	patches.frequency = 0.25
-	for z in range(-128, 128):
+	for z in range(NORTH_EDGE, 128):
 		for x in range(-128, 128):
 			var point := Vector3(x, 0, z)
 			var height := land_heights[_land_index(x, z)]
@@ -106,5 +138,7 @@ func _paint_land(data) -> void:
 			colour = colour.lerp(forest, smoothstep(2.0, 9.0, height) * 0.8)
 			colour = colour.lerp(rock, clampf(smoothstep(26.0, 40.0, height) + smoothstep(1.3, 2.4, _steepness(x, z)), 0.0, 0.85))
 			colour = colour.lerp(snow, smoothstep(44.0, 52.0, height))
+			# Wet mud and sand down the river banks.
+			colour = colour.lerp(Color(0.42, 0.37, 0.28) / 0.92, 1.0 - smoothstep(WATER_Y - 0.5, WATER_Y + 1.6, height))
 			colour.a = 1.0
 			data.set_color(point, colour)
