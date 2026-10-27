@@ -132,37 +132,62 @@ func _slope_strip(st: SurfaceTool, x0: float, x1: float, z0: float, z1: float, y
 const LandShape := preload("res://land_shape.gd")
 
 ## The hills and mountains are baked into the Landscape's data (land_shape.gd);
-## pines on their gentle lower slopes (not in the road valley) are planted at load,
-## all one MultiMesh.
+## trees cover them at load: neem trees on the low slopes, pines higher up (not on
+## the road valley, the North Road, the river banks, bare rock or cliffs). They are
+## drawn in 64 m squares (one MultiMesh per kind per square, so squares out of view
+## are skipped) and each has a trunk collider, as the hills can be walked.
+const FOREST_SQUARE := 64.0
+const FOREST_TREES := 1300
+
 func _hill_forest() -> void:
 	var landscape := town.get_parent().get_node_or_null("Landscape")
 	if landscape == null or landscape.get_class() != "Terrain3D": return
 	var data = landscape.data
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2026
-	var spots: Array[Transform3D] = []
-	for attempt in range(4500):
-		var x := rng.randf_range(-126.0, 126.0)
-		var z := rng.randf_range(-250.0, 126.0)
+	var squares := {}
+	var trunks := StaticBody3D.new()
+	trunks.name = "ForestTrunks"
+	var planted := 0
+	for attempt in range(10000):
+		var x := rng.randf_range(-124.0, 123.0)
+		var z := rng.randf_range(-250.0, 123.0)
 		if LandShape.FLAT_TOWN.grow(3.0).has_point(Vector2(x, z)): continue
 		if absf(x) > LandShape.FLAT_TOWN.end.x and absf(z - ROAD_Z) < 14.0: continue
 		if z < LandShape.FLAT_TOWN.position.y and absf(x - LandShape.NORTH_ROAD_X) < 14.0: continue
 		var height: float = data.get_height(Vector3(x, 0, z))
 		var steepness: float = absf(data.get_height(Vector3(x + 1.0, 0, z)) - height) + absf(data.get_height(Vector3(x, 0, z + 1.0)) - height)
-		if height < 0.6 or height > 28.0 or steepness > 1.6: continue
-		var size := rng.randf_range(1.3, 2.5)
-		spots.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(size, size * rng.randf_range(0.9, 1.3), size)), Vector3(x, height - 0.45 * size, z)))
-		if spots.size() >= 560: break
-	var multimesh := MultiMesh.new()
-	multimesh.transform_format = MultiMesh.TRANSFORM_3D
-	multimesh.mesh = _pine_mesh()
-	multimesh.instance_count = spots.size()
-	for index in range(spots.size()): multimesh.set_instance_transform(index, spots[index])
-	var forest := MultiMeshInstance3D.new()
-	forest.name = "HillForest"
-	forest.multimesh = multimesh
-	forest.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	town.add_child(forest)
+		if height < 0.6 or height > 30.0 or steepness > 1.8: continue
+		var neem := height < 7.0 and rng.randf() < 0.55
+		var size := rng.randf_range(0.85, 1.25) if neem else rng.randf_range(1.3, 2.5)
+		var foot := Vector3(x, height - (0.15 if neem else 0.45 * size), z)
+		var key := Vector2i(floori(x / FOREST_SQUARE), floori(z / FOREST_SQUARE))
+		if not squares.has(key): squares[key] = [[] as Array[Transform3D], [] as Array[Transform3D]]
+		squares[key][1 if neem else 0].append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(size, size * rng.randf_range(0.9, 1.2), size)), foot))
+		var trunk := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = Vector3(0.45, 3.0, 0.45) * Vector3(size, 1.0, size)
+		trunk.shape = shape
+		trunk.position = Vector3(x, height + 1.5, z)
+		trunks.add_child(trunk)
+		planted += 1
+		if planted >= FOREST_TREES: break
+	var meshes := [_pine_mesh(), preload("res://tree_models.gd").mesh("neem_tree")]
+	for key in squares:
+		for kind in range(2):
+			var spots: Array[Transform3D] = squares[key][kind]
+			if spots.is_empty(): continue
+			var multimesh := MultiMesh.new()
+			multimesh.transform_format = MultiMesh.TRANSFORM_3D
+			multimesh.mesh = meshes[kind]
+			multimesh.instance_count = spots.size()
+			for index in range(spots.size()): multimesh.set_instance_transform(index, spots[index])
+			var forest := MultiMeshInstance3D.new()
+			forest.name = "%s%d_%d" % [["HillPines", "HillNeems"][kind], key.x, key.y]
+			forest.multimesh = multimesh
+			forest.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			town.add_child(forest)
+	town.add_child(trunks)
 
 ## The Blender pine (tools/blender/build_trees.py), origin at its foot.
 static func _pine_mesh() -> Mesh:

@@ -21,6 +21,17 @@ const GROUND_SIZE := Vector3(150, 0.2, 176)
 const GROUND_Z := 2.0
 var grass_chunks: Array[MultiMeshInstance3D] = []
 var grass_level := 3
+## Wild grass on the hills, mountains and meadows round the player (outside the town
+## and the North Road lane, which have their own): 8 m squares up to WILD_REACH
+## squares away, standing on the Landscape, built as the player walks and dropped
+## behind them; none on the river banks, bare rock, snow or cliffs.
+const WILD_REACH := 2
+const WILD_DENSITY := 0.6
+var wild_chunks := {}
+var wild_cell := Vector2i(1 << 20, 1 << 20)
+var wild_clump: ArrayMesh
+var wild_land: Node
+var wild_player: Node3D
 
 func _ready() -> void:
 	var grass := Node3D.new()
@@ -73,6 +84,51 @@ func _build_grass() -> void:
 			_grass_chunk("GrassChunk%d_%d" % [cell_x, cell_z], transforms, clump, rng, holder)
 	_road_grass(clump, rng, holder)
 	_apply_grass_quality()
+	wild_clump = clump
+	wild_player = get_tree().current_scene.get_node_or_null("Player")
+	var land = get_tree().current_scene.get_node_or_null("Landscape")
+	if land != null and land.get_class() == "Terrain3D": wild_land = land
+
+func _physics_process(_delta: float) -> void:
+	if wild_clump == null or wild_land == null or not is_instance_valid(wild_player): return
+	var cell := Vector2i(floori(wild_player.global_position.x / GRASS_CELL), floori(wild_player.global_position.z / GRASS_CELL))
+	if cell == wild_cell: return
+	wild_cell = cell
+	for key in wild_chunks.keys():
+		if maxi(absi(key.x - cell.x), absi(key.y - cell.y)) <= WILD_REACH + 1: continue
+		var old = wild_chunks[key]
+		if old != null:
+			grass_chunks.erase(old)
+			old.queue_free()
+		wild_chunks.erase(key)
+	for dx in range(-WILD_REACH, WILD_REACH + 1):
+		for dz in range(-WILD_REACH, WILD_REACH + 1):
+			var key := cell + Vector2i(dx, dz)
+			if not wild_chunks.has(key): wild_chunks[key] = _wild_chunk(key)
+
+func _wild_chunk(key: Vector2i) -> MultiMeshInstance3D:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(key)
+	var data = wild_land.data
+	var transforms: Array[Transform3D] = []
+	for index in range(int(GRASS_CELL * GRASS_CELL * GRASS_DENSITY * WILD_DENSITY)):
+		var x := (key.x + rng.randf()) * GRASS_CELL
+		var z := (key.y + rng.randf()) * GRASS_CELL
+		var size := rng.randf_range(0.8, 1.25)
+		var turn := rng.randf() * TAU
+		if x > Edge.MIN_X and x < Edge.MAX_X and z > Edge.MIN_Z and z < Edge.MAX_Z: continue
+		if x > Edge.ROAD_MIN_X and x < Edge.ROAD_MAX_X and z > Edge.ROAD_END_Z and z < Edge.MIN_Z: continue
+		var y: float = data.get_height(Vector3(x, 0, z))
+		if is_nan(y) or y < -1.8 or y > 30.0: continue
+		var steepness: float = absf(data.get_height(Vector3(x + 1.0, 0, z)) - y) + absf(data.get_height(Vector3(x, 0, z + 1.0)) - y)
+		if steepness > 1.6: continue
+		transforms.append(Transform3D(Basis(Vector3.UP, turn).scaled(Vector3(size, size * rng.randf_range(0.75, 1.35), size)), Vector3(x, y, z)))
+	if transforms.is_empty(): return null
+	var before := grass_chunks.size()
+	_grass_chunk("WildGrass%d_%d" % [key.x, key.y], transforms, wild_clump, rng, get_node("WindGrass"))
+	var chunk := grass_chunks[before]
+	_grass_quality(chunk)
+	return chunk
 
 ## Grass along the North Road lane through the hills (town_boundary.gd), standing on
 ## the Landscape: not on the road itself, the river banks or under the bridge.
@@ -180,10 +236,12 @@ func set_grass(level: int) -> void:
 
 func _apply_grass_quality() -> void:
 	get_node("WindGrass").visible = grass_level > 0
-	for chunk in grass_chunks:
-		var count := chunk.multimesh.instance_count
-		chunk.multimesh.visible_instance_count = -1 if grass_level >= 3 else count / (2 if grass_level == 2 else 4)
-		chunk.visibility_range_end = [24.0, 24.0, 38.0, 45.0][grass_level]
+	for chunk in grass_chunks: _grass_quality(chunk)
+
+func _grass_quality(chunk: MultiMeshInstance3D) -> void:
+	var count := chunk.multimesh.instance_count
+	chunk.multimesh.visible_instance_count = -1 if grass_level >= 3 else count / (2 if grass_level == 2 else 4)
+	chunk.visibility_range_end = [24.0, 24.0, 38.0, 45.0][grass_level]
 
 ## About 36 clouds spread over the whole sky (x and z +-150, 28-48 m up), kept apart
 ## from each other: small, medium and big ones, each one merged mesh (one of five

@@ -74,20 +74,6 @@ func _run() -> void:
 	for step in range(20): traffic._physics_process(0.1)
 	assert(is_equal_approx(traffic.bus.position.x, traffic.BUS_STOP_X) and bus_state.stop > 0.0, "Bus halts at the bus stop")
 
-	# Town edge: see-through barrier, 3-2-1 countdown, stepping back cancels, then home.
-	var boundary = town.get_node("TownBoundary")
-	boundary.set_physics_process(false)
-	player.global_position = Vector3(71.0, 1.1, 20)
-	boundary._physics_process(1.0)
-	assert(not boundary.walls[1].visible and boundary.material.albedo_color.a > 0.4)
-	assert(boundary.notice.visible and boundary.notice.text.contains("Returning home in 2"), boundary.notice.text)
-	player.global_position = Vector3(60, 1.1, 20)
-	boundary._physics_process(0.1)
-	assert(not boundary.notice.visible and boundary.remaining < 0.0, "Stepping back cancels the countdown")
-	player.global_position = Vector3(71.0, 1.1, 20)
-	for step in range(4): boundary._physics_process(1.0)
-	assert(player.indoors and player.global_position.distance_to(Vector3(71.0, 1.1, 20)) > 20.0, "Sent home after 3-2-1")
-
 	# Night: shutters down, porch lamps on, chai till 23:00, fewer people and cars, stars.
 	business.advance_clock(22 * 60.0 - business.minutes_of_day)
 	var night_life = town.get_node("NightLife")

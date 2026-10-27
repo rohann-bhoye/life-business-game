@@ -25,7 +25,7 @@ lod0_range = 128.0
 name = "Neighbourhood grass"
 albedo_texture = ExtResource("1_j7gxj")
 normal_texture = ExtResource("2_v6tvh")
-normal_depth = 0.0
+normal_depth = 0.6
 ao_strength = 0.0
 uv_scale = 0.2
 

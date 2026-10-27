@@ -35,19 +35,12 @@ func _ready() -> void:
 	world_audio.set_script(preload("res://world_audio.gd"))
 	get_parent().add_child.call_deferred(world_audio)
 	add_child(street_life)
-	# Edge of the open town (town_boundary.gd shows the see-through barrier and sends
-	# the player home); the south edge was moved back for the airport (export_world.gd).
-	var middle_z: float = (Edge.MIN_Z + Edge.MAX_Z) / 2.0
-	for x in [Edge.MIN_X, Edge.MAX_X]:
-		_collider("BoundaryX%s" % x, self, Vector3(0.3, 5, Edge.MAX_Z - Edge.MIN_Z + 1.0), Vector3(x, 2.5, middle_z))
-	_collider("BoundaryZ%s" % Edge.MAX_Z, self, Vector3(Edge.MAX_X - Edge.MIN_X + 1.0, 5, 0.3), Vector3(0, 2.5, Edge.MAX_Z))
-	# The north edge leaves a gap for the North Road; its lane has walls of its own
-	# up the hills (tall, as the land rises beside the road) and across its far end.
-	for part in [[Edge.MIN_X, Edge.ROAD_MIN_X], [Edge.ROAD_MAX_X, Edge.MAX_X]]:
-		_collider("BoundaryZ%s_%s" % [Edge.MIN_Z, part[0]], self, Vector3(part[1] - part[0] + 0.3, 5, 0.3), Vector3((part[0] + part[1]) / 2.0, 2.5, Edge.MIN_Z))
-	for x in [Edge.ROAD_MIN_X, Edge.ROAD_MAX_X]:
-		_collider("NorthRoadEdge%s" % x, self, Vector3(0.3, 14, Edge.MIN_Z - Edge.ROAD_END_Z), Vector3(x, 4, (Edge.MIN_Z + Edge.ROAD_END_Z) / 2.0))
-	_collider("NorthRoadEnd", self, Vector3(Edge.ROAD_MAX_X - Edge.ROAD_MIN_X, 14, 0.3), Vector3((Edge.ROAD_MIN_X + Edge.ROAD_MAX_X) / 2.0, 4, Edge.ROAD_END_Z))
+	# The whole land is open (town_boundary.gd); invisible walls only at its end.
+	var middle := Vector2((Edge.LAND_MIN_X + Edge.LAND_MAX_X) / 2.0, (Edge.LAND_MIN_Z + Edge.LAND_MAX_Z) / 2.0)
+	for x in [Edge.LAND_MIN_X, Edge.LAND_MAX_X]:
+		_collider("LandEndX%s" % x, self, Vector3(0.3, 60, Edge.LAND_MAX_Z - Edge.LAND_MIN_Z), Vector3(x, 20, middle.y))
+	for z in [Edge.LAND_MIN_Z, Edge.LAND_MAX_Z]:
+		_collider("LandEndZ%s" % z, self, Vector3(Edge.LAND_MAX_X - Edge.LAND_MIN_X, 60, 0.3), Vector3(middle.x, 20, z))
 
 func set_quality(quality: int) -> void:
 	var show_scenery := quality > 0
@@ -354,10 +347,6 @@ func _build_background() -> void:
 		life.set_script(script)
 		add_child(life)
 		life.build(self, get_parent().get_node("Shop/ShopArea").business)
-	var boundary := Node3D.new()
-	boundary.set_script(preload("res://town_boundary.gd"))
-	add_child(boundary)
-	boundary.build(self)
 
 # Cement-block paths to every house door. North: a back lane behind the shop and
 # home with a short step to each door, joining the street left of the shop and past

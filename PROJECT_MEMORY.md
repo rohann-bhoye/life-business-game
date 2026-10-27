@@ -202,7 +202,14 @@ board and a local suggestion form. See Farming section below for controls and li
   deck top = origin at road level) and one water strip. No traffic yet. The giant
   policeman stands on the north meadow (-20, -1, -185), scale 80. The see-through
   edge walls are hidden (town_boundary.gd SHOW_WALLS false); the stop still works.
-- North Road open (2026-10-28): town_boundary.gd ROAD_MIN_X/MAX_X 40..60 to ROAD_END_Z
+- Whole land open (2026-10-28): no send-home barrier/countdown any more; town_boundary.gd
+  is constants only (TOWN_NAME, town rect for grass, lane, LAND_* end walls built in
+  neighbourhood.gd). north_river.gd walls both river banks (RiverBanks, gap at the
+  bridge). Hill forest: up to 1300 trees (neem below 7 m, pines higher) in 64 m
+  MultiMesh squares with trunk colliders (ForestTrunks). Wild grass: 8 m squares
+  within 2 of the player on the terrain (environment_details.gd _wild_chunk). Ground
+  texture: tools/bake_terrain_texture.gd (256 px grass detail + normal, depth 0.6).
+- North Road open (2026-10-28, lane walls later removed): town_boundary.gd ROAD_MIN_X/MAX_X 40..60 to ROAD_END_Z
   -232 (distance_to_edge = max of town and lane); neighbourhood.gd splits the north
   wall and walls the lane; the Landscape has collision_mode 1 (dynamic, game only);
   north_river.gd adds bridge deck/rail colliders and bank walls. Grass along the lane
