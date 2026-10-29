@@ -26,7 +26,7 @@ SWATCHES = {
 	"stem": "E6E0CF", "cap": "C8FF6A", "cap_spot": "F4FFD0", "cap_blue": "3FC1C9", "cap_pink": "FF7FD0",
 	"stone": "8C8A86", "stone_dark": "6A6866", "rune": "6FD3FF", "iron": "3A3D42", "wood": "7A4E2D",
 	"chest": "8B5A2B", "chest_dark": "5E3A1C", "gold": "E8B84A", "glass": "BFEFF5", "cork": "A67C52",
-	"glow": "D8FF7A", "hole": "0B0E14",
+	"glow": "D8FF7A", "hole": "0B0E14", "ore": "9FE8FF", "crack": "151B24",
 }
 
 def rock(b, centre, size, rng, swatch="rock", seg=7, light="rock_light"):
@@ -38,6 +38,32 @@ def rock(b, centre, size, rng, swatch="rock", seg=7, light="rock_light"):
 		v = b.verts[i]
 		j = 1.0 + rng.uniform(-0.18, 0.18)
 		b.verts[i] = type(v)((centre[0] + v.x * sx * j, centre[1] + v.y * sy * j, centre[2] + v.z * sz * j))
+
+def rubble(mat):
+	"""A heap of broken stone: angular chunks of different sizes, a cracked slab beside them."""
+	rng = random.Random(21)
+	b = Builder(SHEET)
+	for k in range(9):
+		a = rng.uniform(0, 2 * math.pi)
+		d = rng.uniform(0.0, 0.9)
+		size = rng.uniform(0.16, 0.42)
+		rock(b, (d * math.cos(a), d * math.sin(a), size * 0.3), (size * 1.2, size, size * 0.8), rng, "rock" if k % 3 else "rock_dark", 5, "rock_light")
+	b.box((1.1, -0.5, 0.06), (0.9, 0.7, 0.12), "rock_dark", rot_z=24)
+	b.box((1.1, -0.5, 0.125), (0.9, 0.06, 0.02), "crack", rot_z=24)
+	return b.to_object("Rubble", mat)
+
+def ore_rock(mat):
+	"""A rock to break open: a rough boulder with glowing pale-blue veins and dark cracks."""
+	rng = random.Random(22)
+	b = Builder(SHEET)
+	rock(b, (0, 0, 0.5), (0.95, 0.85, 1.0), rng, "rock_dark", 8, "rock")
+	rock(b, (0.35, 0.3, 0.3), (0.5, 0.45, 0.5), rng, "rock", 6, "rock_light")
+	for k in range(4):
+		a = k * 1.7 + 0.4
+		b.box((0.78 * math.cos(a), 0.78 * math.sin(a), 0.45 + 0.1 * k), (0.2, 0.2, 0.34), "ore", rot_z=math.degrees(a))
+	b.box((0, -0.8, 0.55), (0.04, 0.03, 0.7), "crack")
+	b.box((0.1, -0.78, 0.3), (0.3, 0.03, 0.04), "crack")
+	return b.to_object("OreRock", mat)
 
 def floor_tile(mat):
 	rng = random.Random(1)
@@ -187,7 +213,7 @@ pieces = {
 	"wall_torch": wall(mat, "torch"), "corner": corner(mat), "stream": stream(mat), "bridge": bridge(mat),
 	"mushroom_stem": mushroom_stem(mat), "mushroom_cap": mushroom_cap(mat), "boulder": boulder(mat),
 	"stalagmite": stalagmite(mat), "entry_stone": entry_stone(mat), "stairs": stairs(mat),
-	"chest_base": chest(mat, False), "chest_lid": chest(mat, True), "jar": jar(mat, False), "jar_glow": jar(mat, True),
+	"rubble": rubble(mat), "ore_rock": ore_rock(mat), "chest_base": chest(mat, False), "chest_lid": chest(mat, True), "jar": jar(mat, False), "jar_glow": jar(mat, True),
 }
 for name, ob in pieces.items(): export_glb(ob, os.path.join(out_dir, name + ".glb"))
 # Preview: a corner of a room.

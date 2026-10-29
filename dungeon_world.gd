@@ -24,7 +24,7 @@ const UNDERGROUND_FAR := 150.0
 ## light, and on which days (every 7th for Agni Mandir).
 const FLOORS := [
 	{"name": "Jugnu Gufa", "rank": "E", "open": 360, "close": 1320, "every": 1, "treasure": "jar",
-		"background": Color(0.06, 0.09, 0.12), "ambient": Color(0.5, 0.68, 0.85), "ambient_energy": 1.0, "fog_density": 0.018},
+		"background": Color(0.04, 0.06, 0.09), "ambient": Color(0.45, 0.58, 0.72), "ambient_energy": 0.6, "fog_density": 0.018},
 	{"name": "Neelam Mahal", "rank": "C", "open": 1080, "close": 120, "every": 1, "treasure": "shard",
 		"background": Color(0.05, 0.04, 0.11), "ambient": Color(0.55, 0.5, 0.9), "ambient_energy": 0.95, "fog_density": 0.016},
 	{"name": "Agni Mandir", "rank": "A", "open": 1200, "close": 240, "every": 7, "treasure": "coin",
@@ -48,6 +48,9 @@ var exit_point := Vector3.ZERO
 var busy := false
 ## Treasure found on this trip, by kind (dungeon_store.gd).
 var finds := {}
+var audio: Node
+var lathi: Node3D
+var swing_ready := true
 var monsters: Array[Node3D] = []
 var hud: Label
 var guild: Node3D
@@ -228,6 +231,7 @@ func _update_gate() -> void:
 		board_label.modulate = Color(0.7, 0.12, 0.1)
 
 func _process(_delta: float) -> void:
+	if underground_floor >= 0 and is_instance_valid(audio): audio.tension = _tension()
 	var time := Time.get_ticks_msec() / 1000.0
 	for index in range(flames.size()):
 		flames[index].scale = Vector3(1.0, 1.0 + sin(time * 9.0 + index * 2.0) * 0.12, 1.0)
@@ -296,6 +300,10 @@ func _enter(index: int) -> void:
 	camera.far = UNDERGROUND_FAR
 	var day_night = get_tree().current_scene.get_node_or_null("DayNight")
 	if day_night != null and day_night.has_method("set_underground"): day_night.set_underground(FLOORS[index])
+	audio = preload("res://dungeon_audio.gd").new()
+	add_child(audio)
+	lathi = _make_lathi()
+	player.camera.add_child(lathi)
 	floor_root = preload("res://dungeon_floor.gd").create(index, UNDER)
 	add_child(floor_root)
 	finds = {}
@@ -314,6 +322,9 @@ func _leave() -> void:
 	busy = true
 	await _fade_to(1.0)
 	if is_instance_valid(floor_root): floor_root.queue_free()
+	if is_instance_valid(audio): audio.queue_free()
+	if is_instance_valid(lathi): lathi.queue_free()
+	monsters.clear()
 	business.bring_up_treasure(finds, underground_floor + 1)
 	var total := 0
 	for kind in finds: total += int(finds[kind])
@@ -362,7 +373,7 @@ func caught(monster: Node3D) -> void:
 	for kind in finds: dropped += int(finds[kind])
 	finds = {}
 	for other in monsters:
-		if is_instance_valid(other): other.reset()
+		if is_instance_valid(other) and not other.dying: other.reset()
 	for jar in floor_root.loot: jar.visible = true
 	player.global_position = floor_root.to_global(floor_root.get_meta("entry"))
 	player.velocity = Vector3.ZERO
@@ -370,6 +381,109 @@ func caught(monster: Node3D) -> void:
 	_update_hud()
 	await _fade_to(0.0)
 	busy = false
+
+func sound(kind: String) -> void:
+	if is_instance_valid(audio): audio.play(kind)
+
+## The policeman's bamboo lathi, held low on the right in first person.
+func _make_lathi() -> Node3D:
+	var held := Node3D.new()
+	held.name = "Lathi"
+	held.position = Vector3(0.34, -0.3, -0.55)
+	held.rotation = Vector3(deg_to_rad(-62), deg_to_rad(8), deg_to_rad(-6))
+	var shaft := MeshInstance3D.new()
+	var tube := CylinderMesh.new()
+	tube.top_radius = 0.025
+	tube.bottom_radius = 0.032
+	tube.height = 0.95
+	tube.radial_segments = 8
+	var bamboo := StandardMaterial3D.new()
+	bamboo.albedo_color = Color(0.78, 0.6, 0.3)
+	bamboo.roughness = 0.8
+	tube.material = bamboo
+	shaft.mesh = tube
+	shaft.position.y = 0.3
+	held.add_child(shaft)
+	for ring in [0.0, 0.3, 0.62]:
+		var band := MeshInstance3D.new()
+		var cylinder := CylinderMesh.new()
+		cylinder.top_radius = 0.037
+		cylinder.bottom_radius = 0.037
+		cylinder.height = 0.025
+		var dark := StandardMaterial3D.new()
+		dark.albedo_color = Color(0.35, 0.22, 0.1)
+		cylinder.material = dark
+		band.mesh = cylinder
+		band.position.y = ring - 0.12
+		held.add_child(band)
+	return held
+
+func _unhandled_input(event: InputEvent) -> void:
+	if underground_floor < 0 or busy or not swing_ready: return
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		_swing()
+
+## A lathi swing: 0.5 s apart, hits at the middle of the arc the nearest monster in front
+## (within 2.6 m) or else a rock to break.
+func _swing() -> void:
+	swing_ready = false
+	sound("swing")
+	var home := lathi.rotation
+	var arc := create_tween()
+	arc.tween_property(lathi, "rotation", Vector3(deg_to_rad(-20), deg_to_rad(-34), deg_to_rad(18)), 0.11).set_ease(Tween.EASE_OUT)
+	arc.tween_property(lathi, "rotation", Vector3(deg_to_rad(-100), deg_to_rad(30), deg_to_rad(-20)), 0.14)
+	arc.tween_property(lathi, "rotation", home, 0.2)
+	await get_tree().create_timer(0.14).timeout
+	if underground_floor >= 0 and not busy: _strike()
+	await get_tree().create_timer(0.36).timeout
+	swing_ready = true
+
+func _strike() -> void:
+	var forward: Vector3 = -player.camera.global_transform.basis.z
+	forward.y = 0.0
+	forward = forward.normalized()
+	var best: Node3D = null
+	var best_distance := 2.6
+	for monster in monsters:
+		if not is_instance_valid(monster) or monster.dying: continue
+		var to: Vector3 = monster.global_position - player.global_position
+		to.y = 0.0
+		var reach: float = to.length() - monster.data.radius
+		if reach < best_distance and to.normalized().dot(forward) > 0.3:
+			best = monster
+			best_distance = reach
+	if best != null:
+		best.hurt(1, player.global_position)
+		return
+	var local_at: Vector3 = floor_root.to_local(player.global_position)
+	var local_forward: Vector3 = (floor_root.global_transform.basis.inverse() * forward).normalized()
+	var got: int = floor_root.strike(local_at, local_forward)
+	if got == 0: sound("hit")
+	elif got > 0:
+		sound("break")
+		var kind: String = FLOORS[underground_floor].treasure
+		finds[kind] = int(finds.get(kind, 0)) + got
+		_feedback("The rock breaks! +%d %s" % [got, preload("res://dungeon_store.gd").ITEMS[kind].name.to_lower()])
+		_update_hud()
+
+## Called by a monster that has just been beaten.
+func monster_died(monster: Node3D) -> void:
+	monsters.erase(monster)
+	if monster.kind == "boss":
+		var kind: String = FLOORS[underground_floor].treasure
+		finds[kind] = int(finds.get(kind, 0)) + 3
+		_feedback("Raja Jelly vanishes in smoke! +3 %s" % preload("res://dungeon_store.gd").ITEMS[kind].name.to_lower())
+		_update_hud()
+
+## How tense the cave sounds: 1 while something chases you, rising as one nears.
+func _tension() -> float:
+	var worst := 0.0
+	for monster in monsters:
+		if not is_instance_valid(monster) or monster.dying: continue
+		var d: float = monster.global_position.distance_to(player.global_position)
+		var near := clampf(1.0 - d / 16.0, 0.0, 1.0) * 0.55
+		worst = maxf(worst, 1.0 if monster.state == "chase" else near)
+	return worst
 
 func _near_stairs() -> bool:
 	var stairs: Vector3 = floor_root.get_meta("stairs", Vector3.ZERO)

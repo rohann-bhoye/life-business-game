@@ -6,6 +6,7 @@ extends RefCounted
 #   #  solid rock             .  open floor            w  stream (no walking)
 #   p  plank bridge over it   E  entry stone (arrive, and E there to climb up)
 #   X  stairs down            C  treasure chest        L  treasure lying about
+#   o  ore rock (break it with the lathi)  x  rubble
 #   m  glowing mushrooms      r  boulder               T  torch on a nearby wall
 #   S  monster spawn          b  boss                  B  boss chamber floor
 const CELL := 4.0
@@ -16,17 +17,17 @@ const CELL := 4.0
 const FLOOR_1 := [
 	"########################",
 	"##.......###ww##########",
-	"#..m..L....#ww#.......T#",
+	"#..m..L..o.#ww#.......T#",
 	"#.m...S..m.#ww#..L..S..#",
 	"#T.......m..pp.........#",
-	"##.....r...#ww#..r.....#",
+	"##.....r..x#ww#..r..o..#",
 	"###.S......#ww##...m..##",
 	"####..m..###ww###..#####",
 	"####.....###ww###..#####",
-	"###...#####.ww.#BBBBBB##",
+	"###.x.#####.ww.#BBBBBB##",
 	"##..S..####.ww.BBBBBBBB#",
 	"#...r..T....pp.BBBbBBCB#",
-	"#..E...S.##.ww.BBBBBBBT#",
+	"#..E.o.S.##.ww.BBBBBBBT#",
 	"##.....#####ww#BBBBBBXB#",
 	"###..#######ww##########",
 	"########################",

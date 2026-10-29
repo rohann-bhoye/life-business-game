@@ -27,6 +27,8 @@ var stairs_spot := Vector3.ZERO
 var spawns: Array[Vector3] = []
 var boss_spot := Vector3.ZERO
 var lid_turn := 0.0
+var ores: Array[Node3D] = []
+var torches: Array[OmniLight3D] = []
 
 static func create(index: int, origin: Vector3) -> Node3D:
 	var floor := preload("res://dungeon_floor.gd").new()
@@ -65,6 +67,8 @@ func _build(index: int) -> void:
 				else: _solid(Vector3(CELL, 1.6, CELL), at + Vector3(0, 0.4, 0))
 			else:
 				_add(pieces, "floor", Transform3D(Basis(Vector3.UP, (rng.randi() % 4) * PI / 2.0), at))
+				if tag == "." and rng.randf() < 0.14:
+					_add(pieces, "rubble", Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(0.5, 0.9)), at + Vector3(rng.randf_range(-1.2, 1.2), 0, rng.randf_range(-1.2, 1.2))))
 			var torch_placed := false
 			for direction in WALL_DIRECTIONS:
 				var side: Vector2i = direction[0]
@@ -91,6 +95,10 @@ func _build(index: int) -> void:
 						_add(pieces, "stalagmite", Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(0.7, 1.2)), at + Vector3(rng.randf_range(-1.6, 1.6), 0, rng.randf_range(-1.6, 1.6))))
 				"L":
 					_loot(at + Vector3(rng.randf_range(-0.8, 0.8), 0, rng.randf_range(-0.8, 0.8)))
+				"o":
+					_ore(at + Vector3(rng.randf_range(-0.6, 0.6), 0, rng.randf_range(-0.6, 0.6)), rng)
+				"x":
+					_add(pieces, "rubble", Transform3D(Basis(Vector3.UP, rng.randf() * TAU), at))
 				"C":
 					_chest(at)
 				"X":
@@ -224,8 +232,9 @@ func _torch(at: Vector3) -> void:
 	var light := OmniLight3D.new()
 	light.name = "Torch"
 	light.light_color = Color(1.0, 0.68, 0.38)
-	light.light_energy = 2.2
-	light.omni_range = 13.0
+	light.light_energy = 2.7
+	light.omni_range = 11.0
+	torches.append(light)
 	light.position = at
 	add_child(light)
 	var flame := MeshInstance3D.new()
@@ -301,11 +310,57 @@ func _chest(at: Vector3) -> void:
 
 func _process(delta: float) -> void:
 	var time := Time.get_ticks_msec() / 1000.0
+	for index in range(torches.size()):
+		torches[index].light_energy = 2.7 + sin(time * 11.0 + index * 3.1) * 0.25 + sin(time * 23.0 + index) * 0.18
 	for index in range(loot.size()):
 		if loot[index].visible: loot[index].get_child(1).scale = Vector3.ONE * (1.0 + sin(time * 3.0 + index) * 0.15)
 	if chest_open and lid_turn < 1.6:
 		lid_turn = minf(1.6, lid_turn + delta * 3.0)
 		chest_lid.rotation.x = -lid_turn
+
+## A rock to break with the lathi: three good hits (see strike).
+func _ore(at: Vector3, rng: RandomNumberGenerator) -> void:
+	var ore := Node3D.new()
+	ore.name = "OreRock"
+	ore.position = at
+	ore.rotation.y = rng.randf() * TAU
+	ore.set_meta("hp", 3)
+	ore.add_child(_piece("ore_rock", Vector3.ZERO, toon_outlined))
+	var body := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(1.7, 1.5, 1.7)
+	shape.shape = box
+	shape.position.y = 0.75
+	body.add_child(shape)
+	ore.add_child(body)
+	add_child(ore)
+	ores.append(ore)
+
+## A lathi swing from `at` (local) towards `facing` (local, flat): the nearest ore rock
+## in front takes a hit. -1 nothing there, 0 hit (it shakes and cracks), else the
+## treasure it broke into (smoke and chunks fly).
+func strike(at: Vector3, facing: Vector3) -> int:
+	for ore in ores:
+		var to: Vector3 = ore.position - at
+		to.y = 0.0
+		if to.length() > 2.7 or to.normalized().dot(facing) < 0.35: continue
+		var hp: int = ore.get_meta("hp") - 1
+		ore.set_meta("hp", hp)
+		var Effects := preload("res://dungeon_effects.gd")
+		if hp > 0:
+			Effects.chunks(self, ore.position + Vector3(0, 0.8, 0), Color(0.3, 0.35, 0.42), 6)
+			var shake := create_tween()
+			shake.tween_property(ore, "scale", Vector3(1.08, 0.92, 1.08), 0.05)
+			shake.tween_property(ore, "scale", Vector3.ONE * (0.9 + hp * 0.03), 0.1)
+			return 0
+		Effects.chunks(self, ore.position + Vector3(0, 0.8, 0), Color(0.3, 0.35, 0.42), 16)
+		Effects.chunks(self, ore.position + Vector3(0, 0.8, 0), Color(0.6, 0.9, 1.0), 8)
+		Effects.smoke(self, ore.position + Vector3(0, 0.6, 0), 1.0, 16, Color(0.6, 0.62, 0.66))
+		ores.erase(ore)
+		ore.queue_free()
+		return 1 + int(randf() < 0.3)
+	return -1
 
 ## What E would do near `at` (local to the floor), for the hint line.
 func hint_at(at: Vector3) -> String:

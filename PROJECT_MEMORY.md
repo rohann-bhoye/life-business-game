@@ -244,6 +244,16 @@ board and a local suggestion form. See Farming section below for controls and li
   reset. Tint by level (green <=3, blue, gold elite 15%, +50% notice); name tag Lv N Name.
   Code-animated (hops/squash, wing flaps, waddle). dungeon_world._spawn_monsters: S cells
   cycle slime/bat/mushroom, Raja Jelly (Lv 5) in the boss chamber. 78 FPS on Low.
+- Dungeon M3b (2026-10-29): lathi combat + cave feel. Left click underground swings a held
+  bamboo lathi (dungeon_world._swing/_strike, 0.5 s apart): hits the nearest monster within
+  2.6 m in front, else an ore rock. Monster hp: slime 2, bat 1, mushroom 3, boss 12 (elite x2);
+  hurt() = knock-back + white flash; death = smoke puff (dungeon_effects.gd) + squash/rise,
+  freed; Raja Jelly drops 3 treasure. Ore rocks (o cells, 3 hits, kit ore_rock.glb) break into
+  chunks/smoke and give 1-2 treasure; rubble (x cells + 14% of floor cells) is kit rubble.glb.
+  Darker cave light (ambient 0.6), flickering torches. dungeon_audio.gd: procedural sound via
+  AudioStreamGenerator on a reverb bus "Cave": air rumble, drips with echoes, tension
+  (drone + heartbeat speeding up with nearest/chasing monsters), swing/hit/break/poof/alert;
+  town music paused while underground. New models need `godot --import`.
 - Darwaza Guild (2026-10-29): tools/blender/build_guild_office.py -> guild_office.glb at
   land_shape GUILD_X/Z -80/-18 (pad GUILD_FLOOR 0.4, re-baked), facing +z; clerk
   (character female-c) behind the counter, notice board Label3D with gate times; E at the
