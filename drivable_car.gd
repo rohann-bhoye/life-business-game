@@ -1,34 +1,40 @@
 extends CharacterBody3D
 
-# A car you can drive (Blender model from tools/blender/build_cars.py). Arcade driving:
-# throttle and brake, steering that tightens at low speed, gentle drag, gravity and
-# a tilt that follows the ground. The front wheels turn, all four spin, and the lamps glow
-# at night. car_world.gd puts the player in the seat (first person) and calls drive().
+# A car you can drive. The models are Quaternius' CC0 Realistic Car Pack (converted by
+# tools/blender/import_car_pack.py into assets/props/cars/pack/*.glb: Body, Wheel_FL,
+# Wheel_FR, Wheels_Back). Arcade driving: throttle and brake, steering that tightens at low
+# speed, gentle drag, gravity and a tilt that follows the ground. The front wheels turn, all
+# wheels spin, the lamps glow at night, and inside there is a dashboard and a steering
+# wheel that turns. car_world.gd puts the player in the seat (first person) and calls drive().
+## name, top speed (m/s), acceleration, collision box (width, height, length), wheel radius,
+## and the driver's eye in the cabin (right-hand seat), all in the car's own space (front -z).
 const MODELS := {
-	"hatchback": {"name": "Hatchback", "top": 21.0, "accel": 7.5, "box": Vector3(1.8, 1.3, 3.7), "radius": 0.3, "eye": Vector3(0.37, 1.17, 0.32)},
-	"sedan": {"name": "Sedan", "top": 24.0, "accel": 7.0, "box": Vector3(1.9, 1.3, 4.3), "radius": 0.32, "eye": Vector3(0.37, 1.17, 0.3)},
-	"suv": {"name": "SUV", "top": 22.0, "accel": 6.2, "box": Vector3(2.0, 1.6, 4.5), "radius": 0.38, "eye": Vector3(0.4, 1.42, 0.3)},
-	"pickup": {"name": "Pickup", "top": 20.0, "accel": 5.8, "box": Vector3(2.0, 1.6, 5.0), "radius": 0.4, "eye": Vector3(0.4, 1.45, 0.3)},
+	"normal1": {"name": "City Car", "top": 23.0, "accel": 7.5, "box": Vector3(1.7, 1.0, 4.1), "radius": 0.26, "eye": Vector3(0.4, 0.8, 0.15)},
+	"normal2": {"name": "Mini", "top": 21.0, "accel": 7.0, "box": Vector3(1.55, 0.95, 3.2), "radius": 0.26, "eye": Vector3(0.38, 0.78, 0.1)},
+	"taxi": {"name": "Taxi", "top": 20.0, "accel": 6.5, "box": Vector3(1.7, 1.12, 4.1), "radius": 0.25, "eye": Vector3(0.4, 0.84, 0.15)},
+	"suv": {"name": "SUV", "top": 22.0, "accel": 6.4, "box": Vector3(2.0, 1.25, 4.1), "radius": 0.33, "eye": Vector3(0.45, 0.98, 0.15)},
+	"sports": {"name": "Sports Car", "top": 30.0, "accel": 9.5, "box": Vector3(1.7, 0.95, 3.85), "radius": 0.26, "eye": Vector3(0.4, 0.74, 0.15)},
+	"sports2": {"name": "Racer", "top": 32.0, "accel": 10.0, "box": Vector3(1.75, 1.0, 3.8), "radius": 0.26, "eye": Vector3(0.4, 0.78, 0.15)},
+	"cop": {"name": "Police Car", "top": 27.0, "accel": 8.5, "box": Vector3(1.7, 1.1, 3.6), "radius": 0.275, "eye": Vector3(0.4, 0.86, 0.12)},
 }
-const ATLAS := "res://assets/props/cars/cars_print.png"
 ## The player's eye height above its own origin (player.gd EYE_HEIGHT): the seat position is
-## the driver's eye (data.eye, right-hand seat, inside the cabin) minus this.
+## the driver's eye (data.eye) minus this.
 const EYE_DROP := 0.7
 
-var kind := "hatchback"
+var kind := "normal1"
 var data: Dictionary
-var paint := Color.WHITE
+## Repaint colour for the body; alpha 0 keeps the model's own paint (taxi yellow, police white).
+var paint := Color(0, 0, 0, 0)
 var speed := 0.0
 var steer := 0.0
-var wheels: Array[Node3D] = []
+var spinners: Array[Node3D] = []
 var front_wheels: Array[Node3D] = []
-var lamps: MeshInstance3D
-var lamp_material: StandardMaterial3D
+var lamp_materials: Array[StandardMaterial3D] = []
 var occupied := false
 var wheel_node: Node3D
 var spin_node: Node3D
 
-static func create(type: String, colour: Color) -> CharacterBody3D:
+static func create(type: String, colour := Color(0, 0, 0, 0)) -> CharacterBody3D:
 	var car := preload("res://drivable_car.gd").new()
 	car.kind = type
 	car.data = MODELS[type]
@@ -36,7 +42,7 @@ static func create(type: String, colour: Color) -> CharacterBody3D:
 	return car
 
 func _ready() -> void:
-	name = "Car" + data.name
+	name = "Car" + data.name.replace(" ", "")
 	collision_layer = 1
 	collision_mask = 1
 	floor_snap_length = 0.6
@@ -44,72 +50,93 @@ func _ready() -> void:
 	var box := BoxShape3D.new()
 	box.size = data.box
 	shape.shape = box
-	shape.position.y = data.box.y / 2.0
+	shape.position.y = data.box.y / 2.0 + 0.12
 	add_child(shape)
-	var scene := (load("res://assets/props/cars/%s.glb" % kind) as PackedScene).instantiate() as Node3D
+	var scene := (load("res://assets/props/cars/pack/%s.glb" % kind) as PackedScene).instantiate() as Node3D
+	# The model faces +z; the car drives towards -z.
+	scene.rotation.y = PI
 	add_child(scene)
-	var atlas: Texture2D = load(ATLAS)
 	for node in scene.find_children("*", "MeshInstance3D", true, false):
 		var part := node as MeshInstance3D
-		var material := StandardMaterial3D.new()
-		material.albedo_texture = atlas
-		material.cull_mode = BaseMaterial3D.CULL_DISABLED
-		material.roughness = 0.55
-		var part_name := str(part.name).split("_")[0]
-		match part_name:
-			"Body":
-				material.albedo_color = paint
-				material.metallic = 0.25
-				material.roughness = 0.35
-			"Glass":
-				material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-				material.albedo_color = Color(1, 1, 1, 0.42)
-				material.roughness = 0.1
-			"Lamps":
-				material.emission_enabled = true
-				material.emission_texture = atlas
-				material.emission_energy_multiplier = 0.4
-				lamp_material = material
-				lamps = part
-		part.material_override = material
-		part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if part_name != "Body" else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if str(part.name) == "Body" else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		for index in range(part.mesh.get_surface_count()):
+			var source := part.mesh.surface_get_material(index) as StandardMaterial3D
+			if source == null: continue
+			var material := source.duplicate() as StandardMaterial3D
+			material.cull_mode = BaseMaterial3D.CULL_DISABLED
+			match str(source.resource_name):
+				"Paint":
+					if paint.a > 0.0: material.albedo_color = paint
+					material.metallic = 0.3
+					material.roughness = 0.35
+				"Windows":
+					material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+					material.albedo_color = Color(material.albedo_color, 0.4)
+					material.roughness = 0.1
+				"Headlights", "TailLights", "WhiteLights", "BlueLights":
+					material.emission_enabled = true
+					material.emission = material.albedo_color
+					material.emission_energy_multiplier = 0.5
+					lamp_materials.append(material)
+			part.set_surface_override_material(index, material)
 		if str(part.name).begins_with("Wheel"):
-			wheels.append(part)
+			# The bodies have no wheel openings, so the tyres are widened and pushed out to show
+			# beside the body (the rear pair is one mesh with its axle, so it only widens).
+			if str(part.name) == "Wheels_Back": part.scale.x *= 1.26
+			else:
+				part.scale.x *= 1.9
+				part.position.x += signf(part.position.x) * 0.13
+			spinners.append(part)
 			if str(part.name).begins_with("Wheel_F"): front_wheels.append(part)
-	_build_wheel()
+	_build_cabin()
 
-## A black steering wheel (rim, hub and two spokes) that turns with the steering.
-func _build_wheel() -> void:
+## Inside: a dark floor and dashboard and a black steering wheel (rim and two spokes) that
+## turns with the steering.
+func _build_cabin() -> void:
+	var dark := StandardMaterial3D.new()
+	dark.albedo_color = Color(0.1, 0.1, 0.11)
+	dark.roughness = 0.8
+	var floor_plate := MeshInstance3D.new()
+	var plate := BoxMesh.new()
+	plate.size = Vector3(data.box.x - 0.3, 0.03, data.box.z * 0.55)
+	plate.material = dark
+	floor_plate.mesh = plate
+	floor_plate.position = Vector3(0, data.radius + 0.08, 0.1)
+	add_child(floor_plate)
+	var dash := MeshInstance3D.new()
+	var board := BoxMesh.new()
+	board.size = Vector3(data.box.x - 0.3, 0.22, 0.4)
+	board.material = dark
+	dash.mesh = board
+	dash.position = Vector3(0, data.eye.y - 0.5, data.eye.z - 0.95)
+	add_child(dash)
 	wheel_node = Node3D.new()
 	wheel_node.name = "SteeringWheel"
-	wheel_node.position = Vector3(data.eye.x, data.eye.y - 0.2, data.eye.z - 0.62)
+	wheel_node.position = Vector3(data.eye.x, data.eye.y - 0.36, data.eye.z - 0.58)
 	wheel_node.rotation.x = deg_to_rad(62)
 	spin_node = Node3D.new()
 	wheel_node.add_child(spin_node)
-	var black := StandardMaterial3D.new()
-	black.albedo_color = Color(0.07, 0.07, 0.08)
-	black.roughness = 0.6
 	var rim := MeshInstance3D.new()
 	var ring := TorusMesh.new()
-	ring.inner_radius = 0.15
-	ring.outer_radius = 0.19
+	ring.inner_radius = 0.12
+	ring.outer_radius = 0.155
 	ring.rings = 18
 	ring.ring_segments = 8
-	ring.material = black
+	ring.material = dark
 	rim.mesh = ring
 	spin_node.add_child(rim)
 	for angle in [0.0, PI / 2.0]:
 		var spoke := MeshInstance3D.new()
 		var bar := BoxMesh.new()
-		bar.size = Vector3(0.33, 0.012, 0.03)
-		bar.material = black
+		bar.size = Vector3(0.27, 0.012, 0.025)
+		bar.material = dark
 		spoke.mesh = bar
 		spoke.rotation.y = angle
 		spin_node.add_child(spoke)
 	add_child(wheel_node)
 
 func set_night(night: bool) -> void:
-	if lamp_material != null: lamp_material.emission_energy_multiplier = 2.4 if night else 0.4
+	for material in lamp_materials: material.emission_energy_multiplier = 2.6 if night else 0.5
 
 ## One physics step of driving: throttle -1..1 (forward positive), steering -1..1 (right positive).
 func drive(throttle: float, steering: float, handbrake: bool, delta: float) -> void:
@@ -138,8 +165,8 @@ func drive(throttle: float, steering: float, handbrake: bool, delta: float) -> v
 		var back := right.cross(normal).normalized()
 		var target := Basis(right, normal, back).orthonormalized()
 		global_transform.basis = global_transform.basis.slerp(target, clampf(delta * 6.0, 0.0, 1.0))
-	for wheel in wheels:
-		wheel.rotation.x -= speed * delta / data.radius
+	for wheel in spinners:
+		wheel.rotation.x += speed * delta / data.radius
 	for wheel in front_wheels: wheel.rotation.y = -steer * 0.5
 	if spin_node != null: spin_node.rotation.y = steer * 2.4
 

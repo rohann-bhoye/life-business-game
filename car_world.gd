@@ -9,7 +9,7 @@ const DrivableCar := preload("res://drivable_car.gd")
 const LOT_AT := Vector3(13.4, 0.1, -0.1)
 const BAY := 2.7
 const REACH := 3.2
-const CARS := [["hatchback", Color(0.78, 0.12, 0.14)], ["sedan", Color(0.14, 0.28, 0.62)]]
+const CARS := [["sports", Color(0.78, 0.12, 0.14)], ["normal1", Color(0.14, 0.28, 0.62)]]
 
 var ops: Node
 var player: CharacterBody3D

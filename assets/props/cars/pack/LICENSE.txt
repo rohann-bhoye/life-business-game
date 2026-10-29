@@ -1,0 +1,2 @@
+Realistic Car Pack - Nov 2018 by Quaternius (https://quaternius.com), https://quaternius.itch.io/lowpoly-cars
+License: CC0 1.0 (public domain dedication). Converted from FBX to GLB by tools/blender/import_car_pack.py.
