@@ -29,6 +29,11 @@ const NORTH_ROAD_END := -230.0
 const CAVE_X := -94.0
 const CAVE_Z := -32.0
 const CAVE_FLOOR := 3.2
+## The Darwaza Guild office (dungeon_world.gd) at the hill's foot, facing the road
+## (+z), on a level pad.
+const GUILD_X := -80.0
+const GUILD_Z := -18.0
+const GUILD_FLOOR := 0.4
 ## Heights of the 256 x 384 terrain points, kept while shaping so the colours need
 ## not read the terrain back.
 var land_heights := PackedFloat32Array()
@@ -119,8 +124,8 @@ func _lower_valley(data) -> void:
 				land_heights[index] = lerpf(land_heights[index], 0.06 + Horizon.height(x), weight)
 				data.set_height(Vector3(x, 0, z), land_heights[index])
 
-## A level apron in front of the cave mouth, and the hill cut away under its tunnel
-## (the tunnel's own floor and the mouth's rocks cover the cut).
+## A level apron in front of the cave mouth, the hill cut away under its tunnel (the
+## tunnel's own floor and the mouth's rocks cover the cut), and the guild's pad.
 func _cave_ground(data) -> void:
 	for z in range(int(CAVE_Z) - 10, int(CAVE_Z) + 11):
 		for x in range(int(CAVE_X) - 6, int(CAVE_X) + 12):
@@ -134,6 +139,12 @@ func _cave_ground(data) -> void:
 				height = lerpf(height, CAVE_FLOOR, (1.0 - smoothstep(3.0, 9.0, across)) * (1.0 - smoothstep(6.0, 11.0, ahead)))
 			land_heights[index] = height
 			data.set_height(Vector3(x, 0, z), height)
+	for z in range(int(GUILD_Z) - 14, int(GUILD_Z) + 9):
+		for x in range(int(GUILD_X) - 10, int(GUILD_X) + 11):
+			var index := _land_index(x, z)
+			var away := maxf(absf(x - GUILD_X) - 6.0, maxf(GUILD_Z - 9.0 - z, z - GUILD_Z - 4.0))
+			land_heights[index] = lerpf(land_heights[index], GUILD_FLOOR, 1.0 - smoothstep(0.0, 4.0, away))
+			data.set_height(Vector3(x, 0, z), land_heights[index])
 
 func _steepness(x: int, z: int) -> float:
 	var height := land_heights[_land_index(x, z)]

@@ -235,6 +235,10 @@ board and a local suggestion form. See Farming section below for controls and li
   dungeon_store.gd (business_backend `treasure`, save key "treasure"): held/sold/deepest,
   fixed prices jar 40 / shard 120 / coin 300; guild income = sold x price, added to the
   money identity; sell_treasure() pays it. ~60 FPS on Floor 1 on Low.
+- Darwaza Guild (2026-10-29): tools/blender/build_guild_office.py -> guild_office.glb at
+  land_shape GUILD_X/Z -80/-18 (pad GUILD_FLOOR 0.4, re-baked), facing +z; clerk
+  (character female-c) behind the counter, notice board Label3D with gate times; E at the
+  counter sells all treasure (dungeon_world.gd _near_guild).
 - Market street (2026-10-28): 8 Blender shop-houses (tools/blender/build_market_shops.py
   -> assets/props/market/market_shop_<i>.glb, names printed on the boards) with body and
   counter colliders and a shopkeeper each (town_expansion.gd _shop). market_life.gd: 6

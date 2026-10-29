@@ -10,8 +10,10 @@ extends Node3D
 # cave light. Treasure found on a trip is banked on the way out (business_backend.gd
 # bring_up_treasure) and sold at the Darwaza Guild. Press E at the entry stone to come
 # back up; if the gate shuts meanwhile, the player is sent up with their finds.
-# Co-op games keep the gate shut for now.
-# Created by shop_operations.gd, which passes E and the hint through.
+# Co-op games keep the gate shut for now. On the way up to the cave stands the
+# Darwaza Guild office (tools/blender/build_guild_office.py): its clerk buys all the
+# treasure held (business_backend.gd sell_treasure) and its notice board lists the
+# gate times. Created by shop_operations.gd, which passes E and the hint through.
 const LandShape := preload("res://land_shape.gd")
 const CAVE_YAW := PI / 2.0
 const UNDER := Vector3(1000.0, 0.0, 0.0)
@@ -47,12 +49,15 @@ var busy := false
 ## Treasure found on this trip, by kind (dungeon_store.gd).
 var finds := {}
 var hud: Label
+var guild: Node3D
+const GUILD_COUNTER := Vector3(0.0, 1.4, -0.5)
 
 func _ready() -> void:
 	name = "DungeonWorld"
 	business = get_tree().current_scene.get_node("Shop/ShopArea").business
 	player = get_tree().current_scene.get_node("Player")
 	_build_cave()
+	_build_guild()
 	_build_fade()
 	business.clock_changed.connect(_update_gate)
 	_update_gate()
@@ -136,6 +141,41 @@ func _build_cave() -> void:
 	board_label.width = 300
 	cave.add_child(board_label)
 
+func _build_guild() -> void:
+	guild = (load("res://assets/props/dungeon/guild_office.glb") as PackedScene).instantiate() as Node3D
+	guild.name = "DarwazaGuild"
+	guild.position = Vector3(LandShape.GUILD_X, LandShape.GUILD_FLOOR, LandShape.GUILD_Z)
+	add_child(guild)
+	_body("GuildWalls", guild, Vector3(9.6, 7.0, 7.0), Vector3(0, 3.5, -3.7))
+	_body("GuildPlinth", guild, Vector3(9.6, 0.5, 0.6), Vector3(0, 0.25, -0.1))
+	_body("NoticeBoard", guild, Vector3(1.9, 1.8, 0.2), Vector3(-4.0, 0.9, 1.6))
+	_body("Crates", guild, Vector3(1.6, 1.2, 0.9), Vector3(3.7, 0.6, 1.2))
+	var clerk := Node3D.new()
+	clerk.name = "GuildClerk"
+	clerk.position = Vector3(0.0, 0.85, -1.5)
+	var visual := Node3D.new()
+	visual.name = "CharacterVisual"
+	visual.set_script(preload("res://character_visual.gd"))
+	visual.model = "female-c"
+	clerk.add_child(visual)
+	guild.add_child(clerk)
+	var notice := Label3D.new()
+	notice.name = "GateTimes"
+	notice.text = "DARWAZA TIMES
+Rank E  Jugnu Gufa  06:00-22:00
+Rank C  Neelam Mahal  18:00-02:00
+Rank A  Agni Mandir  every 7th night
+           20:00-04:00"
+	notice.position = Vector3(-4.0, 1.45, 1.61)
+	notice.font_size = 22
+	notice.pixel_size = 0.0034
+	notice.outline_size = 0
+	notice.modulate = Color(0.18, 0.1, 0.05)
+	guild.add_child(notice)
+
+func _near_guild() -> bool:
+	return is_instance_valid(guild) and player.global_position.distance_to(guild.to_global(GUILD_COUNTER)) < REACH
+
 func _body(node_name: String, parent: Node3D, size: Vector3, offset: Vector3) -> void:
 	var body := StaticBody3D.new()
 	body.name = node_name
@@ -203,6 +243,9 @@ func hint() -> String:
 		if not found.is_empty(): return found
 		if _near_stairs(): return "The stairs down to Neelam Mahal (Rank C) open in a later update"
 		return ""
+	if _near_guild():
+		var worth: int = business.treasure.value()
+		return "E - sell your treasure to the Darwaza Guild (%s%d)" % [String.chr(8377), worth] if worth > 0 else "Darwaza Guild: bring treasure from the Darwaza to sell here"
 	if not is_instance_valid(cave) or player.global_position.distance_to(_portal_point()) > REACH: return ""
 	if get_tree().current_scene.get_node_or_null("CoopWorld") != null: return "The Darwaza stays shut in co-op for now"
 	if not gate_open(): return "The Darwaza is shut - it opens at 06:00"
@@ -224,6 +267,10 @@ func try_interact() -> bool:
 			_update_hud()
 			return true
 		return _near_stairs()
+	if _near_guild():
+		var paid: int = business.sell_treasure()
+		_feedback("The Darwaza Guild paid %s%d for your treasure." % [String.chr(8377), paid] if paid > 0 else "Bring treasure from the Darwaza to sell here.")
+		return true
 	if not is_instance_valid(cave) or player.global_position.distance_to(_portal_point()) > REACH: return false
 	if not gate_open() or _hands_full(): return true
 	_enter(open_floors()[0])
