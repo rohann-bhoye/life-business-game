@@ -19,6 +19,8 @@ var suggestions_path := "user://player_suggestions.json"
 @onready var builder = world.get_node("Neighbourhood")
 
 func _ready() -> void:
+	# The whole farm stands in Kisan Gram, across the river (farm_village.gd).
+	position = preload("res://land_shape.gd").FARM_OFFSET
 	for index in range(24):
 		var bed := Node3D.new()
 		bed.name = "FarmBed%d" % index

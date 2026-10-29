@@ -34,6 +34,11 @@ const CAVE_FLOOR := 3.2
 const GUILD_X := -80.0
 const GUILD_Z := -18.0
 const GUILD_FLOOR := 0.4
+## Kisan Gram, the farming village across the river (farm_village.gd): a level pad round the
+## North Road. The playable farm (farm_world.gd, farm_details.gd) is shifted there by FARM_OFFSET.
+const VILLAGE := Rect2(20.0, -228.0, 82.0, 68.0)
+const VILLAGE_FLOOR := 0.08
+const FARM_OFFSET := Vector3(100.0, 0.0, -190.0)
 ## Heights of the 256 x 384 terrain points, kept while shaping so the colours need
 ## not read the terrain back.
 var land_heights := PackedFloat32Array()
@@ -50,6 +55,7 @@ func shape(data) -> void:
 	_mountains(data)
 	_lower_valley(data)
 	_cave_ground(data)
+	_village_ground(data)
 	_paint_land(data)
 	data.calc_height_range(true)
 	# All maps of all regions, with fresh mipmaps (distant land reads those; new
@@ -144,6 +150,15 @@ func _cave_ground(data) -> void:
 			var index := _land_index(x, z)
 			var away := maxf(absf(x - GUILD_X) - 6.0, maxf(GUILD_Z - 9.0 - z, z - GUILD_Z - 4.0))
 			land_heights[index] = lerpf(land_heights[index], GUILD_FLOOR, 1.0 - smoothstep(0.0, 4.0, away))
+			data.set_height(Vector3(x, 0, z), land_heights[index])
+
+## Levels the village pad to VILLAGE_FLOOR, blending into the land over 12 m round its edge.
+func _village_ground(data) -> void:
+	for z in range(int(VILLAGE.position.y) - 14, int(VILLAGE.end.y) + 14):
+		for x in range(int(VILLAGE.position.x) - 14, int(VILLAGE.end.x) + 14):
+			var away := maxf(maxf(VILLAGE.position.x - x, x - VILLAGE.end.x), maxf(VILLAGE.position.y - z, z - VILLAGE.end.y))
+			var index := _land_index(x, z)
+			land_heights[index] = lerpf(land_heights[index], VILLAGE_FLOOR, 1.0 - smoothstep(0.0, 12.0, away))
 			data.set_height(Vector3(x, 0, z), land_heights[index])
 
 func _steepness(x: int, z: int) -> float:

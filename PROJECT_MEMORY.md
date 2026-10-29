@@ -244,6 +244,14 @@ board and a local suggestion form. See Farming section below for controls and li
   reset. Tint by level (green <=3, blue, gold elite 15%, +50% notice); name tag Lv N Name.
   Code-animated (hops/squash, wing flaps, waddle). dungeon_world._spawn_monsters: S cells
   cycle slime/bat/mushroom, Raja Jelly (Lv 5) in the boss chamber. 78 FPS on Low.
+- Kisan Gram farming village (2026-10-30): across the Dholkar river around the North Road. farm_village.gd
+  (called from town_expansion after north_river): 9 mud-brick huts with tiled roofs/verandas (4 west, 5 east
+  of the road at x 41.7/58.3), village square (well, banyan platform + tree, saffron shrine), 3 crop fields
+  west of the road (wheat, mustard, sugarcane), irrigation canal from the river (x 42, water_flow shader),
+  cattle shed with 3 cows, haystacks, blue water tower, dirt track to the farm, KISAN GRAM sign. Land: land_shape
+  VILLAGE Rect2(20,-228,82,68) levelled to 0.08 (_village_ground, re-baked), no forest inside. The PLAYABLE
+  FARM moved there: farm_world.gd and the farm_details node (town_fill) are shifted by LandShape.FARM_OFFSET
+  (100,0,-190) (beds at ~x72-82, z-193). The old farm spot in the town (x -29..-12, z -13..0) is empty now.
 - Cars v2 (2026-10-29): owner rejected our first Blender cars (too crude) and asked for packs, then a Blender
   supercar like their reference render ("Volterra S7"). (1) Quaternius CC0 Realistic Car Pack (downloaded
   from itch.io, 2.6 MB, CC0) converted by tools/blender/import_car_pack.py -> assets/props/cars/pack/

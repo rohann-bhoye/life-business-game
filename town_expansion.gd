@@ -46,6 +46,8 @@ func build(neighbourhood: Node3D) -> void:
 	_welcome_gates()
 	# The north road, the Dholkar river and its bridge past the town hills.
 	preload("res://north_river.gd").new().build(self)
+	# Kisan Gram, the farming village across the river, where the farm now stands.
+	preload("res://farm_village.gd").new().build(self)
 	# The giant policeman watching over the north hills.
 	town.add_child(preload("res://giant_police.gd").new())
 	_airport_road()
@@ -157,6 +159,7 @@ func _hill_forest() -> void:
 		if z < LandShape.FLAT_TOWN.position.y and absf(x - LandShape.NORTH_ROAD_X) < 14.0: continue
 		if Vector2(x - LandShape.CAVE_X, z - LandShape.CAVE_Z).length() < 13.0: continue
 		if Vector2(x - LandShape.GUILD_X, z - LandShape.GUILD_Z).length() < 11.0: continue
+		if LandShape.VILLAGE.grow(2.0).has_point(Vector2(x, z)): continue
 		var height: float = data.get_height(Vector3(x, 0, z))
 		var steepness: float = absf(data.get_height(Vector3(x + 1.0, 0, z)) - height) + absf(data.get_height(Vector3(x, 0, z + 1.0)) - height)
 		if height < 0.6 or height > 40.0 or steepness > 2.3: continue

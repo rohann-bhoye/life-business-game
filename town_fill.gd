@@ -53,6 +53,7 @@ func build(neighbourhood: Node3D) -> void:
 	# Tube-well, scarecrow, hay, sacks, charpai and a tractor round the farm field.
 	var farm := Node3D.new()
 	farm.set_script(preload("res://farm_details.gd"))
+	farm.position = preload("res://land_shape.gd").FARM_OFFSET
 	add_child(farm)
 	farm.build(town)
 
