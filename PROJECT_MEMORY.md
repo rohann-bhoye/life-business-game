@@ -214,6 +214,18 @@ board and a local suggestion form. See Farming section below for controls and li
   wall and walls the lane; the Landscape has collision_mode 1 (dynamic, game only);
   north_river.gd adds bridge deck/rail colliders and bank walls. Grass along the lane
   stands on the terrain (environment_details.gd _road_grass).
+- Gufa Darwaza dungeon M1 (2026-10-29, plan: ~/.claude/plans/melodic-toasting-hamster.md):
+  cave mouth + gate ring in Blender (tools/blender/build_cave_entrance.py ->
+  assets/props/dungeon) at land_shape.gd CAVE_X/Z -94/-32 on the west hill, facing +x;
+  land_shape levels an apron and cuts the hill under the tunnel (_cave_ground, re-baked).
+  dungeon_world.gd (made by shop_operations.gd like export_world; E/hint hooked first):
+  FLOORS schedule (E 06-22, C 18-02, A every 7th night 20-04), portal swirl
+  (portal.gdshader), enter = fade, hide every visible top-level Node3D, camera far 150,
+  day_night.set_underground(profile) (sky/sun/moon off, cave ambient/fog), build the floor
+  at UNDER (x 1000); leave = reverse. Shut in co-op. dungeon_test_room.gd is a stand-in
+  room until the Blender kit (M2). Shaders: toon.gdshader (3 bands, rim), outline.gdshader
+  (inverted hull, next_pass). 120+ FPS inside on Low. Next: M2 Floor 1 kit + layout +
+  loot + Darwaza Guild office to sell treasure (guild_income in the money identity).
 - Market street (2026-10-28): 8 Blender shop-houses (tools/blender/build_market_shops.py
   -> assets/props/market/market_shop_<i>.glb, names printed on the boards) with body and
   counter colliders and a shopkeeper each (town_expansion.gd _shop). market_life.gd: 6

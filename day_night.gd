@@ -75,6 +75,15 @@ func _build_stars() -> void:
 	stars.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(stars)
 
+## Inside the dungeon (dungeon_world.gd) the floor's cave light replaces the sky, the
+## sun, the moon and the stars: background, ambient and fog colours from `profile`
+## (empty again back in the town).
+var underground := {}
+
+func set_underground(profile: Dictionary) -> void:
+	underground = profile
+	_refresh()
+
 func _on_clock_changed() -> void:
 	if floori(business.minutes_of_day) != last_minute:
 		_refresh()
@@ -85,6 +94,20 @@ func set_quality(quality: int) -> void:
 
 func _refresh() -> void:
 	last_minute = floori(business.minutes_of_day)
+	sun.visible = underground.is_empty()
+	moon.visible = underground.is_empty()
+	if not underground.is_empty():
+		environment.background_mode = Environment.BG_COLOR
+		environment.background_color = underground.background
+		environment.ambient_light_color = underground.ambient
+		environment.ambient_light_energy = underground.ambient_energy
+		environment.fog_enabled = true
+		environment.fog_light_color = underground.background
+		environment.fog_light_energy = 1.0
+		environment.fog_density = underground.fog_density
+		stars.visible = false
+		return
+	environment.background_mode = Environment.BG_SKY
 	var hour: float = business.minutes_of_day / 60.0
 	var angle := (hour - 6.0) / 24.0 * TAU
 	var elevation := sin(angle)

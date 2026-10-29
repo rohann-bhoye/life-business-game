@@ -23,6 +23,12 @@ const RIVER_Z := -146.0
 const WATER_Y := -3.0
 const NORTH_ROAD_X := 50.0
 const NORTH_ROAD_END := -230.0
+## The Gufa Darwaza cave mouth (dungeon_world.gd) on the west hill, facing the town
+## (+x): the land is levelled to CAVE_FLOOR in front of it and cut away under its
+## tunnel.
+const CAVE_X := -94.0
+const CAVE_Z := -32.0
+const CAVE_FLOOR := 3.2
 ## Heights of the 256 x 384 terrain points, kept while shaping so the colours need
 ## not read the terrain back.
 var land_heights := PackedFloat32Array()
@@ -38,6 +44,7 @@ static func river_z(x: float) -> float:
 func shape(data) -> void:
 	_mountains(data)
 	_lower_valley(data)
+	_cave_ground(data)
 	_paint_land(data)
 	data.calc_height_range(true)
 	# All maps of all regions, with fresh mipmaps (distant land reads those; new
@@ -111,6 +118,22 @@ func _lower_valley(data) -> void:
 				var index := _land_index(int(x), z)
 				land_heights[index] = lerpf(land_heights[index], 0.06 + Horizon.height(x), weight)
 				data.set_height(Vector3(x, 0, z), land_heights[index])
+
+## A level apron in front of the cave mouth, and the hill cut away under its tunnel
+## (the tunnel's own floor and the mouth's rocks cover the cut).
+func _cave_ground(data) -> void:
+	for z in range(int(CAVE_Z) - 10, int(CAVE_Z) + 11):
+		for x in range(int(CAVE_X) - 6, int(CAVE_X) + 12):
+			var index := _land_index(x, z)
+			var across := absf(z - CAVE_Z)
+			var ahead := x - CAVE_X
+			var height := land_heights[index]
+			if ahead < 0.5 and ahead > -4.5 and across < 2.6:
+				height = CAVE_FLOOR - 0.4
+			elif ahead >= 0.5:
+				height = lerpf(height, CAVE_FLOOR, (1.0 - smoothstep(3.0, 9.0, across)) * (1.0 - smoothstep(6.0, 11.0, ahead)))
+			land_heights[index] = height
+			data.set_height(Vector3(x, 0, z), height)
 
 func _steepness(x: int, z: int) -> float:
 	var height := land_heights[_land_index(x, z)]

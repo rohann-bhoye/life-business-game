@@ -155,6 +155,7 @@ func _hill_forest() -> void:
 		if LandShape.FLAT_TOWN.grow(3.0).has_point(Vector2(x, z)): continue
 		if absf(x) > LandShape.FLAT_TOWN.end.x and absf(z - ROAD_Z) < 14.0: continue
 		if z < LandShape.FLAT_TOWN.position.y and absf(x - LandShape.NORTH_ROAD_X) < 14.0: continue
+		if Vector2(x - LandShape.CAVE_X, z - LandShape.CAVE_Z).length() < 13.0: continue
 		var height: float = data.get_height(Vector3(x, 0, z))
 		var steepness: float = absf(data.get_height(Vector3(x + 1.0, 0, z)) - height) + absf(data.get_height(Vector3(x, 0, z + 1.0)) - height)
 		if height < 0.6 or height > 30.0 or steepness > 1.8: continue
