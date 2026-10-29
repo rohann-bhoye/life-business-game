@@ -244,6 +244,13 @@ board and a local suggestion form. See Farming section below for controls and li
   reset. Tint by level (green <=3, blue, gold elite 15%, +50% notice); name tag Lv N Name.
   Code-animated (hops/squash, wing flaps, waddle). dungeon_world._spawn_monsters: S cells
   cycle slime/bat/mushroom, Raja Jelly (Lv 5) in the boss chamber. 78 FPS on Low.
+- Empty land filled (2026-10-30): town_extras.gd (after farm_village in town_expansion): Apna Vidyalaya school
+  at (-24,-44) (26 m classroom block facing south, flagpole, assembly ground, compound wall + gate, swings/
+  slide/see-saw, 4 trees), Gram Maidan cricket ground at (26,-40) (mown oval 14.5x7.5, pitch, stumps, boundary
+  posts, pavilion + scoreboard), benches and dustbins at the colony lane mouths. Scanned free areas first:
+  the south-west (x -42..-14, z 20..44) and the area beside the petrol/airport are NOT free (kenney buildings,
+  terminal). Still open: haat/market stalls, petrol pump, orchard, more props at the old farm spot (x -29..-12,
+  z -13..0), the dungeon floors 2 and 3, push, v0.9 build.
 - Kisan Gram farming village (2026-10-30): across the Dholkar river around the North Road. farm_village.gd
   (called from town_expansion after north_river): 9 mud-brick huts with tiled roofs/verandas (4 west, 5 east
   of the road at x 41.7/58.3), village square (well, banyan platform + tree, saffron shrine), 3 crop fields

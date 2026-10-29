@@ -48,6 +48,8 @@ func build(neighbourhood: Node3D) -> void:
 	preload("res://north_river.gd").new().build(self)
 	# Kisan Gram, the farming village across the river, where the farm now stands.
 	preload("res://farm_village.gd").new().build(self)
+	# The school, the cricket ground and street furniture on the once empty land.
+	preload("res://town_extras.gd").new().build(self)
 	# The giant policeman watching over the north hills.
 	town.add_child(preload("res://giant_police.gd").new())
 	_airport_road()
