@@ -14,6 +14,7 @@ const LOOK_LIMIT := 70.0
 var bob_phase := 0.0
 
 var indoors := false
+var controller: Node
 var shop_indoors := false
 var warehouse_indoors := false
 var bargain_menu: Control
@@ -35,6 +36,10 @@ func _ready():
 	settings.load_file(get_tree().current_scene.get_meta("session_settings_path", "user://settings.cfg"))
 	settings.apply_player(self)
 	camera.near = 0.05
+	# Controller support (controller.gd): walk, look, buttons and a menu pointer.
+	controller = preload("res://controller.gd").new()
+	controller.name = "Controller"
+	add_child(controller)
 	spring_arm.add_excluded_object(get_rid())
 	spring_arm.spring_length = 0.0
 	camera.position = Vector3.ZERO
@@ -87,6 +92,11 @@ func _input(event: InputEvent) -> void:
 	camera_pivot.rotate_x(event.relative.y * mouse_sensitivity * (1 if invert_y else -1))
 	camera_pivot.rotation.x = clampf(camera_pivot.rotation.x, deg_to_rad(-LOOK_LIMIT), deg_to_rad(LOOK_LIMIT))
 	get_viewport().set_input_as_handled()
+
+## Turns the view by the given radians (the controller's right stick; the mouse does the same).
+func look_by(yaw: float, pitch: float) -> void:
+	rotate_y(-yaw)
+	camera_pivot.rotation.x = clampf(camera_pivot.rotation.x - pitch * (-1 if invert_y else 1), deg_to_rad(-LOOK_LIMIT), deg_to_rad(LOOK_LIMIT))
 
 func _unhandled_input(event):
 	if event.is_action_pressed("ui_cancel"):
@@ -152,6 +162,10 @@ func _physics_process(delta):
 			direction.x += 1
 
 	direction = direction.normalized()
+	# The left stick walks at its own pace (half push, half speed).
+	if direction == Vector3.ZERO and is_instance_valid(controller):
+		var stick: Vector2 = controller.move_vector()
+		direction = Vector3(stick.x, 0, stick.y)
 
 	direction = transform.basis * direction
 

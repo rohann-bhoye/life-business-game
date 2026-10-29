@@ -244,6 +244,12 @@ board and a local suggestion form. See Farming section below for controls and li
   reset. Tint by level (green <=3, blue, gold elite 15%, +50% notice); name tag Lv N Name.
   Code-animated (hops/squash, wing flaps, waddle). dungeon_world._spawn_monsters: S cells
   cycle slime/bat/mushroom, Raja Jelly (Lv 5) in the boss chamber. 78 FPS on Low.
+- Controller (2026-10-29): controller.gd (child of Player, made in player._ready) turns an Xbox-
+  layout pad into the inputs the game reads: left stick walk (player adds move_vector()),
+  right stick look (player.look_by), A jump, X=E, B=Q, Y=Tab, RT/RB = left click (lathi),
+  Start=Esc, Back=F1. In any menu a virtual pointer: left stick moves the OS mouse, A clicks,
+  right stick scrolls, B/Start=Esc, d-pad nudges. Untested on real hardware (no pad here);
+  hint text still says E/Q/Tab. Main menu relies on Godot ui_* joypad defaults.
 - Dungeon M3b (2026-10-29): lathi combat + cave feel. Left click underground swings a held
   bamboo lathi (dungeon_world._swing/_strike, 0.5 s apart): hits the nearest monster within
   2.6 m in front, else an ore rock. Monster hp: slime 2, bat 1, mushroom 3, boss 12 (elite x2);
