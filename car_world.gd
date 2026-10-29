@@ -6,10 +6,10 @@ extends Node3D
 # Space the handbrake, E again gets out beside the car. The left stick and RT/LT do the same
 # on a controller (controller.gd). Created by shop_operations.gd (like export_world).
 const DrivableCar := preload("res://drivable_car.gd")
-const LOT_AT := Vector3(3.0, 0.1, -40.65)
-const BAY := 3.1
+const LOT_AT := Vector3(13.4, 0.1, -0.1)
+const BAY := 2.7
 const REACH := 3.2
-const CARS := [["hatchback", Color(0.78, 0.12, 0.14)], ["sedan", Color(0.14, 0.28, 0.62)], ["suv", Color(0.9, 0.9, 0.88)], ["pickup", Color(0.16, 0.45, 0.28)]]
+const CARS := [["hatchback", Color(0.78, 0.12, 0.14)], ["sedan", Color(0.14, 0.28, 0.62)]]
 
 var ops: Node
 var player: CharacterBody3D
@@ -39,24 +39,25 @@ func _ready() -> void:
 	layer.add_child(hud)
 	get_tree().current_scene.get_node("Shop/ShopArea").business.clock_changed.connect(_update_lamps)
 
-## A tarmac pad with white bay lines, a sign, a low kerb, and the four cars facing +x.
+## Your two bays by the home: a paved driveway from the Main Road's pavement north
+## between white lines, a sign post, and the cars parked nose to the road.
 func _build_lot() -> void:
 	var lot := Node3D.new()
-	lot.name = "ParkingLot"
+	lot.name = "HomeParking"
 	lot.position = LOT_AT
 	add_child(lot)
-	var asphalt := _box(lot, Vector3(7.0, 0.05, BAY * CARS.size() + 0.8), Vector3(0, 0.0, BAY * 1.5 - BAY * 1.5), Color(0.2, 0.21, 0.23))
-	asphalt.position.z = BAY * (CARS.size() - 1) / 2.0
-	for index in range(CARS.size() + 1):
-		_box(lot, Vector3(5.6, 0.052, 0.09), Vector3(-0.1, 0.0, index * BAY - BAY / 2.0), Color(0.93, 0.93, 0.9))
-	_box(lot, Vector3(0.18, 0.2, BAY * CARS.size() + 0.8), Vector3(3.5, 0.1, BAY * (CARS.size() - 1) / 2.0), Color(0.75, 0.75, 0.72))
-	var post := _box(lot, Vector3(0.1, 2.2, 0.1), Vector3(-3.2, 1.1, -BAY / 2.0 - 0.3), Color(0.25, 0.27, 0.3))
-	var board := _box(lot, Vector3(1.3, 0.55, 0.06), Vector3(-3.2, 2.2, -BAY / 2.0 - 0.3), Color(0.1, 0.28, 0.55))
+	var length := 7.7
+	for index in range(CARS.size()):
+		var x: float = index * BAY
+		_box(lot, Vector3(BAY - 0.04, 0.012, length), Vector3(x, 0.027, 0.45 - 0.0), Color(0.5, 0.51, 0.53))
+		for side in [-1, 1]: _box(lot, Vector3(0.07, 0.006, length - 0.5), Vector3(x + side * (BAY / 2.0 - 0.04), 0.035, 0.0), Color(0.93, 0.93, 0.9))
+		_box(lot, Vector3(BAY - 0.3, 0.006, 0.07), Vector3(x, 0.035, -length / 2.0 + 0.55), Color(0.93, 0.93, 0.9))
+	var post := _box(lot, Vector3(0.1, 2.0, 0.1), Vector3(BAY * CARS.size() - BAY / 2.0 + 0.3, 1.0, -2.0), Color(0.25, 0.27, 0.3))
+	var board := _box(lot, Vector3(1.3, 0.5, 0.06), Vector3(BAY * CARS.size() - BAY / 2.0 + 0.3, 2.0, -2.0), Color(0.1, 0.28, 0.55))
 	var label := Label3D.new()
-	label.text = "APNA PARKING"
+	label.text = "APNA GHAR\nPARKING"
 	label.position = Vector3(0, 0, 0.04)
-	label.rotation.y = 0.0
-	label.font_size = 36
+	label.font_size = 30
 	label.pixel_size = 0.0045
 	label.outline_size = 0
 	board.add_child(label)
@@ -64,10 +65,19 @@ func _build_lot() -> void:
 	label_back.position = Vector3(0, 0, -0.04)
 	label_back.rotation.y = PI
 	board.add_child(label_back)
+	# Cars parked in the colony bays (town_plan.gd) are drivable too.
+	var plan = get_tree().current_scene.get_node("Neighbourhood/TownExpansion").plan
+	if plan != null:
+		for spot in plan.car_spots:
+			var parked: CharacterBody3D = DrivableCar.create(spot[2], spot[3])
+			parked.position = spot[0]
+			parked.rotation.y = spot[1]
+			add_child(parked)
+			cars.append(parked)
 	for index in range(CARS.size()):
 		var car: CharacterBody3D = DrivableCar.create(CARS[index][0], CARS[index][1])
-		car.position = LOT_AT + Vector3(0.1, 0.0, index * BAY)
-		car.rotation.y = PI / 2.0
+		car.position = LOT_AT + Vector3(index * BAY, 0.0, -0.6)
+		car.rotation.y = PI
 		add_child(car)
 		cars.append(car)
 

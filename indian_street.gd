@@ -38,7 +38,7 @@ func build(neighbourhood: Node3D) -> void:
 	_pani_puri(st, CART)
 	_mandir(st, MANDIR)
 	_commit(st, self, "StreetMesh")
-	_cow(Vector3(15.6, 0.1, 1.5), 0.35)
+	_cow(Vector3(24.5, 0.1, 1.4), 0.35)
 	sleeping_dog = _sleeping_dog(Vector3(-14.4, 0.1, 2.75), 0.6)
 	_sitting_dog(Vector3(-21.1, 0.1, 12.4), PI + 0.5)
 

@@ -244,6 +244,16 @@ board and a local suggestion form. See Farming section below for controls and li
   reset. Tint by level (green <=3, blue, gold elite 15%, +50% notice); name tag Lv N Name.
   Code-animated (hops/squash, wing flaps, waddle). dungeon_world._spawn_monsters: S cells
   cycle slime/bat/mushroom, Raja Jelly (Lv 5) in the boss chamber. 78 FPS on Low.
+- Town plan, phase 1 (2026-10-29): town_plan.gd (called from town_expansion._houses, the old scattered
+  16 TownHouse spots are gone). West Colony lane x -52 (houses x -60.3 / -43.7, 9 houses) and East
+  Colony lane x 62.5 (houses x 70.8, 7 houses): 4.4 m lanes crossing the Main Road, 1.4 m pavements,
+  houses 10 m apart facing the lane, front gardens with block paths, a parking bay in each gap
+  (every 2nd bay has a parked drivable car, listed in plan.car_spots and made by car_world),
+  concrete poles every 16 m on the lane side with 2 sagging wires and a service wire to each house,
+  streetlamps on the other pavement, green COLONY signs at the Main Road. Home parking: 2 bays
+  east of the yard (13.4/16.1, z -4..4.3, paved to the road) with the player two cars (car_world.gd);
+  cow moved to (24.5,1.4), tree to (27,-3). NOT yet: farm relocation, Back Lane/Service lane,
+  Gufa Road (dirt) to guild+cave, public car park, bus stop/signs/benches, poles on main roads.
 - Home furniture (2026-10-29): tools/blender/build_home_furniture.py -> assets/props/home/*.glb
   (bed, almirah, diwan, tv_unit, dining_table, chair, mandir, kitchen_unit, side_table, matka,
   rug). home_decor.gd PIECES uses them via the "own:" prefix (Kenney.fit scales by the min

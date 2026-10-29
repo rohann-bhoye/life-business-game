@@ -299,24 +299,12 @@ func _road_sign(node_name: String, at: Vector3, yaw: float, words: String) -> vo
 	label.outline_size = 0
 	sign.add_child(label)
 
+## The home colonies (town_plan.gd): lanes, houses, paths, parking, poles and lamps.
+var plan: RefCounted
+
 func _houses() -> void:
-	var spots := [
-		# [x, z, yaw] — north side faces the road (+z), south side faces it (-z).
-		[-40.0, -6.0, 0.0], [-50.0, -6.0, 0.0], [-60.0, -6.0, 0.0], [-70.0, -6.0, 0.0],
-		[-40.0, 18.0, PI], [-52.0, 18.0, PI], [-64.0, 18.0, PI],
-		[36.0, -6.0, 0.0], [64.0, -6.0, 0.0], [71.0, -16.0, 0.0],
-		[38.0, 19.0, PI], [64.0, 19.0, PI], [71.0, 30.0, PI],
-		[-46.0, -24.0, 0.0], [-62.0, -24.0, 0.0], [-36.0, 34.0, PI],
-	]
-	for index in range(spots.size()):
-		var spot: Array = spots[index]
-		IndianHouse.build(future, "TownHouse%d" % index, Vector3(6.4, 0, 5.4), Vector3(spot[0], 0.1, spot[1]), spot[2], index + 3)
-		town._collider("TownHouseBody%d" % index, future, Vector3(5.8, 4.0, 4.8), Vector3(spot[0], 2.1, spot[1]))
-		# Short garden path from the pavement to each front door.
-		var front: float = spot[1] + (2.9 if spot[2] == 0.0 else -2.9)
-		var pavement: float = 2.6 if spot[2] == 0.0 else 11.4
-		if absf(front - pavement) < 14.0:
-			_box("TownHousePath%d" % index, Vector3(1.4, 0.016, absf(front - pavement)), Vector3(spot[0], 0.108, (front + pavement) / 2.0), Color(0.72, 0.73, 0.7), false, future)
+	plan = preload("res://town_plan.gd").new()
+	plan.build(self)
 
 ## A small Indian shop: coloured facade, half-open shutter, sign and awning.
 ## A market shop: the Blender shop-house for this trade (tools/blender/build_market_shops.py,
@@ -423,5 +411,5 @@ func _vehicles() -> void:
 	town.add_child(market_life)
 
 func _greenery() -> void:
-	for point in [Vector3(-36, 0.1, -2), Vector3(-56, 0.1, -12), Vector3(-44, 0.1, 26), Vector3(-68, 0.1, 30), Vector3(36, 0.1, -14), Vector3(60, 0.1, -30), Vector3(44, 0.1, 28), Vector3(68, 0.1, 44), Vector3(-30, 0.1, -40), Vector3(10, 0.1, -40), Vector3(38, 0.1, 55), Vector3(-36, 0.1, 46), Vector3(-40, 0.1, 57)]:
+	for point in [Vector3(-36, 0.1, -2), Vector3(-68, 0.1, 30), Vector3(36, 0.1, -14), Vector3(44, 0.1, 28), Vector3(68, 0.1, 44), Vector3(-30, 0.1, -40), Vector3(10, 0.1, -40), Vector3(38, 0.1, 55), Vector3(-36, 0.1, 46), Vector3(-40, 0.1, 57)]:
 		town._tree(point)
