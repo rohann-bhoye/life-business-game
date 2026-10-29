@@ -244,6 +244,17 @@ board and a local suggestion form. See Farming section below for controls and li
   reset. Tint by level (green <=3, blue, gold elite 15%, +50% notice); name tag Lv N Name.
   Code-animated (hops/squash, wing flaps, waddle). dungeon_world._spawn_monsters: S cells
   cycle slime/bat/mushroom, Raja Jelly (Lv 5) in the boss chamber. 78 FPS on Low.
+- Cars v2 (2026-10-29): owner rejected our first Blender cars (too crude) and asked for packs, then a Blender
+  supercar like their reference render ("Volterra S7"). (1) Quaternius CC0 Realistic Car Pack (downloaded
+  from itch.io, 2.6 MB, CC0) converted by tools/blender/import_car_pack.py -> assets/props/cars/pack/
+  {normal1,normal2,taxi,suv,sports,sports2,cop}.glb (Body renamed with a "Paint" material, Wheel_FL/FR,
+  Wheels_Back); drivable_car.gd rotates them 180 deg, repaints Paint, glass see-through, lamps glow; bodies
+  have no wheel openings so wheels are widened/pushed out. (2) tools/blender/build_volterra.py -> cars/
+  volterra.glb: lofted body (front shell, rear shell, two door sills = open cabin), glass+carbon roof, wing,
+  splitter, LED strips, tail bar, 4 exhausts, 5-spoke wheels, MODELS["volterra"].own = true (our model
+  faces -z, parts Body/Trim/Glass/Lamps/Wheel_*; no 180 turn). Player home cars = 2 Volterras (red, blue);
+  colony bays hold a mix incl. Volterras (purple/orange/black). Old build_cars.py models (hatchback etc.)
+  are unused. car_world.gd: third-person chase camera is default (C or R3 toggles the cockpit view).
 - Cockpit + street poles (2026-10-29): drivable_car.gd eye per model (data.eye inside the cabin, EYE_DROP 0.7),
   turning steering wheel (torus under wheel_node/spin_node), driver seat removed from build_cars.py,
   gear letter (N/D/R) in car_world HUD. town_plan._streets: pole+wire lines on Main Road ends, Market St,

@@ -120,6 +120,8 @@ func _input(event: InputEvent) -> void:
 			if not menu or player._menu_is_open(): _key(KEY_TAB, down)
 		JOY_BUTTON_START:
 			_key(KEY_ESCAPE, down)
+		JOY_BUTTON_RIGHT_STICK:
+			_key(KEY_C, down)
 		JOY_BUTTON_LEFT_SHOULDER:
 			_key(KEY_SHIFT, down)
 		JOY_BUTTON_BACK:

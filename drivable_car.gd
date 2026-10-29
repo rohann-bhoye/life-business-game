@@ -15,6 +15,7 @@ const MODELS := {
 	"suv": {"name": "SUV", "top": 22.0, "accel": 6.4, "box": Vector3(2.0, 1.25, 4.1), "radius": 0.33, "eye": Vector3(0.45, 0.98, 0.15)},
 	"sports": {"name": "Sports Car", "top": 30.0, "accel": 9.5, "box": Vector3(1.7, 0.95, 3.85), "radius": 0.26, "eye": Vector3(0.4, 0.74, 0.15)},
 	"sports2": {"name": "Racer", "top": 32.0, "accel": 10.0, "box": Vector3(1.75, 1.0, 3.8), "radius": 0.26, "eye": Vector3(0.4, 0.78, 0.15)},
+	"volterra": {"name": "Volterra S7", "own": true, "top": 36.0, "accel": 11.0, "box": Vector3(1.9, 1.15, 4.6), "radius": 0.36, "eye": Vector3(0.45, 1.04, 0.35)},
 	"cop": {"name": "Police Car", "top": 27.0, "accel": 8.5, "box": Vector3(1.7, 1.1, 3.6), "radius": 0.275, "eye": Vector3(0.4, 0.86, 0.12)},
 }
 ## The player's eye height above its own origin (player.gd EYE_HEIGHT): the seat position is
@@ -52,9 +53,11 @@ func _ready() -> void:
 	shape.shape = box
 	shape.position.y = data.box.y / 2.0 + 0.12
 	add_child(shape)
-	var scene := (load("res://assets/props/cars/pack/%s.glb" % kind) as PackedScene).instantiate() as Node3D
-	# The model faces +z; the car drives towards -z.
-	scene.rotation.y = PI
+	var own: bool = data.get("own", false)
+	var path := "res://assets/props/cars/%s.glb" % kind if own else "res://assets/props/cars/pack/%s.glb" % kind
+	var scene := (load(path) as PackedScene).instantiate() as Node3D
+	# The pack models face +z (the car drives towards -z); our own Blender car already faces -z.
+	if not own: scene.rotation.y = PI
 	add_child(scene)
 	for node in scene.find_children("*", "MeshInstance3D", true, false):
 		var part := node as MeshInstance3D
@@ -64,6 +67,26 @@ func _ready() -> void:
 			if source == null: continue
 			var material := source.duplicate() as StandardMaterial3D
 			material.cull_mode = BaseMaterial3D.CULL_DISABLED
+			if own:
+				# One shared atlas: the part decides (Body paint, Glass, Lamps, Trim).
+				match str(part.name).split("_")[0]:
+					"Body":
+						if paint.a > 0.0: material.albedo_color = paint
+						material.metallic = 0.4
+						material.roughness = 0.22
+						# Only the outside of the shell is drawn, so from the seat you see into the cabin.
+						material.cull_mode = BaseMaterial3D.CULL_BACK
+					"Glass":
+						material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+						material.albedo_color = Color(1, 1, 1, 0.5)
+						material.roughness = 0.08
+					"Lamps":
+						material.emission_enabled = true
+						material.emission_texture = material.albedo_texture
+						material.emission_energy_multiplier = 0.9
+						lamp_materials.append(material)
+				part.set_surface_override_material(index, material)
+				continue
 			match str(source.resource_name):
 				"Paint":
 					if paint.a > 0.0: material.albedo_color = paint
@@ -82,7 +105,8 @@ func _ready() -> void:
 		if str(part.name).begins_with("Wheel"):
 			# The bodies have no wheel openings, so the tyres are widened and pushed out to show
 			# beside the body (the rear pair is one mesh with its axle, so it only widens).
-			if str(part.name) == "Wheels_Back": part.scale.x *= 1.26
+			if own: pass
+			elif str(part.name) == "Wheels_Back": part.scale.x *= 1.26
 			else:
 				part.scale.x *= 1.9
 				part.position.x += signf(part.position.x) * 0.13
@@ -166,7 +190,7 @@ func drive(throttle: float, steering: float, handbrake: bool, delta: float) -> v
 		var target := Basis(right, normal, back).orthonormalized()
 		global_transform.basis = global_transform.basis.slerp(target, clampf(delta * 6.0, 0.0, 1.0))
 	for wheel in spinners:
-		wheel.rotation.x += speed * delta / data.radius
+		wheel.rotation.x += speed * delta / data.radius * (-1.0 if data.get("own", false) else 1.0)
 	for wheel in front_wheels: wheel.rotation.y = -steer * 0.5
 	if spin_node != null: spin_node.rotation.y = steer * 2.4
 

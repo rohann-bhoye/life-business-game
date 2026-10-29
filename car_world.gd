@@ -9,7 +9,7 @@ const DrivableCar := preload("res://drivable_car.gd")
 const LOT_AT := Vector3(13.4, 0.1, -0.1)
 const BAY := 2.7
 const REACH := 3.2
-const CARS := [["sports", Color(0.78, 0.12, 0.14)], ["normal1", Color(0.14, 0.28, 0.62)]]
+const CARS := [["volterra", Color(0.72, 0.05, 0.07)], ["volterra", Color(0.08, 0.2, 0.68)]]
 
 var ops: Node
 var player: CharacterBody3D
@@ -18,6 +18,10 @@ var driving: CharacterBody3D
 var hud: Label
 var saved_layers := Vector2i.ZERO
 var last_yaw := 0.0
+## Third person (the default) follows the car from behind and above; C (or a click of the right
+## stick) switches to the view from the driver seat.
+var third_person := true
+var chase_cam: Camera3D
 
 func _ready() -> void:
 	name = "CarWorld"
@@ -37,6 +41,11 @@ func _ready() -> void:
 	hud.position += Vector2(-130, -90)
 	hud.visible = false
 	layer.add_child(hud)
+	chase_cam = Camera3D.new()
+	chase_cam.name = "ChaseCamera"
+	chase_cam.far = 800.0
+	chase_cam.near = 0.1
+	add_child(chase_cam)
 	get_tree().current_scene.get_node("Shop/ShopArea").business.clock_changed.connect(_update_lamps)
 
 ## Your two bays by the home: a paved driveway from the Main Road's pavement north
@@ -112,7 +121,7 @@ func _near_car() -> CharacterBody3D:
 	return best
 
 func hint() -> String:
-	if is_instance_valid(driving): return "E - get out of the car"
+	if is_instance_valid(driving): return "E - get out of the car   (C - change view)"
 	var car := _near_car()
 	if car == null: return ""
 	return "E - drive the %s  (W/S gas and brake, A/D steer, Space handbrake)" % car.data.name
@@ -139,6 +148,31 @@ func _get_in(car: CharacterBody3D) -> void:
 	last_yaw = car.rotation.y
 	player.global_position = car.seat_position()
 	hud.visible = true
+	_apply_view(true)
+
+## Third person or the driver seat: whichever camera is current.
+func _apply_view(snap: bool) -> void:
+	if third_person and is_instance_valid(driving):
+		if snap: _chase(1.0)
+		chase_cam.current = true
+	else:
+		player.camera.current = true
+
+func _chase(weight: float) -> void:
+	var car := driving
+	var behind: Vector3 = car.global_transform.basis.z
+	behind.y = 0.0
+	behind = behind.normalized()
+	var wanted: Vector3 = car.global_position + behind * (6.4 + absf(car.speed) * 0.05) + Vector3(0, 2.5, 0)
+	chase_cam.global_position = chase_cam.global_position.lerp(wanted, weight)
+	chase_cam.look_at(car.global_position + Vector3(0, 0.9, 0) - behind * 1.5)
+	chase_cam.fov = 68.0 + clampf(absf(car.speed) * 0.7, 0.0, 14.0)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if is_instance_valid(driving) and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_C:
+		third_person = not third_person
+		_apply_view(true)
+		get_viewport().set_input_as_handled()
 
 func _get_out() -> void:
 	var car := driving
@@ -146,6 +180,7 @@ func _get_out() -> void:
 	car.occupied = false
 	car.speed = 0.0
 	hud.visible = false
+	player.camera.current = true
 	player.collision_layer = saved_layers.x
 	player.collision_mask = saved_layers.y
 	player.global_position = car.to_global(Vector3(-2.0, 0.9, 0.2))
@@ -171,6 +206,7 @@ func _physics_process(delta: float) -> void:
 	player.rotation.y += driving.rotation.y - last_yaw
 	last_yaw = driving.rotation.y
 	player.global_position = driving.seat_position()
+	if third_person: _chase(minf(1.0, delta * 7.0))
 	var gear := "N" if absf(driving.speed) < 0.4 else ("D" if driving.speed > 0.0 else "R")
 	hud.text = "%s   %d km/h   %s" % [gear, roundi(absf(driving.speed) * 3.6), driving.data.name]
 	if player.global_position.y < -20.0: _get_out()

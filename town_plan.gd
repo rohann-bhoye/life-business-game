@@ -105,8 +105,8 @@ func _house(colony: Dictionary, x: float, z: float, toward: float, pole_zs: Arra
 	for side in [-1, 1]: IndianHouse.box(details, Vector3(bay.x, 0.118, bay.z + side * BAY_WIDTH / 2.0), Vector3(BAY_LENGTH - 0.2, 0.008, 0.07), LINE)
 	IndianHouse.box(details, Vector3(bay.x - toward * (BAY_LENGTH / 2.0 - 0.1), 0.118, bay.z), Vector3(0.07, 0.008, BAY_WIDTH), LINE)
 	if index % 2 == 0:
-		var kinds := ["normal1", "suv", "normal2", "taxi", "sports2", "cop", "sports"]
-		var colours := [Color(0.78, 0.12, 0.14), Color(0.14, 0.28, 0.62), Color(0.9, 0.9, 0.88), Color(0.16, 0.45, 0.28), Color(0.95, 0.75, 0.15), Color(0.35, 0.35, 0.38)]
+		var kinds := ["normal1", "volterra", "suv", "normal2", "taxi", "volterra", "sports2", "cop", "sports", "volterra"]
+		var colours := [Color(0.78, 0.12, 0.14), Color(0.55, 0.2, 0.7), Color(0.9, 0.9, 0.88), Color(0.16, 0.45, 0.28), Color(0.95, 0.55, 0.1), Color(0.12, 0.12, 0.14), Color(0.14, 0.28, 0.62)]
 		var pick: String = kinds[(index / 2) % kinds.size()]
 		car_spots.append([Vector3(bay.x, 0.0, bay.z), -PI / 2.0 * toward, pick, Color(0, 0, 0, 0) if pick in ["taxi", "cop"] else colours[(index / 2) % colours.size()]])
 	# The service wire from the nearest pole to the house roof.
