@@ -27,7 +27,7 @@ const GAME_SCENE := "res://main.tscn.tscn"
 
 const KenneyTheme := preload("res://kenney_theme.gd")
 const CREDITS := "Made by Bucketstudy team"
-const VERSION := "Development Demo | v0.8"
+const VERSION := "Development Demo | v0.9"
 const WHATS_NEW := ["Co-op: run one shop with up to 3 friends", "Indian town: mandir, pani puri cart, cows", "Thick grass, block paths and a home yard", "Graphics presets, 3D resolution, FPS counter", "Longer days: a relaxed 12-minute shop day", "Street lamps glow at night on every setting"]
 
 ## Lobby look: Kenney buttons (green / blue / grey / red) on dark glass panels,

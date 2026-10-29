@@ -244,6 +244,9 @@ board and a local suggestion form. See Farming section below for controls and li
   reset. Tint by level (green <=3, blue, gold elite 15%, +50% notice); name tag Lv N Name.
   Code-animated (hops/squash, wing flaps, waddle). dungeon_world._spawn_monsters: S cells
   cycle slime/bat/mushroom, Raja Jelly (Lv 5) in the boss chamber. 78 FPS on Low.
+- Demo v0.9 BUILT (2026-10-30): build/LifeBusinessGame_Demo_v0.9.zip (51 MB; exe + 21 MB pck + libterrain release DLL +
+  READ ME with controls, driving, new features). Version string in main_menu.gd and export_presets 0.9.0.0.
+  Exe smoke-tested headless (no errors, not played). Not uploaded to itch.io / website yet.
 - Empty land filled (2026-10-30): town_extras.gd (after farm_village in town_expansion): Apna Vidyalaya school
   at (-24,-44) (26 m classroom block facing south, flagpole, assembly ground, compound wall + gate, swings/
   slide/see-saw, 4 trees), Gram Maidan cricket ground at (26,-40) (mown oval 14.5x7.5, pitch, stumps, boundary
