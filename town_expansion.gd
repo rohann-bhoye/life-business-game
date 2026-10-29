@@ -137,7 +137,7 @@ const LandShape := preload("res://land_shape.gd")
 ## drawn in 64 m squares (one MultiMesh per kind per square, so squares out of view
 ## are skipped) and each has a trunk collider, as the hills can be walked.
 const FOREST_SQUARE := 64.0
-const FOREST_TREES := 1300
+const FOREST_TREES := 3400
 
 func _hill_forest() -> void:
 	var landscape := town.get_parent().get_node_or_null("Landscape")
@@ -149,7 +149,7 @@ func _hill_forest() -> void:
 	var trunks := StaticBody3D.new()
 	trunks.name = "ForestTrunks"
 	var planted := 0
-	for attempt in range(10000):
+	for attempt in range(26000):
 		var x := rng.randf_range(-124.0, 123.0)
 		var z := rng.randf_range(-250.0, 123.0)
 		if LandShape.FLAT_TOWN.grow(3.0).has_point(Vector2(x, z)): continue
@@ -159,7 +159,7 @@ func _hill_forest() -> void:
 		if Vector2(x - LandShape.GUILD_X, z - LandShape.GUILD_Z).length() < 11.0: continue
 		var height: float = data.get_height(Vector3(x, 0, z))
 		var steepness: float = absf(data.get_height(Vector3(x + 1.0, 0, z)) - height) + absf(data.get_height(Vector3(x, 0, z + 1.0)) - height)
-		if height < 0.6 or height > 30.0 or steepness > 1.8: continue
+		if height < 0.6 or height > 40.0 or steepness > 2.3: continue
 		var neem := height < 7.0 and rng.randf() < 0.55
 		var size := rng.randf_range(0.85, 1.25) if neem else rng.randf_range(1.3, 2.5)
 		var foot := Vector3(x, height - (0.15 if neem else 0.45 * size), z)
@@ -186,6 +186,8 @@ func _hill_forest() -> void:
 			for index in range(spots.size()): multimesh.set_instance_transform(index, spots[index])
 			var forest := MultiMeshInstance3D.new()
 			forest.name = "%s%d_%d" % [["HillPines", "HillNeems"][kind], key.x, key.y]
+			forest.visibility_range_end = 150.0
+			forest.visibility_range_end_margin = 15.0
 			forest.multimesh = multimesh
 			forest.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			town.add_child(forest)
