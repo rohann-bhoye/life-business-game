@@ -244,6 +244,10 @@ board and a local suggestion form. See Farming section below for controls and li
   reset. Tint by level (green <=3, blue, gold elite 15%, +50% notice); name tag Lv N Name.
   Code-animated (hops/squash, wing flaps, waddle). dungeon_world._spawn_monsters: S cells
   cycle slime/bat/mushroom, Raja Jelly (Lv 5) in the boss chamber. 78 FPS on Low.
+- Home furniture (2026-10-29): tools/blender/build_home_furniture.py -> assets/props/home/*.glb
+  (bed, almirah, diwan, tv_unit, dining_table, chair, mandir, kitchen_unit, side_table, matka,
+  rug). home_decor.gd PIECES uses them via the "own:" prefix (Kenney.fit scales by the min
+  factor, so fit sizes must match the models); fridge, plants and KayKit lamp/cactus remain.
 - Cars (2026-10-29): tools/blender/build_cars.py -> assets/props/cars/{hatchback,sedan,suv,pickup}.glb
   (parts Body/Trim/Glass/Lamps/Wheel_FL..RR, car faces -Z in Godot, driver seat right
   (0.37,1.1,0.12)). drivable_car.gd: arcade CharacterBody3D (gas/brake/steer/handbrake, tilt
