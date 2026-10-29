@@ -15,11 +15,10 @@ var bob_phase := 0.0
 
 var indoors := false
 var controller: Node
-## Fly mode for testing (the Fly button on screen, F, or L3 on a controller): no gravity and
+## Fly mode for testing (the F key, or L3 on a controller; no button on screen): no gravity and
 ## no collisions; W/A/S/D go where you look, Space rises, Shift or Ctrl sinks, Alt is
 ## faster. Off by default and never saved.
 var flying := false
-var fly_button: Button
 var fly_layers := Vector2i.ZERO
 var shop_indoors := false
 var warehouse_indoors := false
@@ -46,18 +45,6 @@ func _ready():
 	controller = preload("res://controller.gd").new()
 	controller.name = "Controller"
 	add_child(controller)
-	var fly_layer := CanvasLayer.new()
-	fly_layer.layer = 20
-	add_child(fly_layer)
-	fly_button = Button.new()
-	fly_button.name = "FlyButton"
-	fly_button.text = "Fly: OFF  (F)"
-	fly_button.focus_mode = Control.FOCUS_NONE
-	fly_button.position = Vector2(16, 78)
-	fly_button.custom_minimum_size = Vector2(120, 30)
-	fly_button.add_theme_font_size_override("font_size", 13)
-	fly_button.pressed.connect(toggle_flying)
-	fly_layer.add_child(fly_button)
 	controller.changed.connect(func(pad: bool): get_tree().current_scene.get_node("Ui")._on_device_changed(pad))
 	spring_arm.add_excluded_object(get_rid())
 	spring_arm.spring_length = 0.0
@@ -128,8 +115,6 @@ func toggle_flying() -> void:
 		collision_layer = fly_layers.x
 		collision_mask = fly_layers.y
 		velocity = Vector3.ZERO
-	fly_button.text = "Fly: ON  (F)" if flying else "Fly: OFF  (F)"
-	fly_button.modulate = Color(0.55, 1.0, 0.6) if flying else Color.WHITE
 
 func _unhandled_input(event):
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F and not _menu_is_open():
