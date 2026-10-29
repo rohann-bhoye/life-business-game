@@ -48,6 +48,7 @@ var exit_point := Vector3.ZERO
 var busy := false
 ## Treasure found on this trip, by kind (dungeon_store.gd).
 var finds := {}
+var monsters: Array[Node3D] = []
 var hud: Label
 var guild: Node3D
 const GUILD_COUNTER := Vector3(0.0, 1.4, -0.5)
@@ -302,7 +303,8 @@ func _enter(index: int) -> void:
 	player.global_position = UNDER + floor_root.get_meta("entry", Vector3(0, 1, 0))
 	player.velocity = Vector3.ZERO
 	player.rotation.y = floor_root.get_meta("facing", 0.0)
-	_feedback("%s - Rank %s. Find the treasure; monsters come in the next update." % [FLOORS[index].name, FLOORS[index].rank])
+	_spawn_monsters(index)
+	_feedback("%s - Rank %s. Find the treasure and keep away from the monsters!" % [FLOORS[index].name, FLOORS[index].rank])
 	hud.visible = true
 	_update_hud()
 	await _fade_to(0.0)
@@ -329,6 +331,43 @@ func _leave() -> void:
 	player.global_position = cave.to_global(Vector3(0, 1.0, 3.2))
 	player.velocity = Vector3.ZERO
 	player.rotation.y = CAVE_YAW
+	await _fade_to(0.0)
+	busy = false
+
+## Floor monsters (no weapon yet: they only chase): slimes, bats and mushrooms on the
+## S cells, Raja Jelly in the boss chamber, each at a level in its kind's range.
+func _spawn_monsters(_index: int) -> void:
+	monsters.clear()
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var kinds := ["slime", "bat", "mushroom"]
+	var spawns: Array[Vector3] = floor_root.spawns
+	for number in range(spawns.size()):
+		var type: String = kinds[number % kinds.size()]
+		var levels: Array = preload("res://monster.gd").KINDS[type].levels
+		var monster := preload("res://monster.gd").create(type, rng.randi_range(levels[0], levels[1]), spawns[number], rng.randf() < 0.15, self, player)
+		floor_root.add_child(monster)
+		monsters.append(monster)
+	if floor_root.boss_spot != Vector3.ZERO:
+		var boss := preload("res://monster.gd").create("boss", 5, floor_root.boss_spot, false, self, player)
+		floor_root.add_child(boss)
+		monsters.append(boss)
+
+## A monster caught the player: back to the entry stone, this trip's finds lost.
+func caught(monster: Node3D) -> void:
+	if busy: return
+	busy = true
+	await _fade_to(1.0)
+	var dropped := 0
+	for kind in finds: dropped += int(finds[kind])
+	finds = {}
+	for other in monsters:
+		if is_instance_valid(other): other.reset()
+	for jar in floor_root.loot: jar.visible = true
+	player.global_position = floor_root.to_global(floor_root.get_meta("entry"))
+	player.velocity = Vector3.ZERO
+	_feedback("%s caught you!%s" % [monster.data.name, " You dropped %d treasure." % dropped if dropped > 0 else ""])
+	_update_hud()
 	await _fade_to(0.0)
 	busy = false
 

@@ -235,6 +235,15 @@ board and a local suggestion form. See Farming section below for controls and li
   dungeon_store.gd (business_backend `treasure`, save key "treasure"): held/sold/deepest,
   fixed prices jar 40 / shard 120 / coin 300; guild income = sold x price, added to the
   money identity; sell_treasure() pays it. ~60 FPS on Floor 1 on Low.
+- Dungeon M3 (2026-10-29): Floor 1 monsters. tools/blender/build_monsters.py ->
+  assets/characters/monsters/{jugnu_slime,chamgadar,khumbi,raja_jelly}.glb (separate parts
+  Body/WingL/WingR/Cap/Stem/Feet/Crown; Blender renames repeats to Body_001, monster.gd
+  strips the suffix). monster.gd (CharacterBody3D, mask 1 only): wander near home, notice in
+  line of sight within radius ("!"), chase (slower than the player), give up after 3 s,
+  caught -> dungeon_world.caught(): fade, back to entry stone, trip finds dropped, monsters
+  reset. Tint by level (green <=3, blue, gold elite 15%, +50% notice); name tag Lv N Name.
+  Code-animated (hops/squash, wing flaps, waddle). dungeon_world._spawn_monsters: S cells
+  cycle slime/bat/mushroom, Raja Jelly (Lv 5) in the boss chamber. 78 FPS on Low.
 - Darwaza Guild (2026-10-29): tools/blender/build_guild_office.py -> guild_office.glb at
   land_shape GUILD_X/Z -80/-18 (pad GUILD_FLOOR 0.4, re-baked), facing +z; clerk
   (character female-c) behind the counter, notice board Label3D with gate times; E at the
