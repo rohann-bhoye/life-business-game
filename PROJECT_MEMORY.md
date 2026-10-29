@@ -244,6 +244,9 @@ board and a local suggestion form. See Farming section below for controls and li
   reset. Tint by level (green <=3, blue, gold elite 15%, +50% notice); name tag Lv N Name.
   Code-animated (hops/squash, wing flaps, waddle). dungeon_world._spawn_monsters: S cells
   cycle slime/bat/mushroom, Raja Jelly (Lv 5) in the boss chamber. 78 FPS on Low.
+- Fly mode (2026-10-29, testing): player.gd toggle_flying() - on-screen Fly button (top-left, y 78,
+  no focus), F key, L3 on a pad. Flying = no gravity, collision layers 0, move along the camera, Space up,
+  Shift/Ctrl down (LB on pad), Alt faster. Not saved.
 - Town plan, phase 1 (2026-10-29): town_plan.gd (called from town_expansion._houses, the old scattered
   16 TownHouse spots are gone). West Colony lane x -52 (houses x -60.3 / -43.7, 9 houses) and East
   Colony lane x 62.5 (houses x 70.8, 7 houses): 4.4 m lanes crossing the Main Road, 1.4 m pavements,

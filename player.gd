@@ -15,6 +15,12 @@ var bob_phase := 0.0
 
 var indoors := false
 var controller: Node
+## Fly mode for testing (the Fly button on screen, F, or L3 on a controller): no gravity and
+## no collisions; W/A/S/D go where you look, Space rises, Shift or Ctrl sinks, Alt is
+## faster. Off by default and never saved.
+var flying := false
+var fly_button: Button
+var fly_layers := Vector2i.ZERO
 var shop_indoors := false
 var warehouse_indoors := false
 var bargain_menu: Control
@@ -40,6 +46,18 @@ func _ready():
 	controller = preload("res://controller.gd").new()
 	controller.name = "Controller"
 	add_child(controller)
+	var fly_layer := CanvasLayer.new()
+	fly_layer.layer = 20
+	add_child(fly_layer)
+	fly_button = Button.new()
+	fly_button.name = "FlyButton"
+	fly_button.text = "Fly: OFF  (F)"
+	fly_button.focus_mode = Control.FOCUS_NONE
+	fly_button.position = Vector2(16, 78)
+	fly_button.custom_minimum_size = Vector2(120, 30)
+	fly_button.add_theme_font_size_override("font_size", 13)
+	fly_button.pressed.connect(toggle_flying)
+	fly_layer.add_child(fly_button)
 	controller.changed.connect(func(pad: bool): get_tree().current_scene.get_node("Ui")._on_device_changed(pad))
 	spring_arm.add_excluded_object(get_rid())
 	spring_arm.spring_length = 0.0
@@ -99,7 +117,28 @@ func look_by(yaw: float, pitch: float) -> void:
 	rotate_y(-yaw)
 	camera_pivot.rotation.x = clampf(camera_pivot.rotation.x - pitch * (-1 if invert_y else 1), deg_to_rad(-LOOK_LIMIT), deg_to_rad(LOOK_LIMIT))
 
+func toggle_flying() -> void:
+	flying = not flying
+	if flying:
+		fly_layers = Vector2i(collision_layer, collision_mask)
+		collision_layer = 0
+		collision_mask = 0
+		velocity = Vector3.ZERO
+	else:
+		collision_layer = fly_layers.x
+		collision_mask = fly_layers.y
+		velocity = Vector3.ZERO
+	fly_button.text = "Fly: ON  (F)" if flying else "Fly: OFF  (F)"
+	fly_button.modulate = Color(0.55, 1.0, 0.6) if flying else Color.WHITE
+
 func _unhandled_input(event):
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F and not _menu_is_open():
+		toggle_flying()
+		get_viewport().set_input_as_handled()
+		return
+	if event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_LEFT_STICK:
+		toggle_flying()
+		return
 	if event.is_action_pressed("ui_cancel"):
 		if _menu_is_open():
 			var dialog := get_tree().current_scene.get_node_or_null("Ui/StaffDialog")
@@ -167,6 +206,18 @@ func _physics_process(delta):
 	if direction == Vector3.ZERO and is_instance_valid(controller):
 		var stick: Vector2 = controller.move_vector()
 		direction = Vector3(stick.x, 0, stick.y)
+
+	if flying:
+		# Fly where the camera looks.
+		var heading: Vector3 = camera.global_transform.basis * direction
+		var lift := 0.0
+		if not _menu_is_open():
+			if Input.is_key_pressed(KEY_SPACE): lift += 1.0
+			if Input.is_key_pressed(KEY_SHIFT) or Input.is_key_pressed(KEY_CTRL): lift -= 1.0
+		var pace: float = speed * (9.0 if Input.is_key_pressed(KEY_ALT) else 3.5)
+		velocity = (heading + Vector3(0, lift, 0)).limit_length(1.0) * pace
+		move_and_slide()
+		return
 
 	direction = transform.basis * direction
 
