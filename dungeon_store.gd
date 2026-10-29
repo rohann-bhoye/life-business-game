@@ -15,6 +15,9 @@ var held := {"jar": 0, "shard": 0, "coin": 0}
 var sold := {"jar": 0, "shard": 0, "coin": 0}
 ## Deepest floor reached (1-3, 0 before the first visit).
 var deepest := 0
+## The weapon taken from the table outside the cave (dungeon_world.gd WEAPONS), or empty.
+var weapon := ""
+const WEAPONS := ["", "lathi", "talwar", "gada"]
 
 func add(kind: String, count: int) -> void:
 	if held.has(kind): held[kind] = mini(MAX_COUNT, held[kind] + maxi(0, count))
@@ -44,13 +47,14 @@ func sell_all() -> int:
 	return paid
 
 func snapshot() -> Dictionary:
-	return {"held": held.duplicate(), "sold": sold.duplicate(), "deepest": deepest}
+	return {"held": held.duplicate(), "sold": sold.duplicate(), "deepest": deepest, "weapon": weapon}
 
 func restore(data: Dictionary) -> void:
 	for kind in ITEMS:
 		held[kind] = int(data.get("held", {}).get(kind, 0))
 		sold[kind] = int(data.get("sold", {}).get(kind, 0))
 	deepest = int(data.get("deepest", 0))
+	weapon = str(data.get("weapon", "")) if str(data.get("weapon", "")) in WEAPONS else ""
 
 static func valid(data) -> bool:
 	if not data is Dictionary: return false
@@ -61,5 +65,6 @@ static func valid(data) -> bool:
 			if not ITEMS.has(str(kind)): return false
 			var count = counts[kind]
 			if not (count is int or count is float) or int(count) != count or int(count) < 0 or int(count) > MAX_COUNT: return false
+	if not str(data.get("weapon", "")) in WEAPONS: return false
 	var deepest = data.get("deepest", 0)
 	return (deepest is int or deepest is float) and int(deepest) >= 0 and int(deepest) <= 3

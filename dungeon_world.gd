@@ -50,10 +50,22 @@ var busy := false
 var finds := {}
 var audio: Node
 var lathi: Node3D
+var table: Node3D
+var displays: Array[Node3D] = []
 var swing_ready := true
 var monsters: Array[Node3D] = []
 var hud: Label
 var guild: Node3D
+## The weapons on the table outside the cave: damage per hit, seconds per swing, reach in
+## metres. Taking one is saved; you need one to fight below.
+const WEAPON_IDS := ["lathi", "talwar", "gada"]
+const TABLE_SLOTS := [-0.8, 0.0, 0.8]
+const TABLE_AT := Vector3(-3.6, 0.0, 6.4)
+const WEAPONS := {
+	"lathi": {"name": "Lathi", "damage": 1, "rate": 0.5, "reach": 2.6, "note": "1 damage, fast"},
+	"talwar": {"name": "Talwar", "damage": 2, "rate": 0.62, "reach": 2.9, "note": "2 damage, long reach"},
+	"gada": {"name": "Gada", "damage": 3, "rate": 1.0, "reach": 2.5, "note": "3 damage, slow and heavy"},
+}
 const GUILD_COUNTER := Vector3(0.0, 1.4, -0.5)
 
 func _ready() -> void:
@@ -62,6 +74,7 @@ func _ready() -> void:
 	player = get_tree().current_scene.get_node("Player")
 	_build_cave()
 	_build_guild()
+	_build_table()
 	_build_fade()
 	business.clock_changed.connect(_update_gate)
 	_update_gate()
@@ -242,6 +255,11 @@ func _portal_point() -> Vector3:
 ## The interaction line shown under the crosshair (shop_operations.gd asks).
 func hint() -> String:
 	if busy: return ""
+	if underground_floor < 0 and _table_slot() >= 0:
+		var id: String = WEAPON_IDS[_table_slot()]
+		var info: Dictionary = WEAPONS[id]
+		if business.treasure.weapon == id: return "You are holding the %s (%s)" % [info.name, info.note]
+		return "E - take the %s (%s)" % [info.name, info.note]
 	if underground_floor >= 0:
 		if player.global_position.distance_to(exit_point) < REACH: return "E - climb back up to the town"
 		var found: String = floor_root.hint_at(floor_root.to_local(player.global_position))
@@ -260,6 +278,9 @@ func hint() -> String:
 
 func try_interact() -> bool:
 	if busy: return false
+	if underground_floor < 0 and _table_slot() >= 0:
+		_take(_table_slot())
+		return true
 	if underground_floor >= 0:
 		if player.global_position.distance_to(exit_point) < REACH:
 			_leave()
@@ -302,8 +323,9 @@ func _enter(index: int) -> void:
 	if day_night != null and day_night.has_method("set_underground"): day_night.set_underground(FLOORS[index])
 	audio = preload("res://dungeon_audio.gd").new()
 	add_child(audio)
-	lathi = _make_lathi()
-	player.camera.add_child(lathi)
+	if business.treasure.weapon != "":
+		lathi = _make_held(business.treasure.weapon)
+		player.camera.add_child(lathi)
 	floor_root = preload("res://dungeon_floor.gd").create(index, UNDER)
 	add_child(floor_root)
 	finds = {}
@@ -385,42 +407,79 @@ func caught(monster: Node3D) -> void:
 func sound(kind: String) -> void:
 	if is_instance_valid(audio): audio.play(kind)
 
-## The policeman's bamboo lathi, held low on the right in first person.
-func _make_lathi() -> Node3D:
+## A weapon held low on the right in first person (the Blender model of `id`).
+func _make_held(id: String) -> Node3D:
 	var held := Node3D.new()
-	held.name = "Lathi"
+	held.name = "Weapon"
 	held.position = Vector3(0.34, -0.3, -0.55)
 	held.rotation = Vector3(deg_to_rad(-62), deg_to_rad(8), deg_to_rad(-6))
-	var shaft := MeshInstance3D.new()
-	var tube := CylinderMesh.new()
-	tube.top_radius = 0.025
-	tube.bottom_radius = 0.032
-	tube.height = 0.95
-	tube.radial_segments = 8
-	var bamboo := StandardMaterial3D.new()
-	bamboo.albedo_color = Color(0.78, 0.6, 0.3)
-	bamboo.roughness = 0.8
-	tube.material = bamboo
-	shaft.mesh = tube
-	shaft.position.y = 0.3
-	held.add_child(shaft)
-	for ring in [0.0, 0.3, 0.62]:
-		var band := MeshInstance3D.new()
-		var cylinder := CylinderMesh.new()
-		cylinder.top_radius = 0.037
-		cylinder.bottom_radius = 0.037
-		cylinder.height = 0.025
-		var dark := StandardMaterial3D.new()
-		dark.albedo_color = Color(0.35, 0.22, 0.1)
-		cylinder.material = dark
-		band.mesh = cylinder
-		band.position.y = ring - 0.12
-		held.add_child(band)
+	var model := (load("res://assets/props/dungeon/weapons/%s.glb" % id) as PackedScene).instantiate() as Node3D
+	held.add_child(model)
 	return held
+
+## The weapon table in front of the cave: lathi, talwar and gada lie on a red cloth, each
+## on a soft glow. E takes (or swaps to) the one you stand beside.
+func _build_table() -> void:
+	table = (load("res://assets/props/dungeon/weapons/weapon_table.glb") as PackedScene).instantiate() as Node3D
+	table.name = "WeaponTable"
+	table.position = TABLE_AT
+	cave.add_child(table)
+	_body("TableTop", table, Vector3(2.9, 0.95, 1.2), Vector3(0, 0.475, -0.55))
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glow.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	glow.albedo_color = Color(1.0, 0.85, 0.45, 0.14)
+	for index in range(WEAPON_IDS.size()):
+		var shown := (load("res://assets/props/dungeon/weapons/%s.glb" % WEAPON_IDS[index]) as PackedScene).instantiate() as Node3D
+		shown.name = WEAPON_IDS[index]
+		shown.rotation.x = -PI / 2.0
+		shown.position = Vector3(TABLE_SLOTS[index], 0.98, 0.05)
+		table.add_child(shown)
+		displays.append(shown)
+		var halo := MeshInstance3D.new()
+		var disc := CylinderMesh.new()
+		disc.top_radius = 0.26
+		disc.bottom_radius = 0.26
+		disc.height = 0.004
+		disc.material = glow
+		halo.mesh = disc
+		halo.position = Vector3(TABLE_SLOTS[index], 0.958, -0.5)
+		halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		table.add_child(halo)
+	_refresh_table()
+
+func _refresh_table() -> void:
+	var holding: String = business.treasure.weapon
+	for index in range(displays.size()): displays[index].visible = WEAPON_IDS[index] != holding
+
+## Which weapon the player stands beside (index), or -1 if they are not at the table.
+func _table_slot() -> int:
+	if not is_instance_valid(table): return -1
+	var at: Vector3 = table.to_local(player.global_position)
+	if absf(at.x) > 1.9 or at.z < -0.4 or at.z > 2.4: return -1
+	var best := 0
+	for index in range(TABLE_SLOTS.size()):
+		if absf(at.x - TABLE_SLOTS[index]) < absf(at.x - TABLE_SLOTS[best]): best = index
+	return best
+
+func _take(index: int) -> void:
+	var id: String = WEAPON_IDS[index]
+	if business.treasure.weapon == id:
+		_feedback("You are already holding the %s." % WEAPONS[id].name)
+		return
+	business.treasure.weapon = id
+	business.save_progress()
+	sound("pick")
+	_refresh_table()
+	_feedback("You took the %s: %s. Left click swings it underground." % [WEAPONS[id].name, WEAPONS[id].note])
 
 func _unhandled_input(event: InputEvent) -> void:
 	if underground_floor < 0 or busy or not swing_ready: return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		if not is_instance_valid(lathi):
+			_feedback("You have no weapon! Take one from the table outside the cave.")
+			return
 		_swing()
 
 ## A lathi swing: 0.5 s apart, hits at the middle of the arc the nearest monster in front
@@ -428,14 +487,15 @@ func _unhandled_input(event: InputEvent) -> void:
 func _swing() -> void:
 	swing_ready = false
 	sound("swing")
+	var slow: float = WEAPONS[business.treasure.weapon].rate / 0.5
 	var home := lathi.rotation
 	var arc := create_tween()
-	arc.tween_property(lathi, "rotation", Vector3(deg_to_rad(-20), deg_to_rad(-34), deg_to_rad(18)), 0.11).set_ease(Tween.EASE_OUT)
-	arc.tween_property(lathi, "rotation", Vector3(deg_to_rad(-100), deg_to_rad(30), deg_to_rad(-20)), 0.14)
-	arc.tween_property(lathi, "rotation", home, 0.2)
-	await get_tree().create_timer(0.14).timeout
+	arc.tween_property(lathi, "rotation", Vector3(deg_to_rad(-20), deg_to_rad(-34), deg_to_rad(18)), 0.11 * slow).set_ease(Tween.EASE_OUT)
+	arc.tween_property(lathi, "rotation", Vector3(deg_to_rad(-100), deg_to_rad(30), deg_to_rad(-20)), 0.14 * slow)
+	arc.tween_property(lathi, "rotation", home, 0.2 * slow)
+	await get_tree().create_timer(0.14 * slow).timeout
 	if underground_floor >= 0 and not busy: _strike()
-	await get_tree().create_timer(0.36).timeout
+	await get_tree().create_timer(0.36 * slow).timeout
 	swing_ready = true
 
 func _strike() -> void:
@@ -443,7 +503,8 @@ func _strike() -> void:
 	forward.y = 0.0
 	forward = forward.normalized()
 	var best: Node3D = null
-	var best_distance := 2.6
+	var stats: Dictionary = WEAPONS[business.treasure.weapon]
+	var best_distance: float = stats.reach
 	for monster in monsters:
 		if not is_instance_valid(monster) or monster.dying: continue
 		var to: Vector3 = monster.global_position - player.global_position
@@ -453,11 +514,11 @@ func _strike() -> void:
 			best = monster
 			best_distance = reach
 	if best != null:
-		best.hurt(1, player.global_position)
+		best.hurt(stats.damage, player.global_position)
 		return
 	var local_at: Vector3 = floor_root.to_local(player.global_position)
 	var local_forward: Vector3 = (floor_root.global_transform.basis.inverse() * forward).normalized()
-	var got: int = floor_root.strike(local_at, local_forward)
+	var got: int = floor_root.strike(local_at, local_forward, stats.damage)
 	if got == 0: sound("hit")
 	elif got > 0:
 		sound("break")

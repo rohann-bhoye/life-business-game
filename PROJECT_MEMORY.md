@@ -244,6 +244,12 @@ board and a local suggestion form. See Farming section below for controls and li
   reset. Tint by level (green <=3, blue, gold elite 15%, +50% notice); name tag Lv N Name.
   Code-animated (hops/squash, wing flaps, waddle). dungeon_world._spawn_monsters: S cells
   cycle slime/bat/mushroom, Raja Jelly (Lv 5) in the boss chamber. 78 FPS on Low.
+- Weapon table (2026-10-29): tools/blender/build_weapons.py -> assets/props/dungeon/weapons
+  (weapon_table, lathi, talwar, gada). dungeon_world.gd builds the table on the cave apron
+  (cave-local (-3.6, 0, 6.4)); stand by a weapon, E takes/swaps (WEAPONS: lathi 1 dmg 0.5 s
+  reach 2.6, talwar 2 dmg 0.62 s 2.9, gada 3 dmg 1.0 s 2.5), the taken one leaves the table.
+  Saved in business.treasure.weapon (dungeon_store.gd). Underground you need one; left click
+  swings the held model; damage/reach/rate come from the weapon.
 - Controller (2026-10-29): controller.gd (child of Player, made in player._ready) turns an Xbox-
   layout pad into the inputs the game reads: left stick walk (player adds move_vector()),
   right stick look (player.look_by), A jump, X=E, B=Q, Y=Tab, RT/RB = left click (lathi),

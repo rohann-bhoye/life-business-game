@@ -340,12 +340,12 @@ func _ore(at: Vector3, rng: RandomNumberGenerator) -> void:
 ## A lathi swing from `at` (local) towards `facing` (local, flat): the nearest ore rock
 ## in front takes a hit. -1 nothing there, 0 hit (it shakes and cracks), else the
 ## treasure it broke into (smoke and chunks fly).
-func strike(at: Vector3, facing: Vector3) -> int:
+func strike(at: Vector3, facing: Vector3, damage := 1) -> int:
 	for ore in ores:
 		var to: Vector3 = ore.position - at
 		to.y = 0.0
 		if to.length() > 2.7 or to.normalized().dot(facing) < 0.35: continue
-		var hp: int = ore.get_meta("hp") - 1
+		var hp: int = ore.get_meta("hp") - damage
 		ore.set_meta("hp", hp)
 		var Effects := preload("res://dungeon_effects.gd")
 		if hp > 0:
