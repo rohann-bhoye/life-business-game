@@ -244,6 +244,13 @@ board and a local suggestion form. See Farming section below for controls and li
   reset. Tint by level (green <=3, blue, gold elite 15%, +50% notice); name tag Lv N Name.
   Code-animated (hops/squash, wing flaps, waddle). dungeon_world._spawn_monsters: S cells
   cycle slime/bat/mushroom, Raja Jelly (Lv 5) in the boss chamber. 78 FPS on Low.
+- Cockpit + street poles (2026-10-29): drivable_car.gd eye per model (data.eye inside the cabin, EYE_DROP 0.7),
+  turning steering wheel (torus under wheel_node/spin_node), driver seat removed from build_cars.py,
+  gear letter (N/D/R) in car_world HUD. town_plan._streets: pole+wire lines on Main Road ends, Market St,
+  North Road (both halves), Airport Road, Back Street; TURNS = 5 paved turning circles (r 7, island
+  with a tree) at lane/North Road ends, grass skips them (environment_details._on_turning_circle).
+  Owner asked (2026-10-29) to use car models from packs instead of ours: none in the project;
+  candidates found: Quaternius lowpoly-cars (itch), others - ask before downloading.
 - Fly mode (2026-10-29, testing): player.gd toggle_flying() - on-screen Fly button (top-left, y 78,
   no focus), F key, L3 on a pad. Flying = no gravity, collision layers 0, move along the camera, Space up,
   Shift/Ctrl down (LB on pad), Alt faster. Not saved.

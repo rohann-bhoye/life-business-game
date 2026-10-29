@@ -171,5 +171,6 @@ func _physics_process(delta: float) -> void:
 	player.rotation.y += driving.rotation.y - last_yaw
 	last_yaw = driving.rotation.y
 	player.global_position = driving.seat_position()
-	hud.text = "%d km/h   %s" % [roundi(absf(driving.speed) * 3.6), driving.data.name]
+	var gear := "N" if absf(driving.speed) < 0.4 else ("D" if driving.speed > 0.0 else "R")
+	hud.text = "%s   %d km/h   %s" % [gear, roundi(absf(driving.speed) * 3.6), driving.data.name]
 	if player.global_position.y < -20.0: _get_out()

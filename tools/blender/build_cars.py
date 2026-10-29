@@ -91,11 +91,10 @@ def build(kind, mat):
 		lamps.box((s * (hw - 0.08), h - 0.03, c["hood"] - 0.2), (0.12, 0.06, 0.1), "lamp_amber")
 		lamps.box((s * (hw - 0.22), -h + 0.02, c["belt"] - 0.3), (0.34, 0.05, 0.18), "lamp_tail")
 	# Interior: seats, a dashboard, a steering wheel on the right.
-	for s in (-1, 1):
+	for s in (-1,):
 		trim.box((s * 0.37, 0.1, lift + 0.35), (0.44, 0.5, 0.15), "seat")
 		trim.box((s * 0.37, -0.12, lift + 0.7), (0.44, 0.1, 0.55), "seat")
 	trim.box((0, c["cf"] - 0.35, c["belt"] - 0.12), (W - 0.2, 0.3, 0.25), "trim_light")
-	trim.box((0.37, c["cf"] - 0.6, c["belt"] - 0.02), (0.36, 0.04, 0.36), "trim")
 	trim.box((0, -0.9, lift + 0.35), (W - 0.2, 0.7, 0.15), "seat")
 	objects = [body.to_object("Body", mat), trim.to_object("Trim", mat), glass.to_object("Glass", mat), lamps.to_object("Lamps", mat)]
 	for name, sx, sy in (("FL", -1, 1), ("FR", 1, 1), ("RL", -1, -1), ("RR", 1, -1)):

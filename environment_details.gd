@@ -78,6 +78,7 @@ func _build_grass() -> void:
 				var z := (cell_z + rng.randf()) * GRASS_CELL
 				if x < Edge.MIN_X + 0.3 or x > Edge.MAX_X - 0.3 or z < Edge.MIN_Z + 0.3 or z > Edge.MAX_Z - 0.3: continue
 				if mask[int((z - Edge.MIN_Z) / MASK_STEP) * MASK_WIDTH + int((x - Edge.MIN_X) / MASK_STEP)]: continue
+				if _on_turning_circle(x, z): continue
 				var size := rng.randf_range(0.8, 1.25)
 				var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(size, size * rng.randf_range(0.75, 1.35), size))
 				transforms.append(Transform3D(basis, Vector3(x, 0.1, z)))
@@ -106,6 +107,12 @@ func _physics_process(_delta: float) -> void:
 			var key := cell + Vector2i(dx, dz)
 			if not wild_chunks.has(key): wild_chunks[key] = _wild_chunk(key)
 
+## Is this ground one of the paved turning circles at the road ends (town_plan.gd)?
+func _on_turning_circle(x: float, z: float) -> bool:
+	for turn in preload("res://town_plan.gd").TURNS:
+		if Vector2(x - turn[0].x, z - turn[0].z).length() < preload("res://town_plan.gd").TURN_RADIUS: return true
+	return false
+
 func _wild_chunk(key: Vector2i) -> MultiMeshInstance3D:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(key)
@@ -118,6 +125,7 @@ func _wild_chunk(key: Vector2i) -> MultiMeshInstance3D:
 		var turn := rng.randf() * TAU
 		if x > Edge.MIN_X and x < Edge.MAX_X and z > Edge.MIN_Z and z < Edge.MAX_Z: continue
 		if x > Edge.ROAD_MIN_X and x < Edge.ROAD_MAX_X and z > Edge.ROAD_END_Z and z < Edge.MIN_Z: continue
+		if _on_turning_circle(x, z): continue
 		var y: float = data.get_height(Vector3(x, 0, z))
 		if is_nan(y) or y < -1.8 or y > 30.0: continue
 		var steepness: float = absf(data.get_height(Vector3(x + 1.0, 0, z)) - y) + absf(data.get_height(Vector3(x, 0, z + 1.0)) - y)

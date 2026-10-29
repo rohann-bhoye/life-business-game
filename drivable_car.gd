@@ -5,13 +5,15 @@ extends CharacterBody3D
 # a tilt that follows the ground. The front wheels turn, all four spin, and the lamps glow
 # at night. car_world.gd puts the player in the seat (first person) and calls drive().
 const MODELS := {
-	"hatchback": {"name": "Hatchback", "top": 21.0, "accel": 7.5, "box": Vector3(1.8, 1.3, 3.7), "radius": 0.3},
-	"sedan": {"name": "Sedan", "top": 24.0, "accel": 7.0, "box": Vector3(1.9, 1.3, 4.3), "radius": 0.32},
-	"suv": {"name": "SUV", "top": 22.0, "accel": 6.2, "box": Vector3(2.0, 1.6, 4.5), "radius": 0.38},
-	"pickup": {"name": "Pickup", "top": 20.0, "accel": 5.8, "box": Vector3(2.0, 1.6, 5.0), "radius": 0.4},
+	"hatchback": {"name": "Hatchback", "top": 21.0, "accel": 7.5, "box": Vector3(1.8, 1.3, 3.7), "radius": 0.3, "eye": Vector3(0.37, 1.17, 0.32)},
+	"sedan": {"name": "Sedan", "top": 24.0, "accel": 7.0, "box": Vector3(1.9, 1.3, 4.3), "radius": 0.32, "eye": Vector3(0.37, 1.17, 0.3)},
+	"suv": {"name": "SUV", "top": 22.0, "accel": 6.2, "box": Vector3(2.0, 1.6, 4.5), "radius": 0.38, "eye": Vector3(0.4, 1.42, 0.3)},
+	"pickup": {"name": "Pickup", "top": 20.0, "accel": 5.8, "box": Vector3(2.0, 1.6, 5.0), "radius": 0.4, "eye": Vector3(0.4, 1.45, 0.3)},
 }
 const ATLAS := "res://assets/props/cars/cars_print.png"
-const SEAT := Vector3(0.37, 1.1, 0.12)
+## The player's eye height above its own origin (player.gd EYE_HEIGHT): the seat position is
+## the driver's eye (data.eye, right-hand seat, inside the cabin) minus this.
+const EYE_DROP := 0.7
 
 var kind := "hatchback"
 var data: Dictionary
@@ -23,6 +25,8 @@ var front_wheels: Array[Node3D] = []
 var lamps: MeshInstance3D
 var lamp_material: StandardMaterial3D
 var occupied := false
+var wheel_node: Node3D
+var spin_node: Node3D
 
 static func create(type: String, colour: Color) -> CharacterBody3D:
 	var car := preload("res://drivable_car.gd").new()
@@ -72,6 +76,37 @@ func _ready() -> void:
 		if str(part.name).begins_with("Wheel"):
 			wheels.append(part)
 			if str(part.name).begins_with("Wheel_F"): front_wheels.append(part)
+	_build_wheel()
+
+## A black steering wheel (rim, hub and two spokes) that turns with the steering.
+func _build_wheel() -> void:
+	wheel_node = Node3D.new()
+	wheel_node.name = "SteeringWheel"
+	wheel_node.position = Vector3(data.eye.x, data.eye.y - 0.2, data.eye.z - 0.62)
+	wheel_node.rotation.x = deg_to_rad(62)
+	spin_node = Node3D.new()
+	wheel_node.add_child(spin_node)
+	var black := StandardMaterial3D.new()
+	black.albedo_color = Color(0.07, 0.07, 0.08)
+	black.roughness = 0.6
+	var rim := MeshInstance3D.new()
+	var ring := TorusMesh.new()
+	ring.inner_radius = 0.15
+	ring.outer_radius = 0.19
+	ring.rings = 18
+	ring.ring_segments = 8
+	ring.material = black
+	rim.mesh = ring
+	spin_node.add_child(rim)
+	for angle in [0.0, PI / 2.0]:
+		var spoke := MeshInstance3D.new()
+		var bar := BoxMesh.new()
+		bar.size = Vector3(0.33, 0.012, 0.03)
+		bar.material = black
+		spoke.mesh = bar
+		spoke.rotation.y = angle
+		spin_node.add_child(spoke)
+	add_child(wheel_node)
 
 func set_night(night: bool) -> void:
 	if lamp_material != null: lamp_material.emission_energy_multiplier = 2.4 if night else 0.4
@@ -106,6 +141,7 @@ func drive(throttle: float, steering: float, handbrake: bool, delta: float) -> v
 	for wheel in wheels:
 		wheel.rotation.x -= speed * delta / data.radius
 	for wheel in front_wheels: wheel.rotation.y = -steer * 0.5
+	if spin_node != null: spin_node.rotation.y = steer * 2.4
 
 func seat_position() -> Vector3:
-	return to_global(SEAT)
+	return to_global(data.eye - Vector3(0, EYE_DROP, 0))
