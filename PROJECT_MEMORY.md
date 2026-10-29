@@ -249,7 +249,10 @@ board and a local suggestion form. See Farming section below for controls and li
   right stick look (player.look_by), A jump, X=E, B=Q, Y=Tab, RT/RB = left click (lathi),
   Start=Esc, Back=F1. In any menu a virtual pointer: left stick moves the OS mouse, A clicks,
   right stick scrolls, B/Start=Esc, d-pad nudges. Untested on real hardware (no pad here);
-  hint text still says E/Q/Tab. Main menu relies on Godot ui_* joypad defaults.
+  Auto-switch: controller.using_pad flips true on any pad button or stick push, false on any real
+  key/mouse click/mouse move (our synthetic events use device 77; pointer warps ignored 250 ms);
+  signal changed -> game_ui._on_device_changed swaps the controls panel (X/B/Y, sticks) and
+  "E - " hints to "X - ". Main menu relies on Godot ui_* joypad defaults.
 - Dungeon M3b (2026-10-29): lathi combat + cave feel. Left click underground swings a held
   bamboo lathi (dungeon_world._swing/_strike, 0.5 s apart): hits the nearest monster within
   2.6 m in front, else an ore rock. Monster hp: slime 2, bat 1, mushroom 3, boss 12 (elite x2);

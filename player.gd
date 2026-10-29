@@ -40,6 +40,7 @@ func _ready():
 	controller = preload("res://controller.gd").new()
 	controller.name = "Controller"
 	add_child(controller)
+	controller.changed.connect(func(pad: bool): get_tree().current_scene.get_node("Ui")._on_device_changed(pad))
 	spring_arm.add_excluded_object(get_rid())
 	spring_arm.spring_length = 0.0
 	camera.position = Vector3.ZERO

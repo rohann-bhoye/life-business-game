@@ -38,6 +38,8 @@ var town_label: Label
 var interaction_label: Label
 var feedback_label: Label
 var controls_panel: Panel
+## True while the controller is the active device (controller.gd): the key hints show buttons.
+var pad_active := false
 var crosshair: Control
 var first_day_panel: Panel
 var first_day_label: Label
@@ -274,6 +276,18 @@ func _build_controls_hint() -> void:
 	tablet_text.text = "TABLET"
 	_place(tablet_text, 154, 118, 48, 24)
 	tablet_text.add_theme_font_size_override("font_size", 11)
+
+## Swaps the on-screen key hints between keyboard and controller (controller.gd changed).
+func _on_device_changed(pad: bool) -> void:
+	pad_active = pad
+	for key in ["W", "A", "S", "D", "G"]: controls_panel.get_node("Key" + key).visible = not pad
+	controls_panel.get_node("KeyE").text = "X" if pad else "E"
+	controls_panel.get_node("KeyQ").text = "B" if pad else "Q"
+	controls_panel.get_node("KeyTAB").text = "Y" if pad else "TAB"
+	controls_panel.get_node("MouseLookText").text = "L-STICK WALK
+R-STICK LOOK" if pad else "MOUSE
+LOOK"
+	controls_panel.get_node("MoveText").visible = not pad
 
 func _keycap(text: String, at: Vector2) -> void:
 	var key := Label.new()
@@ -875,3 +889,4 @@ func _process(delta: float) -> void:
 	if coop_world != null and shop.business.carried_stock == 0:
 		var friend: int = coop_world.aimed_friend()
 		if friend != 0: interaction_label.text = "Talk to %s" % coop_world.peers[friend].name
+	if pad_active: interaction_label.text = interaction_label.text.replace("E - ", "X - ").replace("Press E", "Press X").replace("press E", "press X").replace("Q - ", "B - ")

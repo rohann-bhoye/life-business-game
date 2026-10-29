@@ -16,9 +16,24 @@ var player: CharacterBody3D
 var trigger_down := false
 var pointer := Vector2.ZERO
 var was_menu := false
+## True while the player last used the controller, false after the keyboard or mouse.
+## Switches by itself the moment either is touched; `changed` tells the screen (game_ui.gd)
+## to swap its key hints.
+var using_pad := false
+var warped_at := 0
+signal changed(pad: bool)
+## Our own synthetic key and mouse events carry this device number, so they are not
+## mistaken for the keyboard.
+const OWN_DEVICE := 77
 
 func _ready() -> void:
 	player = get_parent()
+
+func _set_pad(pad: bool) -> void:
+	if pad == using_pad: return
+	using_pad = pad
+	if pad: pointer = get_viewport().get_mouse_position()
+	changed.emit(pad)
 
 func connected() -> bool:
 	return not Input.get_connected_joypads().is_empty()
@@ -33,11 +48,15 @@ func _stick(x_axis: JoyAxis, y_axis: JoyAxis) -> Vector2:
 
 ## The walking direction from the left stick (x right, y back), zero in a menu.
 func move_vector() -> Vector2:
-	if not connected() or player._menu_is_open(): return Vector2.ZERO
+	if not using_pad or not connected() or player._menu_is_open(): return Vector2.ZERO
 	return _stick(JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y)
 
 func _process(delta: float) -> void:
 	if not connected(): return
+	var pad_id: int = Input.get_connected_joypads()[0]
+	# Any real stick push or trigger pull wakes the controller.
+	if not using_pad and (Vector2(Input.get_joy_axis(pad_id, JOY_AXIS_LEFT_X), Input.get_joy_axis(pad_id, JOY_AXIS_LEFT_Y)).length() > 0.45 or Vector2(Input.get_joy_axis(pad_id, JOY_AXIS_RIGHT_X), Input.get_joy_axis(pad_id, JOY_AXIS_RIGHT_Y)).length() > 0.45 or Input.get_joy_axis(pad_id, JOY_AXIS_TRIGGER_RIGHT) > 0.5): _set_pad(true)
+	if not using_pad: return
 	var menu: bool = player._menu_is_open() or Input.mouse_mode != Input.MOUSE_MODE_CAPTURED
 	if menu:
 		if not was_menu: pointer = get_viewport().get_mouse_position()
@@ -57,11 +76,13 @@ func _pointer(delta: float) -> void:
 	if move != Vector2.ZERO:
 		var size := get_viewport().get_visible_rect().size
 		pointer = (pointer + move * move.length() * POINTER_SPEED * delta).clamp(Vector2.ZERO, size - Vector2.ONE)
+		warped_at = Time.get_ticks_msec()
 		get_viewport().warp_mouse(pointer)
 		var motion := InputEventMouseMotion.new()
 		motion.position = pointer
 		motion.global_position = pointer
 		motion.relative = move * POINTER_SPEED * delta
+		motion.device = OWN_DEVICE
 		Input.parse_input_event(motion)
 	var scroll := _axis(JOY_AXIS_RIGHT_Y)
 	if scroll != 0.0:
@@ -70,13 +91,20 @@ func _pointer(delta: float) -> void:
 		wheel.global_position = pointer
 		wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN if scroll > 0.0 else MOUSE_BUTTON_WHEEL_UP
 		wheel.factor = absf(scroll) * SCROLL_SPEED * delta * 10.0
+		wheel.device = OWN_DEVICE
 		wheel.pressed = true
 		Input.parse_input_event(wheel)
 		wheel.pressed = false
 		Input.parse_input_event(wheel)
 
 func _input(event: InputEvent) -> void:
+	if event.device == OWN_DEVICE: return
+	# Keyboard or mouse: the controller steps aside at once.
+	if event is InputEventKey or event is InputEventMouseButton or (event is InputEventMouseMotion and event.relative.length() > 1.5 and Time.get_ticks_msec() - warped_at > 250):
+		_set_pad(false)
+		return
 	if not event is InputEventJoypadButton: return
+	_set_pad(true)
 	var menu: bool = player._menu_is_open() or Input.mouse_mode != Input.MOUSE_MODE_CAPTURED
 	var down: bool = event.pressed
 	match event.button_index:
@@ -100,6 +128,7 @@ func _input(event: InputEvent) -> void:
 			if menu and down:
 				var step := Vector2(0, -40) if event.button_index == JOY_BUTTON_DPAD_UP else Vector2(0, 40) if event.button_index == JOY_BUTTON_DPAD_DOWN else Vector2(-40, 0) if event.button_index == JOY_BUTTON_DPAD_LEFT else Vector2(40, 0)
 				pointer = (pointer + step).clamp(Vector2.ZERO, get_viewport().get_visible_rect().size - Vector2.ONE)
+				warped_at = Time.get_ticks_msec()
 				get_viewport().warp_mouse(pointer)
 
 func _key(code: Key, pressed: bool) -> void:
@@ -107,6 +136,7 @@ func _key(code: Key, pressed: bool) -> void:
 	press.keycode = code
 	press.physical_keycode = code
 	press.pressed = pressed
+	press.device = OWN_DEVICE
 	Input.parse_input_event(press)
 
 func _click(button: MouseButton, pressed: bool, at: Vector2) -> void:
@@ -116,4 +146,5 @@ func _click(button: MouseButton, pressed: bool, at: Vector2) -> void:
 	click.position = at
 	click.global_position = at
 	click.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
+	click.device = OWN_DEVICE
 	Input.parse_input_event(click)
