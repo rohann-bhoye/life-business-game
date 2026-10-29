@@ -23,6 +23,8 @@ var holding_bag := false
 var export_world: Node3D
 ## Gufa Darwaza: the cave on the west hill and its dungeon (dungeon_world.gd).
 var dungeon_world: Node3D
+## The parking lot and the cars you can drive (car_world.gd).
+var car_world: Node3D
 ## The doorway from the shop into the packing room, in the left wall (world z).
 const SIDE_DOOR := Vector2(0.75, 1.95)
 const SIDE_DOOR_HEIGHT := 2.2
@@ -608,6 +610,9 @@ func _ready() -> void:
 		return
 	export_world = preload("res://export_world.gd").new()
 	get_parent().add_child.call_deferred(export_world)
+	car_world = preload("res://car_world.gd").new()
+	car_world.ops = self
+	get_parent().add_child.call_deferred(car_world)
 	dungeon_world = preload("res://dungeon_world.gd").new()
 	dungeon_world.ops = self
 	get_parent().add_child.call_deferred(dungeon_world)
@@ -1329,6 +1334,8 @@ func delivery_box_target() -> int:
 
 func interaction_hint() -> String:
 	if is_instance_valid(furnishing) and furnishing.active: return "Place %s" % furnishing.target_name().to_lower()
+	var car_hint: String = car_world.hint() if is_instance_valid(car_world) and car_world.is_inside_tree() else ""
+	if not car_hint.is_empty(): return car_hint
 	var dungeon_hint: String = dungeon_world.hint() if is_instance_valid(dungeon_world) and dungeon_world.is_inside_tree() else ""
 	if not dungeon_hint.is_empty(): return dungeon_hint
 	var export_hint: String = export_world.hint() if is_instance_valid(export_world) else ""
@@ -1373,6 +1380,7 @@ func interaction_hint() -> String:
 func try_interact() -> bool:
 	if not enabled or player._menu_is_open():
 		return false
+	if is_instance_valid(car_world) and car_world.is_inside_tree() and car_world.try_interact(): return true
 	if is_instance_valid(dungeon_world) and dungeon_world.is_inside_tree() and dungeon_world.try_interact(): return true
 	if is_instance_valid(export_world) and export_world.try_interact(): return true
 	if _try_counter_order(): return true

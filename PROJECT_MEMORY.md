@@ -244,6 +244,14 @@ board and a local suggestion form. See Farming section below for controls and li
   reset. Tint by level (green <=3, blue, gold elite 15%, +50% notice); name tag Lv N Name.
   Code-animated (hops/squash, wing flaps, waddle). dungeon_world._spawn_monsters: S cells
   cycle slime/bat/mushroom, Raja Jelly (Lv 5) in the boss chamber. 78 FPS on Low.
+- Cars (2026-10-29): tools/blender/build_cars.py -> assets/props/cars/{hatchback,sedan,suv,pickup}.glb
+  (parts Body/Trim/Glass/Lamps/Wheel_FL..RR, car faces -Z in Godot, driver seat right
+  (0.37,1.1,0.12)). drivable_car.gd: arcade CharacterBody3D (gas/brake/steer/handbrake, tilt
+  to ground, spinning + steering wheels, lamps glow at night). car_world.gd (created by
+  shop_operations like dungeon_world; hint/E hooked first): parking lot at (3,0.1,-40.65)
+  (the only free 8x14 m spot; cars face west, open 80 m), 4 cars in bays; E gets in (player
+  collision off, physics off, view follows the car), E gets out; W/S/A/D/Space or left stick.
+  Not yet: other traffic ignores player cars, no engine sound, no crash damage.
 - Weapon table (2026-10-29): tools/blender/build_weapons.py -> assets/props/dungeon/weapons
   (weapon_table, lathi, talwar, gada). dungeon_world.gd builds the table on the cave apron
   (cave-local (-3.6, 0, 6.4)); stand by a weapon, E takes/swaps (WEAPONS: lathi 1 dmg 0.5 s
