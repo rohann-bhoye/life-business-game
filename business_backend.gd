@@ -60,6 +60,9 @@ var licence_expenses := 0
 ## International orders (export_store.gd): offers, parcels and what was shipped.
 const ExportStore := preload("res://export_store.gd")
 var exports := ExportStore.new()
+## Gufa Darwaza treasure: brought up from the dungeon, sold to the Darwaza Guild.
+const DungeonStore := preload("res://dungeon_store.gd")
+var treasure := DungeonStore.new()
 
 func farm_time() -> int:
 	return day * 1440 + int(minutes_of_day)
@@ -1406,6 +1409,27 @@ func export_to_pad(id: int) -> bool:
 
 ## The cargo plane takes every parcel on the platform: the buyers pay (as sales).
 ## Returns the shipped orders.
+## Banks a dungeon trip's finds (dungeon_world.gd, on the way out) and the deepest
+## floor reached.
+func bring_up_treasure(finds: Dictionary, floor: int) -> void:
+	for kind in finds: treasure.add(str(kind), int(finds[kind]))
+	treasure.deepest = maxi(treasure.deepest, floor)
+	save_progress()
+	changed.emit()
+
+## The Darwaza Guild buys all the treasure held; returns what it paid (0 if none).
+func sell_treasure() -> int:
+	var old := treasure.snapshot()
+	var paid := treasure.sell_all()
+	if paid <= 0: return 0
+	money += paid
+	if not save_progress():
+		money -= paid
+		treasure.restore(old)
+		return 0
+	changed.emit()
+	return paid
+
 func export_ship() -> Array:
 	var leaving: Array = exports.in_state("on_pad")
 	if leaving.is_empty(): return []
@@ -1537,6 +1561,7 @@ func snapshot() -> Dictionary:
 	data["expansion_expenses"] = expansion_expenses
 	data["carry_bags"] = carry_bags
 	data["export"] = exports.snapshot()
+	data["treasure"] = treasure.snapshot()
 	data["licences"] = licences.duplicate()
 	data["licence_expenses"] = licence_expenses
 	data["bag_expenses"] = bag_expenses
@@ -1631,6 +1656,7 @@ func restore(data: Dictionary) -> void:
 	expansion_expenses = int(data.get("expansion_expenses", 0))
 	carry_bags = int(data.get("carry_bags", STARTER_BAGS))
 	exports.restore(data.get("export", {}))
+	treasure.restore(data.get("treasure", {}))
 	licence_expenses = int(data.get("licence_expenses", 0))
 	licences.clear()
 	if data.has("licences"):
@@ -1905,6 +1931,7 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	# Export parcels (sealed, not flown yet) hold their units like boxes in hand.
 	var export_data = data.get("export", {})
 	if not ExportStore.valid(export_data, Catalog.IDS): return false
+	if not DungeonStore.valid(data.get("treasure", {})): return false
 	for order in export_data.get("orders", []):
 		if order.state in ["packed", "on_pad"]:
 			for line in order.lines:
@@ -2034,7 +2061,9 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	expenses -= int(data.get("loan_received", 0)) - int(data.get("loan_principal_repaid", 0))
 	var start_money := int(data.get("starting_money", INITIAL_MONEY))
 	if start_money not in [INITIAL_MONEY] + DIFFICULTY_MONEY: return false
-	if int(data["money"]) != start_money + revenue - expenses - int(data["property_expenses"]) - (int(lent) - int(repaid)):
+	# The Darwaza Guild pays for dungeon treasure outside the shop's sales.
+	var guild_income := DungeonStore.income_of(data.get("treasure", {}))
+	if int(data["money"]) != start_money + revenue + guild_income - expenses - int(data["property_expenses"]) - (int(lent) - int(repaid)):
 		return false
 	var purchased_stock := bottle_cost / STOCK_COST * STOCK_AMOUNT + extra_purchased
 	return int(data["stock"]) + stored_supply == INITIAL_STOCK + purchased_stock - sold

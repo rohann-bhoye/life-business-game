@@ -224,8 +224,17 @@ board and a local suggestion form. See Farming section below for controls and li
   day_night.set_underground(profile) (sky/sun/moon off, cave ambient/fog), build the floor
   at UNDER (x 1000); leave = reverse. Shut in co-op. dungeon_test_room.gd is a stand-in
   room until the Blender kit (M2). Shaders: toon.gdshader (3 bands, rim), outline.gdshader
-  (inverted hull, next_pass). 120+ FPS inside on Low. Next: M2 Floor 1 kit + layout +
-  loot + Darwaza Guild office to sell treasure (guild_income in the money identity).
+  (inverted hull, next_pass). 120+ FPS inside on Low.
+- Dungeon M2a (2026-10-29): Floor 1 kit (tools/blender/build_dungeon_kit.py ->
+  assets/props/dungeon/floor1/*.glb, 18 pieces) laid out by dungeon_floor.gd from
+  dungeon_layouts.gd grid maps (legend in the file): one MultiMesh per piece, toon +
+  outline materials, glow caps/jars unshaded, torches (lights) on T cells, fireflies on m,
+  stream water strip, colliders (floor slab, merged rock runs, stream cells, boulders).
+  Treasure: jars on L cells and 4 in the chest; dungeon_world keeps the trip finds, HUD,
+  pushes you up when the gate shuts, banks finds on leaving (business bring_up_treasure).
+  dungeon_store.gd (business_backend `treasure`, save key "treasure"): held/sold/deepest,
+  fixed prices jar 40 / shard 120 / coin 300; guild income = sold x price, added to the
+  money identity; sell_treasure() pays it. ~60 FPS on Floor 1 on Low.
 - Market street (2026-10-28): 8 Blender shop-houses (tools/blender/build_market_shops.py
   -> assets/props/market/market_shop_<i>.glb, names printed on the boards) with body and
   counter colliders and a shopkeeper each (town_expansion.gd _shop). market_life.gd: 6

@@ -5,9 +5,12 @@ extends Node3D
 # ground land_shape.gd levels for it. Inside the mouth is the Darwaza: a stone ring
 # whose swirl (portal.gdshader) glows while the gate is open. The gate opens by the
 # clock (FLOORS); press E at it to go down. The floors are built far off the land
-# (UNDER) and only while the player is down there: the town is hidden, the camera
-# sees only the cave and day_night.gd swaps the sky for the floor's cave light.
-# Press E at the entry stone to come back up. Co-op games keep the gate shut for now.
+# (UNDER, dungeon_floor.gd) and only while the player is down there: the town is
+# hidden, the camera sees only the cave and day_night.gd swaps the sky for the floor's
+# cave light. Treasure found on a trip is banked on the way out (business_backend.gd
+# bring_up_treasure) and sold at the Darwaza Guild. Press E at the entry stone to come
+# back up; if the gate shuts meanwhile, the player is sent up with their finds.
+# Co-op games keep the gate shut for now.
 # Created by shop_operations.gd, which passes E and the hint through.
 const LandShape := preload("res://land_shape.gd")
 const CAVE_YAW := PI / 2.0
@@ -18,11 +21,11 @@ const UNDERGROUND_FAR := 150.0
 ## Floor, rank, open window in minutes of the day (end may pass midnight), the cave
 ## light, and on which days (every 7th for Agni Mandir).
 const FLOORS := [
-	{"name": "Jugnu Gufa", "rank": "E", "open": 360, "close": 1320, "every": 1,
+	{"name": "Jugnu Gufa", "rank": "E", "open": 360, "close": 1320, "every": 1, "treasure": "jar",
 		"background": Color(0.06, 0.09, 0.12), "ambient": Color(0.5, 0.68, 0.85), "ambient_energy": 1.0, "fog_density": 0.018},
-	{"name": "Neelam Mahal", "rank": "C", "open": 1080, "close": 120, "every": 1,
+	{"name": "Neelam Mahal", "rank": "C", "open": 1080, "close": 120, "every": 1, "treasure": "shard",
 		"background": Color(0.05, 0.04, 0.11), "ambient": Color(0.55, 0.5, 0.9), "ambient_energy": 0.95, "fog_density": 0.016},
-	{"name": "Agni Mandir", "rank": "A", "open": 1200, "close": 240, "every": 7,
+	{"name": "Agni Mandir", "rank": "A", "open": 1200, "close": 240, "every": 7, "treasure": "coin",
 		"background": Color(0.1, 0.04, 0.03), "ambient": Color(0.9, 0.55, 0.45), "ambient_energy": 0.95, "fog_density": 0.016},
 ]
 
@@ -41,6 +44,9 @@ var hidden: Array[Node3D] = []
 var town_far := 4000.0
 var exit_point := Vector3.ZERO
 var busy := false
+## Treasure found on this trip, by kind (dungeon_store.gd).
+var finds := {}
+var hud: Label
 
 func _ready() -> void:
 	name = "DungeonWorld"
@@ -151,9 +157,22 @@ func _build_fade() -> void:
 	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	fade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(fade)
+	hud = Label.new()
+	hud.name = "DungeonHud"
+	hud.position = Vector2(16, 44)
+	hud.add_theme_font_size_override("font_size", 16)
+	hud.add_theme_color_override("font_color", Color(0.8, 0.95, 1.0))
+	hud.add_theme_color_override("font_shadow_color", Color.BLACK)
+	hud.visible = false
+	layer.add_child(hud)
 
 func _update_gate() -> void:
 	var floors := open_floors()
+	if underground_floor >= 0:
+		_update_hud()
+		if not busy and not underground_floor in floors:
+			_feedback("The Darwaza is closing! You are pulled back up with your treasure.")
+			_leave()
 	var open := gate_open()
 	portal_material.set_shader_parameter("open", 1.0 if open else 0.0)
 	portal_light.visible = open
@@ -179,7 +198,11 @@ func _portal_point() -> Vector3:
 func hint() -> String:
 	if busy: return ""
 	if underground_floor >= 0:
-		return "E - climb back up to the town" if player.global_position.distance_to(exit_point) < REACH else ""
+		if player.global_position.distance_to(exit_point) < REACH: return "E - climb back up to the town"
+		var found: String = floor_root.hint_at(floor_root.to_local(player.global_position))
+		if not found.is_empty(): return found
+		if _near_stairs(): return "The stairs down to Neelam Mahal (Rank C) open in a later update"
+		return ""
 	if not is_instance_valid(cave) or player.global_position.distance_to(_portal_point()) > REACH: return ""
 	if get_tree().current_scene.get_node_or_null("CoopWorld") != null: return "The Darwaza stays shut in co-op for now"
 	if not gate_open(): return "The Darwaza is shut - it opens at 06:00"
@@ -190,9 +213,17 @@ func hint() -> String:
 func try_interact() -> bool:
 	if busy: return false
 	if underground_floor >= 0:
-		if player.global_position.distance_to(exit_point) >= REACH: return false
-		_leave()
-		return true
+		if player.global_position.distance_to(exit_point) < REACH:
+			_leave()
+			return true
+		var count: int = floor_root.interact_at(floor_root.to_local(player.global_position))
+		if count > 0:
+			var kind: String = FLOORS[underground_floor].treasure
+			finds[kind] = int(finds.get(kind, 0)) + count
+			_feedback("+%d %s (%d this trip)" % [count, preload("res://dungeon_store.gd").ITEMS[kind].name.to_lower(), finds[kind]])
+			_update_hud()
+			return true
+		return _near_stairs()
 	if not is_instance_valid(cave) or player.global_position.distance_to(_portal_point()) > REACH: return false
 	if not gate_open() or _hands_full(): return true
 	_enter(open_floors()[0])
@@ -217,13 +248,16 @@ func _enter(index: int) -> void:
 	camera.far = UNDERGROUND_FAR
 	var day_night = get_tree().current_scene.get_node_or_null("DayNight")
 	if day_night != null and day_night.has_method("set_underground"): day_night.set_underground(FLOORS[index])
-	floor_root = preload("res://dungeon_test_room.gd").build(UNDER)
+	floor_root = preload("res://dungeon_floor.gd").create(index, UNDER)
 	add_child(floor_root)
+	finds = {}
 	exit_point = UNDER + floor_root.get_meta("exit", Vector3.ZERO)
 	player.global_position = UNDER + floor_root.get_meta("entry", Vector3(0, 1, 0))
 	player.velocity = Vector3.ZERO
 	player.rotation.y = floor_root.get_meta("facing", 0.0)
-	_feedback("%s - Rank %s. Monsters come later; look around!" % [FLOORS[index].name, FLOORS[index].rank])
+	_feedback("%s - Rank %s. Find the treasure; monsters come in the next update." % [FLOORS[index].name, FLOORS[index].rank])
+	hud.visible = true
+	_update_hud()
 	await _fade_to(0.0)
 	busy = false
 
@@ -231,6 +265,12 @@ func _leave() -> void:
 	busy = true
 	await _fade_to(1.0)
 	if is_instance_valid(floor_root): floor_root.queue_free()
+	business.bring_up_treasure(finds, underground_floor + 1)
+	var total := 0
+	for kind in finds: total += int(finds[kind])
+	if total > 0: _feedback("You brought up %d treasure. Sell it at the Darwaza Guild." % total)
+	finds = {}
+	hud.visible = false
 	underground_floor = -1
 	for node in hidden:
 		if is_instance_valid(node): node.visible = true
@@ -244,6 +284,18 @@ func _leave() -> void:
 	player.rotation.y = CAVE_YAW
 	await _fade_to(0.0)
 	busy = false
+
+func _near_stairs() -> bool:
+	var stairs: Vector3 = floor_root.get_meta("stairs", Vector3.ZERO)
+	return stairs != Vector3.ZERO and floor_root.to_local(player.global_position).distance_to(stairs + Vector3(0, 1, 0)) < REACH
+
+func _update_hud() -> void:
+	if underground_floor < 0: return
+	var entry: Dictionary = FLOORS[underground_floor]
+	var kind: String = entry.treasure
+	hud.text = "%s  -  Rank %s
+Treasure this trip: %d %s
+Gate shuts at %02d:%02d" % [entry.name, entry.rank, int(finds.get(kind, 0)), preload("res://dungeon_store.gd").ITEMS[kind].name.to_lower(), int(entry.close) / 60, int(entry.close) % 60]
 
 func _fade_to(alpha: float) -> void:
 	var tween := create_tween()
