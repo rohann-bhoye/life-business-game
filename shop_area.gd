@@ -219,7 +219,7 @@ func sell_one_stock(customer_budget: int = 200) -> bool:
 
 func _update_shop_labels():
 	money_label.text = "Money: ₹%s" % _format_money(money)
-	stock_label.text = "Stock: %d" % stock
+	stock_label.text = "Stock: %d" % stock + (" (+%d on the way)" % business.supply_in_transit if business.supply_in_transit > 0 else "")
 	sales_label.text = "Items sold: %d" % items_sold
 	revenue_label.text = "Revenue: ₹%s" % _format_money(sales_revenue)
 	var total_expenses: int = business.total_expenses()
