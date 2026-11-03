@@ -27,7 +27,7 @@ const GAME_SCENE := "res://main.tscn.tscn"
 
 const KenneyTheme := preload("res://kenney_theme.gd")
 const CREDITS := "Made by Bucketstudy team"
-const VERSION := "Development Demo | v0.9"
+const VERSION := "Development Demo | v0.10"
 const WHATS_NEW := ["Co-op: run one shop with up to 3 friends", "Indian town: mandir, pani puri cart, cows", "Thick grass, block paths and a home yard", "Graphics presets, 3D resolution, FPS counter", "Longer days: a relaxed 12-minute shop day", "Street lamps glow at night on every setting"]
 
 ## Lobby look: Kenney buttons (green / blue / grey / red) on dark glass panels,
@@ -335,12 +335,12 @@ func _request_new() -> void:
 
 func _new_game(difficulty := 1) -> void:
 	if launching: return
-	var error := Session.new_game(save_path, difficulty)
+	var error := Session.new_game(save_path, difficulty, not Coop.active)
 	if not error.is_empty():
 		_cancel_new()
 		status_label.text = error
 		return
-	_start_game("New shop  |  Slot %d  |  Day 1  |  %s%s  |  %s" % [slot, String.chr(8377), _money(Session.Backend.DIFFICULTY_MONEY[difficulty]), Session.Backend.DIFFICULTY_NAMES[difficulty]], "Welcome to your new shop in Dholkarpur Gaon! Follow the First Day guide to get started.")
+	_start_game("New shop  |  Slot %d  |  Day 1  |  %s%s  |  %s" % [slot, String.chr(8377), _money(Session.Backend.DIFFICULTY_MONEY[difficulty]), Session.Backend.DIFFICULTY_NAMES[difficulty]], "Welcome to your new shop in Dholkarpur Gaon! Follow the First Day guide to get started.", "", not Coop.active)
 
 static func _money(value: int) -> String:
 	var digits := str(absi(value))
@@ -352,7 +352,7 @@ static func _money(value: int) -> String:
 
 # The game scene loads on a background thread from the moment the menu opens; the
 # loading screen shows that progress, covers the scene change and waits for a key.
-func _start_game(summary: String, greeting: String, game_path := "") -> void:
+func _start_game(summary: String, greeting: String, game_path := "", play_intro := false) -> void:
 	launching = true
 	status_label.text = "Loading game..."
 	var tree := get_tree()
@@ -364,7 +364,7 @@ func _start_game(summary: String, greeting: String, game_path := "") -> void:
 		launching = false
 		if Coop.active: Coop.leave(tree)
 		status_label.text = "Could not start the game.")
-	loading.begin(func(): return Session.launch_game(tree, path, settings), summary, greeting)
+	loading.begin(func(): return Session.launch_game(tree, path, settings), summary, greeting, play_intro)
 
 func _cancel_new() -> void:
 	confirmation.hide()
