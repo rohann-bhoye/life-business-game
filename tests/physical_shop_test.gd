@@ -172,7 +172,8 @@ func _run() -> void:
 	await _capture("van")
 	delivery_camera.queue_free()
 	player.camera.make_current()
-	operations._process(2.0)
+	operations.van_wait = 0.0  # the player pressed E at the van
+	operations._process(3.0)
 	assert(shop.business.boxed_stock == 10 and operations.delivery_box.visible)
 	player.global_position = operations.drop_point + Vector3(0, 1, 1.3)
 	player.rotation.y = 0
@@ -257,7 +258,8 @@ func _run() -> void:
 	assert(shop.business.supply_in_transit == 0 and shop.stock == 2)
 	assert(shop.business.order_stock())
 	operations._process(5)
-	operations._process(2)
+	operations.van_wait = 0.0
+	operations._process(3)
 	shop.worker._on_restock_timer_timeout()
 	assert(shop.stock == 2 and shop.business.boxed_stock == 10)
 	assert(shop.business.pick_up_box() and shop.business.shelve_box())
