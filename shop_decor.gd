@@ -61,7 +61,8 @@ func build(counter: Node3D) -> void:
 	Kenney.fit(self, "EntranceMat", FURNITURE % "rugDoormat", Vector3(1.4, 0.02, 0.8), Vector3(-3.0, 0.005, 1.9))
 	# Basket stand in the entrance corner (Blender: tools/blender/build_basket_stand.py).
 	Kenney.fit(self, "BasketStand", "res://assets/props/basket_stand/basket_stand.glb", Vector3(0.46, 0.78, 0.36), Vector3(-5.3, 0.0, 2.0))
-	Kenney.fit(self, "WaitingBench", "res://assets/props/waiting_bench/waiting_bench.glb", Vector3(1.5, 0.9, 0.55), Vector3(-5.5, 0.0, 3.0), PI)
+	Kenney.fit(self, "WaitingBench", "res://assets/props/waiting_bench/waiting_bench.glb", Vector3(1.5, 0.9, 0.55), Vector3(-5.5, 0.1, 3.0), PI)
+	_bench_sitter()
 	_sign_panel("OfferBoard", "AAJ KA OFFER\nFresh stock every day!", Vector3(ROOM_MAX_X - 0.02, 1.75, 1.3), -PI / 2, Vector2(1.1, 0.55), Color(0.85, 0.2, 0.18))
 	_sign_panel("PaymentBoard", "CASH  |  CARD  |  UPI\nAll payments accepted", Vector3(ROOM_MAX_X - 0.02, 1.75, -0.1), -PI / 2, Vector2(1.1, 0.5), Color(0.1, 0.42, 0.36))
 	_sign_panel("WelcomeBoard", "APNA MART\nDaily needs - Fresh - Sasta", Vector3(-3.0, 3.48, BACK_Z + 0.02), 0.0, Vector2(2.6, 0.5), Color(0.12, 0.3, 0.26))
@@ -480,7 +481,28 @@ var fan_speed := 0.0
 func _process(delta: float) -> void:
 	# Fans speed up smoothly to a steady low setting (about 70 turns a minute).
 	fan_speed = move_toward(fan_speed, 7.5, delta * 2.5)
+	_update_bench_sitter()
 	for fan in fans: fan.rotate_y(fan_speed * delta)
 	if is_instance_valid(diya_light):
 		flicker += delta
 		diya_light.light_energy = 0.62 + 0.08 * sin(flicker * 13.0) + 0.05 * sin(flicker * 7.3)
+
+## An uncle resting on the waiting bench through the shop's day (visible 09:00-19:00).
+var bench_sitter: Node3D
+
+func _bench_sitter() -> void:
+	bench_sitter = Node3D.new()
+	bench_sitter.name = "BenchSitter"
+	bench_sitter.position = Vector3(-5.5, 0.02, 3.05)
+	var visual := Node3D.new()
+	visual.name = "CharacterVisual"
+	visual.set_script(preload("res://character_visual.gd"))
+	visual.model = "uncle"
+	bench_sitter.add_child(visual)
+	add_child(bench_sitter)
+
+func _update_bench_sitter() -> void:
+	var area := get_tree().current_scene.get_node_or_null("Shop/ShopArea")
+	if bench_sitter == null or area == null: return
+	var minutes: int = area.business.minutes_of_day
+	bench_sitter.visible = minutes >= 540 and minutes < 1140

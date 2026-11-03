@@ -24,7 +24,7 @@ func _run() -> void:
 	camera.current = true
 	for frame in range(10): await process_frame
 	var shop := Node3D.new()
-	var shots := {"bench": [Vector3(-3.5, 1.6, 6.5), Vector3(-5.0, 0.4, 3.0)], "wh1": [Vector3(-6.0, 1.7, 24.5), Vector3(-6.0, 1.0, 14.0)], "wh2": [Vector3(-6.0, 1.7, 12.0), Vector3(-6.0, 1.0, 22.0)], "wh_out": [Vector3(-6.0, 2.5, 30.0), Vector3(-6.0, 1.5, 18.0)], "corner": [Vector3(-4.6, 1.5, -1.8), Vector3(-5.3, 0.4, 2.0)], "in_door": [Vector3(0, 0.5, 2.2), Vector3(0, -0.3, -1.5)], "in_left": [Vector3(2.6, 0.7, 2.0), Vector3(-2.0, -0.4, -1.0)], "in_right": [Vector3(-2.6, 0.7, 2.0), Vector3(2.0, -0.4, -1.0)], "out": [Vector3(3, 0.6, 9), Vector3(0, 0.2, 0)]}
+	var shots := {"bench": [Vector3(-4.0, 1.2, 6.0), Vector3(-5.5, 0.6, 3.0)], "wh1": [Vector3(-6.0, 1.7, 24.5), Vector3(-6.0, 1.0, 14.0)], "wh2": [Vector3(-6.0, 1.7, 12.0), Vector3(-6.0, 1.0, 22.0)], "wh_out": [Vector3(-6.0, 2.5, 30.0), Vector3(-6.0, 1.5, 18.0)], "corner": [Vector3(-4.6, 1.5, -1.8), Vector3(-5.3, 0.4, 2.0)], "in_door": [Vector3(0, 0.5, 2.2), Vector3(0, -0.3, -1.5)], "in_left": [Vector3(2.6, 0.7, 2.0), Vector3(-2.0, -0.4, -1.0)], "in_right": [Vector3(-2.6, 0.7, 2.0), Vector3(2.0, -0.4, -1.0)], "out": [Vector3(3, 0.6, 9), Vector3(0, 0.2, 0)]}
 	for name in shots:
 		camera.global_position = shots[name][0]
 		camera.look_at(shots[name][1])
