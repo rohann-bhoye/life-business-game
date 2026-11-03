@@ -18,6 +18,7 @@ var bank: Panel
 var builders: Panel
 var export_page: Panel
 var licence_page: Panel
+var business_page: Panel
 var staff: Panel
 var desktop: Control
 ## Which desktop app fills the screen: home, store, staff, manager or bank.
@@ -217,20 +218,21 @@ func _build_desktop() -> void:
 	var apps := [
 		["store", "Wholesale", Color("16a34a"), ""],
 		["staff", "Staff", Color("7c3aed"), "res://assets/ui/staff/cashier.png"],
-		["manager", "Shop Manager", Color("d97706"), ""],
+		["manager", "Orders", Color("d97706"), ""],
 		["bank", "Bank", Color("2563eb"), ""],
 		["builders", "Builders", Color("c2410c"), ""],
 		["export", "Export", Color("1e3a8a"), ""],
 		["licences", "Licences", Color("7c3aed"), ""],
+		["business", "Business", Color("c2410c"), ""],
 	]
 	for index in range(apps.size()):
 		var entry: Array = apps[index]
 		var tile := Button.new()
 		tile.name = "App_" + entry[0]
-		# Seven tiles fit beside the Today card at 64% size.
-		tile.position = Vector2(40 + index * 78, 108)
+		# Eight tiles fit beside the Today card at 58% size.
+		tile.position = Vector2(40 + index * 69, 112)
 		tile.size = Vector2(116, 116)
-		tile.scale = Vector2.ONE * 0.64
+		tile.scale = Vector2.ONE * 0.58
 		tile.focus_mode = Control.FOCUS_NONE
 		tile.clip_contents = true
 		tile.tooltip_text = "Open " + entry[1]
@@ -248,6 +250,15 @@ func _build_desktop() -> void:
 			for item in [["milk", Rect2(-2, 6, 76, 96)], ["bottle", Rect2(44, 4, 76, 96)], ["snack", Rect2(16, 26, 84, 90)]]:
 				_picture(tile, "res://assets/ui/products/%s.png" % item[0], item[1])
 		elif entry[0] == "bank": _text(tile, String.chr(8377), Vector2(0, 14), 116, 56, Color.WHITE).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		elif entry[0] == "business":
+			# A little bar chart.
+			for bar in range(4):
+				var column := ColorRect.new()
+				column.color = Color.WHITE
+				column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				column.size = Vector2(14, 22 + bar * 16)
+				column.position = Vector2(24 + bar * 22, 90 - column.size.y)
+				tile.add_child(column)
 		elif entry[0] == "licences":
 			# A white certificate with text lines and an orange seal.
 			var paper := Panel.new()
@@ -374,7 +385,7 @@ func _build_desktop() -> void:
 	taskbar.position = Vector2(0, 500)
 	taskbar.size = Vector2(SCREEN.x, 40)
 	desktop.add_child(taskbar)
-	var buttons := [["home", "APNA", 60], ["store", "Wholesale", 108], ["staff", "Staff", 66], ["manager", "Shop", 62], ["bank", "Bank", 62], ["builders", "Build", 66], ["export", "Export", 74], ["licences", "Licences", 90]]
+	var buttons := [["home", "APNA", 60], ["store", "Wholesale", 108], ["staff", "Staff", 66], ["manager", "Shop", 62], ["bank", "Bank", 62], ["builders", "Build", 66], ["export", "Export", 74], ["licences", "Licences", 90], ["business", "Business", 84]]
 	var x := 8.0
 	for entry in buttons:
 		var button := Button.new()
@@ -456,6 +467,13 @@ func _build_store(_desktop: Control) -> void:
 	licence_page.setup(ui.shop.business, ui.shop._format_money)
 	licence_page.hide()
 	licence_page.back_requested.connect(show_home)
+	business_page = Panel.new()
+	business_page.set_script(preload("res://business_page.gd"))
+	business_page.position = Vector2(24, 12)
+	screen_viewport.add_child(business_page)
+	business_page.setup(ui.shop.business, ui.shop._format_money, ui.shop, ui)
+	business_page.hide()
+	business_page.back_requested.connect(show_home)
 	staff = Panel.new()
 	staff.set_script(preload("res://staff_page.gd"))
 	staff.position = Vector2(24, 12)
@@ -483,6 +501,9 @@ func show_app(target: String) -> void:
 	if is_instance_valid(builders):
 		builders.visible = target == "builders"
 		if builders.visible: builders.refresh()
+	if is_instance_valid(business_page):
+		business_page.visible = target == "business"
+		if business_page.visible: business_page.refresh()
 	if is_instance_valid(licence_page):
 		licence_page.visible = target == "licences"
 		if licence_page.visible: licence_page.refresh()

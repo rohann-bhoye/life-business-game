@@ -163,7 +163,9 @@ func _unhandled_input(event):
 			get_viewport().set_input_as_handled()
 			return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_TAB:
-		open_tablet()
+		# Everything the tablet did now lives on the shop PC.
+		var ui := get_tree().current_scene.get_node_or_null("Ui")
+		if ui != null and not _menu_is_open(): ui.show_feedback("The tablet is now on the shop PC: press E at the desk. Goals are in the Journal (J).")
 		get_viewport().set_input_as_handled()
 		return
 
