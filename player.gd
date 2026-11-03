@@ -4,6 +4,8 @@ const GameSettings := preload("res://game_settings.gd")
 var invert_y := false
 
 @export var speed := 5.0
+## 1.0 normally; below 1.0 while the backpack is over its weight limit (inventory_ui.gd).
+var load_factor := 1.0
 @export var gravity := 20.0
 @export var jump_velocity := 6.5
 @export var mouse_sensitivity := 0.003
@@ -84,6 +86,14 @@ func _menu_is_open() -> bool:
 	if is_instance_valid(pause) and pause.is_open(): return true
 	var report := get_tree().current_scene.get_node_or_null("Ui/DayReportScreen")
 	if is_instance_valid(report) and report.visible: return true
+	var inventory := get_tree().current_scene.get_node_or_null("Ui/InventoryBar")
+	if is_instance_valid(inventory) and inventory.is_open(): return true
+	var journal := get_tree().current_scene.get_node_or_null("Ui/QuestJournal")
+	if is_instance_valid(journal) and journal.is_open(): return true
+	var world_map := get_tree().current_scene.get_node_or_null("Ui/WorldMap")
+	if is_instance_valid(world_map) and world_map.is_open(): return true
+	for book in get_tree().get_nodes_in_group("dungeon_panel"):
+		if book.visible: return true
 	for talk in ["Ui/StaffDialog", "Ui/CustomerChat", "Ui/FriendChat", "Ui/HowToPlay"]:
 		var dialog := get_tree().current_scene.get_node_or_null(talk)
 		if is_instance_valid(dialog) and dialog.visible: return true
@@ -206,8 +216,13 @@ func _physics_process(delta):
 
 	direction = transform.basis * direction
 
-	velocity.x = direction.x * speed
-	velocity.z = direction.z * speed
+	# Shift sprints (not with a menu open); speed eases in and out instead of snapping.
+	var sprint := 1.0
+	if Input.is_key_pressed(KEY_SHIFT) and not _menu_is_open(): sprint = 1.5
+	var wanted: Vector3 = direction * speed * load_factor * sprint
+	var ease_rate: float = (45.0 if direction != Vector3.ZERO else 60.0) * delta
+	velocity.x = move_toward(velocity.x, wanted.x, ease_rate)
+	velocity.z = move_toward(velocity.z, wanted.z, ease_rate)
 
 	if is_on_floor() and not _menu_is_open() and Input.is_key_pressed(KEY_SPACE):
 		velocity.y = jump_velocity

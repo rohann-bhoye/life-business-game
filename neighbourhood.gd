@@ -41,6 +41,28 @@ func _ready() -> void:
 		_collider("LandEndX%s" % x, self, Vector3(0.3, 60, Edge.LAND_MAX_Z - Edge.LAND_MIN_Z), Vector3(x, 20, middle.y))
 	for z in [Edge.LAND_MIN_Z, Edge.LAND_MAX_Z]:
 		_collider("LandEndZ%s" % z, self, Vector3(Edge.LAND_MAX_X - Edge.LAND_MIN_X, 60, 0.3), Vector3(middle.x, 20, z))
+	_close_north()
+
+## For now only the city is open: the North Road, the bridge, the village and the farm
+## beyond are sealed by an invisible wall, with a road barrier and sign at the road.
+func _close_north() -> void:
+	var wall_z := -57.0
+	_collider("NorthClosedWall", self, Vector3(Edge.LAND_MAX_X - Edge.LAND_MIN_X, 60, 0.4), Vector3(0, 20, wall_z))
+	var road_x := 50.0
+	for side in [-1, 1]:
+		_box("BarrierPost%d" % side, self, Vector3(0.25, 1.3, 0.25), Vector3(road_x + side * 5.2, 0.65, wall_z + 1.5), Color(0.9, 0.9, 0.9), false)
+	for i in range(5):
+		var stripe := Color(0.85, 0.12, 0.1) if i % 2 == 0 else Color(0.95, 0.95, 0.95)
+		_box("BarrierBar%d" % i, self, Vector3(2.08, 0.28, 0.12), Vector3(road_x - 4.16 + i * 2.08, 1.05, wall_z + 1.5), stripe, false)
+	var sign_label := Label3D.new()
+	sign_label.name = "NorthClosedSign"
+	sign_label.text = "ROAD CLOSED\nBridge and village open in the next update"
+	sign_label.font_size = 64
+	sign_label.pixel_size = 0.01
+	sign_label.outline_size = 12
+	sign_label.modulate = Color(1.0, 0.85, 0.3)
+	sign_label.position = Vector3(road_x, 2.4, wall_z + 1.6)
+	add_child(sign_label)
 
 func set_quality(quality: int) -> void:
 	var show_scenery := quality > 0
@@ -125,10 +147,10 @@ func _build_shop() -> void:
 
 func _build_streets() -> void:
 	var paving := Color(0.66, 0.69, 0.67)
-	_box("NorthPavement", self, Vector3(64, 0.014, 1.6), Vector3(0, 0.107, 3.4), paving)
-	_box("SouthPavement", self, Vector3(64, 0.014, 1.6), Vector3(0, 0.107, 10.6), paving)
-	_box("ShopForecourt", self, Vector3(6.5, 0.016, 1.2), Vector3(-3, 0.108, 2.6), paving)
-	_box("HomePath", self, Vector3(2.2, 0.018, 5.2), Vector3(4, 0.109, 0.25), Color(0.72, 0.73, 0.7))
+	_box("NorthPavement", self, StreetKit.pavement_size(64, 1.6), StreetKit.pavement_at(0, 3.4), paving)
+	_box("SouthPavement", self, StreetKit.pavement_size(64, 1.6), StreetKit.pavement_at(0, 10.6), paving)
+	_box("ShopForecourt", self, StreetKit.pavement_size(6.5, 1.2), StreetKit.pavement_at(-3, 2.6), paving)
+	_box("HomePath", self, StreetKit.pavement_size(2.2, 5.2), StreetKit.pavement_at(4, 0.25), Color(0.72, 0.73, 0.7))
 	for x in range(-30, 31, 4):
 		_box("LaneMark%d" % x, self, Vector3(1.8, 0.008, 0.09), Vector3(x, 0.124, 7), Color(0.88, 0.86, 0.68))
 	for z in [4.35, 9.65]:

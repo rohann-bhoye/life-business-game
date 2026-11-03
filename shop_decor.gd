@@ -59,6 +59,8 @@ func build(counter: Node3D) -> void:
 	# Between the two ceiling lights (z -1.3 and -5.2), hanging from the 3.9 m ceiling.
 	for z in [-3.25, 0.45]: fans.append(_ceiling_fan(Vector3(-3.0, 3.9, z)))
 	Kenney.fit(self, "EntranceMat", FURNITURE % "rugDoormat", Vector3(1.4, 0.02, 0.8), Vector3(-3.0, 0.005, 1.9))
+	# Basket stand in the entrance corner (Blender: tools/blender/build_basket_stand.py).
+	Kenney.fit(self, "BasketStand", "res://assets/props/basket_stand/basket_stand.glb", Vector3(0.46, 0.78, 0.36), Vector3(-5.3, 0.0, 2.0))
 	_sign_panel("OfferBoard", "AAJ KA OFFER\nFresh stock every day!", Vector3(ROOM_MAX_X - 0.02, 1.75, 1.3), -PI / 2, Vector2(1.1, 0.55), Color(0.85, 0.2, 0.18))
 	_sign_panel("PaymentBoard", "CASH  |  CARD  |  UPI\nAll payments accepted", Vector3(ROOM_MAX_X - 0.02, 1.75, -0.1), -PI / 2, Vector2(1.1, 0.5), Color(0.1, 0.42, 0.36))
 	_sign_panel("WelcomeBoard", "APNA MART\nDaily needs - Fresh - Sasta", Vector3(-3.0, 3.48, BACK_Z + 0.02), 0.0, Vector2(2.6, 0.5), Color(0.12, 0.3, 0.26))
