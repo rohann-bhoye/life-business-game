@@ -29,6 +29,8 @@ var boss_spot := Vector3.ZERO
 var lid_turn := 0.0
 var ores: Array[Node3D] = []
 var torches: Array[OmniLight3D] = []
+## Diary stands (dungeon_books.gd), each with meta "page" (0-3).
+var books: Array[Node3D] = []
 
 static func create(index: int, origin: Vector3) -> Node3D:
 	var floor := preload("res://dungeon_floor.gd").new()
@@ -114,6 +116,8 @@ func _build(index: int) -> void:
 					spawns.append(at)
 				"b":
 					boss_spot = at
+				"1", "2", "3", "4":
+					_book(at, int(tag) - 1)
 	_corners(pieces)
 	for name in pieces: _batch(name, pieces[name])
 	var stream := MeshInstance3D.new()
@@ -308,8 +312,68 @@ func _chest(at: Vector3) -> void:
 	add_child(chest_lid)
 	_solid(Vector3(1.3, 0.8, 0.9), at + Vector3(0, 0.4, 0))
 
+## A page of Dada-ji's diary: a red book on a stone stand, in a warm glow that dims once
+## it has been read (mark_read).
+func _book(at: Vector3, page: int) -> void:
+	var stand := Node3D.new()
+	stand.name = "DiaryPage%d" % (page + 1)
+	stand.position = at + Vector3(0.9, 0, 0.9)
+	stand.rotation.y = page * 1.3
+	stand.set_meta("page", page)
+	add_child(stand)
+	var stone := StandardMaterial3D.new()
+	stone.albedo_color = Color(0.34, 0.35, 0.4)
+	stone.roughness = 0.95
+	var pillar := CylinderMesh.new()
+	pillar.top_radius = 0.3
+	pillar.bottom_radius = 0.42
+	pillar.height = 0.95
+	pillar.radial_segments = 8
+	pillar.material = stone
+	var base := MeshInstance3D.new()
+	base.mesh = pillar
+	base.position.y = 0.475
+	stand.add_child(base)
+	var book := Node3D.new()
+	book.name = "Book"
+	book.position.y = 1.02
+	book.rotation.x = -0.3
+	stand.add_child(book)
+	for part in [[Vector3(0.62, 0.07, 0.46), Vector3.ZERO, Color(0.55, 0.14, 0.09)], [Vector3(0.56, 0.05, 0.42), Vector3(0.02, 0.045, 0), Color(0.96, 0.9, 0.74)], [Vector3(0.07, 0.075, 0.47), Vector3(-0.2, 0.002, 0), Color(0.95, 0.72, 0.25)]]:
+		var paint := StandardMaterial3D.new()
+		paint.albedo_color = part[2]
+		var box := BoxMesh.new()
+		box.size = part[0]
+		box.material = paint
+		var piece := MeshInstance3D.new()
+		piece.mesh = box
+		piece.position = part[1]
+		book.add_child(piece)
+	var light := OmniLight3D.new()
+	light.name = "Glow"
+	light.light_color = Color(1.0, 0.78, 0.42)
+	light.light_energy = 1.6
+	light.omni_range = 4.0
+	light.position.y = 1.7
+	stand.add_child(light)
+	_solid(Vector3(0.8, 1.0, 0.8), stand.position + Vector3(0, 0.5, 0))
+	books.append(stand)
+
+## A page that has been read glows softer, so the unread ones stand out.
+func mark_read(page: int) -> void:
+	for stand in books:
+		if stand.get_meta("page") == page: stand.get_node("Glow").light_energy = 0.5
+
+## The diary page within reach of `at` (local), or -1.
+func book_at(at: Vector3) -> int:
+	for stand in books:
+		if Vector2(stand.position.x - at.x, stand.position.z - at.z).length() < REACH: return stand.get_meta("page")
+	return -1
+
 func _process(delta: float) -> void:
 	var time := Time.get_ticks_msec() / 1000.0
+	for index in range(books.size()):
+		books[index].get_node("Book").position.y = 1.02 + sin(time * 1.8 + index) * 0.025
 	for index in range(torches.size()):
 		torches[index].light_energy = 2.7 + sin(time * 11.0 + index * 3.1) * 0.25 + sin(time * 23.0 + index) * 0.18
 	for index in range(loot.size()):
@@ -364,6 +428,8 @@ func strike(at: Vector3, facing: Vector3, damage := 1) -> int:
 
 ## What E would do near `at` (local to the floor), for the hint line.
 func hint_at(at: Vector3) -> String:
+	var page := book_at(at)
+	if page >= 0: return "E - read Dada-ji's diary (page %d)" % (page + 1)
 	for jar in loot:
 		if jar.visible and Vector2(jar.position.x - at.x, jar.position.z - at.z).length() < REACH: return "E - take the firefly jar"
 	if not chest_open and chest_spot != Vector3.ZERO and Vector2(chest_spot.x - at.x, chest_spot.z - at.z).length() < REACH: return "E - open the treasure chest"

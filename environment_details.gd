@@ -13,8 +13,11 @@ const GRASS_DENSITY := 9.0
 const MASK_STEP := 0.25
 ## Grass grows over the whole open town (town_boundary.gd), masked in 0.25 m cells.
 const Edge := preload("res://town_boundary.gd")
-const MASK_WIDTH := int((Edge.MAX_X - Edge.MIN_X) / MASK_STEP)
-const MASK_HEIGHT := int((Edge.MAX_Z - Edge.MIN_Z) / MASK_STEP)
+## The mask covers the whole land (hills and North Road too), so the wild grass keeps off roads there.
+const MASK_MIN_X := Edge.LAND_MIN_X
+const MASK_MIN_Z := Edge.LAND_MIN_Z
+const MASK_WIDTH := int((Edge.LAND_MAX_X - Edge.LAND_MIN_X) / MASK_STEP)
+const MASK_HEIGHT := int((Edge.LAND_MAX_Z - Edge.LAND_MIN_Z) / MASK_STEP)
 ## The lawn ground (and its collider) reaches into the hills all round, so the open
 ## town is solid everywhere and the lawn meets the hills along their foot.
 const GROUND_SIZE := Vector3(150, 0.2, 176)
@@ -30,6 +33,8 @@ const WILD_DENSITY := 0.6
 var wild_chunks := {}
 var wild_cell := Vector2i(1 << 20, 1 << 20)
 var wild_clump: ArrayMesh
+## 1 where grass must not grow (roads, paving, objects), over the whole land; see _grass_mask.
+var grass_mask := PackedByteArray()
 var wild_land: Node
 var wild_player: Node3D
 
@@ -77,7 +82,7 @@ func _build_grass() -> void:
 				var x := (cell_x + rng.randf()) * GRASS_CELL
 				var z := (cell_z + rng.randf()) * GRASS_CELL
 				if x < Edge.MIN_X + 0.3 or x > Edge.MAX_X - 0.3 or z < Edge.MIN_Z + 0.3 or z > Edge.MAX_Z - 0.3: continue
-				if mask[int((z - Edge.MIN_Z) / MASK_STEP) * MASK_WIDTH + int((x - Edge.MIN_X) / MASK_STEP)]: continue
+				if _masked(mask, x, z): continue
 				if _on_turning_circle(x, z): continue
 				var size := rng.randf_range(0.8, 1.25)
 				var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(size, size * rng.randf_range(0.75, 1.35), size))
@@ -85,6 +90,7 @@ func _build_grass() -> void:
 			_grass_chunk("GrassChunk%d_%d" % [cell_x, cell_z], transforms, clump, rng, holder)
 	_road_grass(clump, rng, holder)
 	_apply_grass_quality()
+	grass_mask = mask
 	wild_clump = clump
 	wild_player = get_tree().current_scene.get_node_or_null("Player")
 	var land = get_tree().current_scene.get_node_or_null("Landscape")
@@ -125,6 +131,7 @@ func _wild_chunk(key: Vector2i) -> MultiMeshInstance3D:
 		var turn := rng.randf() * TAU
 		if x > Edge.MIN_X and x < Edge.MAX_X and z > Edge.MIN_Z and z < Edge.MAX_Z: continue
 		if x > Edge.ROAD_MIN_X and x < Edge.ROAD_MAX_X and z > Edge.ROAD_END_Z and z < Edge.MIN_Z: continue
+		if _masked(grass_mask, x, z): continue
 		if _on_turning_circle(x, z): continue
 		var y: float = data.get_height(Vector3(x, 0, z))
 		if is_nan(y) or y < -1.8 or y > 30.0: continue
@@ -216,22 +223,77 @@ func _grass_mask() -> PackedByteArray:
 		var body := shape.get_parent()
 		if body.name == "Ground" or body is CharacterBody3D: continue
 		var box: AABB = shape.global_transform * AABB(-shape.shape.size / 2.0, shape.shape.size)
-		if box.position.y < 0.6: _mark(mask, box, 0.1)
+		# (Very long boxes are land shapes, not objects: they would blank out whole hills.)
+		if box.position.y < 0.6 and box.size.x < 80.0 and box.size.z < 80.0: _mark(mask, box, 0.1)
 	for mesh in world.find_children("*", "MeshInstance3D", true, false):
-		if mesh == ground or not (mesh.mesh is BoxMesh or mesh.mesh is PlaneMesh): continue
+		if mesh == ground or mesh.mesh == null: continue
 		var box: AABB = mesh.global_transform * mesh.get_aabb()
-		if box.position.y < 0.35 and box.end.y < 0.45 and box.size.x * box.size.z > 0.2: _mark(mask, box, 0.05)
+		if mesh.mesh is BoxMesh or mesh.mesh is PlaneMesh:
+			if box.position.y < 0.35 and box.end.y < 0.45 and box.size.x * box.size.z > 0.2 and box.size.x < 80.0 and box.size.z < 80.0: _mark(mask, box, 0.05)
+		elif mesh.mesh is ArrayMesh and box.position.y < 0.35 and box.end.y < 0.45 and box.size.x * box.size.z > 0.2:
+			# Flat merged meshes (the colony's pads, driveways, kerbs...): every triangle counts,
+			# not the huge box round the whole mesh.
+			_mark_triangles(mask, mesh)
 	# Merged block paths (block_path.gd) mark themselves.
 	for path in get_tree().get_nodes_in_group("no_grass"):
 		_mark(mask, path.global_transform * path.get_aabb(), 0.05)
 	return mask
 
+## True when grass must not grow at this spot.
+func _masked(mask: PackedByteArray, x: float, z: float) -> bool:
+	if mask.is_empty(): return false
+	var cx := int((x - MASK_MIN_X) / MASK_STEP)
+	var cz := int((z - MASK_MIN_Z) / MASK_STEP)
+	if cx < 0 or cz < 0 or cx >= MASK_WIDTH or cz >= MASK_HEIGHT: return false
+	return mask[cz * MASK_WIDTH + cx] == 1
+
+## Marks the cells under every triangle of a flat mesh (plus 0.1 m round the edges).
+func _mark_triangles(mask: PackedByteArray, node: MeshInstance3D) -> void:
+	var xform := node.global_transform
+	var array_mesh := node.mesh as ArrayMesh
+	for surface in range(array_mesh.get_surface_count()):
+		var arrays := array_mesh.surface_get_arrays(surface)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		var count := indices.size() if not indices.is_empty() else vertices.size()
+		for at in range(0, count - 2, 3):
+			var corners: Array[Vector2] = []
+			for corner in range(3):
+				var vertex := vertices[indices[at + corner] if not indices.is_empty() else at + corner]
+				var world := xform * vertex
+				corners.append(Vector2(world.x, world.z))
+			_mark_triangle(mask, corners[0], corners[1], corners[2], 0.1)
+
+func _mark_triangle(mask: PackedByteArray, a: Vector2, b: Vector2, c: Vector2, margin: float) -> void:
+	var low := Vector2(minf(a.x, minf(b.x, c.x)), minf(a.y, minf(b.y, c.y))) - Vector2(margin, margin)
+	var high := Vector2(maxf(a.x, maxf(b.x, c.x)), maxf(a.y, maxf(b.y, c.y))) + Vector2(margin, margin)
+	if high.x < MASK_MIN_X or low.x > Edge.LAND_MAX_X or high.y < MASK_MIN_Z or low.y > Edge.LAND_MAX_Z: return
+	var first_x := clampi(int((low.x - MASK_MIN_X) / MASK_STEP), 0, MASK_WIDTH - 1)
+	var last_x := clampi(int((high.x - MASK_MIN_X) / MASK_STEP), 0, MASK_WIDTH - 1)
+	var first_z := clampi(int((low.y - MASK_MIN_Z) / MASK_STEP), 0, MASK_HEIGHT - 1)
+	var last_z := clampi(int((high.y - MASK_MIN_Z) / MASK_STEP), 0, MASK_HEIGHT - 1)
+	for z in range(first_z, last_z + 1):
+		for x in range(first_x, last_x + 1):
+			var p := Vector2(MASK_MIN_X + (x + 0.5) * MASK_STEP, MASK_MIN_Z + (z + 0.5) * MASK_STEP)
+			var d1 := _edge_distance(p, a, b)
+			var d2 := _edge_distance(p, b, c)
+			var d3 := _edge_distance(p, c, a)
+			var outside_negative := d1 < -margin or d2 < -margin or d3 < -margin
+			var outside_positive := d1 > margin or d2 > margin or d3 > margin
+			if not (outside_negative and outside_positive): mask[z * MASK_WIDTH + x] = 1
+
+## Signed distance from point p to the line a-b (0 for a degenerate edge).
+func _edge_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
+	var edge := b - a
+	var length := edge.length()
+	return 0.0 if length < 0.0001 else edge.cross(p - a) / length
+
 func _mark(mask: PackedByteArray, box: AABB, margin: float) -> void:
-	if box.end.x < Edge.MIN_X or box.position.x > Edge.MAX_X or box.end.z < Edge.MIN_Z or box.position.z > Edge.MAX_Z: return
-	var first_x := clampi(int((box.position.x - margin - Edge.MIN_X) / MASK_STEP), 0, MASK_WIDTH - 1)
-	var last_x := clampi(int((box.end.x + margin - Edge.MIN_X) / MASK_STEP), 0, MASK_WIDTH - 1)
-	var first_z := clampi(int((box.position.z - margin - Edge.MIN_Z) / MASK_STEP), 0, MASK_HEIGHT - 1)
-	var last_z := clampi(int((box.end.z + margin - Edge.MIN_Z) / MASK_STEP), 0, MASK_HEIGHT - 1)
+	if box.end.x < MASK_MIN_X or box.position.x > Edge.LAND_MAX_X or box.end.z < MASK_MIN_Z or box.position.z > Edge.LAND_MAX_Z: return
+	var first_x := clampi(int((box.position.x - margin - MASK_MIN_X) / MASK_STEP), 0, MASK_WIDTH - 1)
+	var last_x := clampi(int((box.end.x + margin - MASK_MIN_X) / MASK_STEP), 0, MASK_WIDTH - 1)
+	var first_z := clampi(int((box.position.z - margin - MASK_MIN_Z) / MASK_STEP), 0, MASK_HEIGHT - 1)
+	var last_z := clampi(int((box.end.z + margin - MASK_MIN_Z) / MASK_STEP), 0, MASK_HEIGHT - 1)
 	for z in range(first_z, last_z + 1):
 		for x in range(first_x, last_x + 1):
 			mask[z * MASK_WIDTH + x] = 1

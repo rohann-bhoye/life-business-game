@@ -1,7 +1,7 @@
 # Shared helpers for our Blender prop scripts (build_carry_bag.py, build_shop_fixtures.py):
 # a print sheet (flat shapes and text rendered to one texture atlas, plus plain colour
 # swatches) and a mesh builder whose faces take their UVs from that atlas.
-import bpy, os, sys, math, random
+import bpy, bmesh, os, sys, math, random
 from mathutils import Vector
 
 FONTS = "C:/Windows/Fonts/"
@@ -209,7 +209,7 @@ class Builder:
 			else:
 				self.quad_strip(a, c, bands[k])
 
-	def to_object(self, name, material, sharp_deg=46):
+	def to_object(self, name, material, sharp_deg=60, bevel=0.012, bevel_deg=30):
 		mesh = bpy.data.meshes.new(name)
 		mesh.from_pydata([tuple(v) for v in self.verts], [], self.faces)
 		uv = mesh.uv_layers.new(name="UVMap")
@@ -217,12 +217,41 @@ class Builder:
 			for k, li in enumerate(poly.loop_indices):
 				uv.data[li].uv = self.uvs[poly.index][k]
 		mesh.materials.append(material)
+		if bevel: soften_edges(mesh, bevel, bevel_deg)
 		mesh.shade_smooth()
 		mesh.set_sharp_from_angle(angle=math.radians(sharp_deg))
 		mesh.update()
 		ob = bpy.data.objects.new(name, mesh)
 		bpy.context.scene.collection.objects.link(ob)
+		if bevel: weight_normals(ob)
 		return ob
+
+def soften_edges(mesh, width, min_deg):
+	"""Weld the boxes' duplicated corners, then chamfer every edge sharper than `min_deg` into
+	a small step so highlights catch them. A bevel strip takes one flat colour from
+	the face beside it, so it never smears across the print sheet."""
+	bm = bmesh.new()
+	bm.from_mesh(mesh)
+	bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
+	uv = bm.loops.layers.uv.active
+	edges = [e for e in bm.edges if len(e.link_faces) == 2 and e.calc_face_angle(0) > math.radians(min_deg)]
+	res = bmesh.ops.bevel(bm, geom=edges, offset=width, segments=1, profile=0.5, affect="EDGES", clamp_overlap=True)
+	fresh = set(res["faces"])
+	for f in fresh:
+		ref = next((l[uv].uv.copy() for v in f.verts for l in v.link_loops if l.face not in fresh), None)
+		if ref is not None:
+			for l in f.loops: l[uv].uv = ref
+	bm.to_mesh(mesh)
+	bm.free()
+
+def weight_normals(ob):
+	"""Face-area weighted normals keep big flat faces flat while the chamfers stay smooth."""
+	mod = ob.modifiers.new("WeightedNormal", "WEIGHTED_NORMAL")
+	mod.keep_sharp = True
+	for other in bpy.context.scene.objects: other.select_set(False)
+	ob.select_set(True)
+	bpy.context.view_layer.objects.active = ob
+	bpy.ops.object.modifier_apply(modifier=mod.name)
 
 def material(name, png, roughness=0.85):
 	m = bpy.data.materials.new(name)

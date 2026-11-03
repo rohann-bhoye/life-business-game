@@ -97,7 +97,7 @@ func _build_room() -> void:
 	office_door.position = Vector3(-14.825, 0.1, FRONT - 0.12)
 	office_door.set_script(preload("res://office_door.gd"))
 	shell.add_child(office_door)
-	var footpath = builder._box("OfficeFootpath", shell, Vector3(1.8, 0.025, 4.2), Vector3(-14.2, 0.13, FRONT - 2.1), Color(0.66, 0.69, 0.68))
+	var footpath = builder._box("OfficeFootpath", shell, StreetKit.pavement_size(1.8, 4.2), StreetKit.pavement_at(-14.2, FRONT - 2.1), Color(0.66, 0.69, 0.68))
 	footpath.material_override = world.get_node("ShopPresentation").surface(Vector2(0.5, 0.5), 2)
 	for z in [16, 22, 28]:
 		var fixture = builder._box("CeilingFixture%d" % z, shell, Vector3(7, 0.08, 0.35), Vector3(-3, 5.18, z), Color(0.87, 0.93, 0.97))

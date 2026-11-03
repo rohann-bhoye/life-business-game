@@ -57,18 +57,19 @@ func setup(business_ref, money_formatter: Callable, shop_ref, ui_ref) -> void:
 	pay_button = _button("PayBillsButton", Vector2(16, 108), Vector2(388, 44), bills)
 	pay_button.theme_type_variation = "PrimaryButton"
 	pay_button.pressed.connect(func(): shop._on_pay_bills_pressed())
-	var marketing := _card(Vector2(460, 76), Vector2(432, 214), "MARKETING")
-	marketing_label = _label("", Vector2(16, 44), 400, 15, KenneyTheme.TEXT, marketing)
-	marketing_label.size.y = 100
+	# Marketing shows five lines (reputation takes two), so its button sits lower.
+	var marketing := _card(Vector2(460, 76), Vector2(432, 234), "MARKETING")
+	marketing_label = _label("", Vector2(16, 42), 400, 15, KenneyTheme.TEXT, marketing)
+	marketing_label.size.y = 124
 	marketing_label.clip_text = false
-	marketing_button = _button("MarketingButton", Vector2(16, 150), Vector2(400, 44), marketing)
+	marketing_button = _button("MarketingButton", Vector2(16, 174), Vector2(400, 44), marketing)
 	marketing_button.theme_type_variation = "PrimaryButton"
 	marketing_button.pressed.connect(func(): shop._on_marketing_button_pressed())
-	var level := _card(Vector2(460, 304), Vector2(432, 146), "SHOP LEVEL")
-	level_label = _label("", Vector2(16, 44), 400, 15, KenneyTheme.TEXT, level)
-	level_label.size.y = 40
+	var level := _card(Vector2(460, 324), Vector2(432, 126), "SHOP LEVEL")
+	level_label = _label("", Vector2(16, 42), 400, 15, KenneyTheme.TEXT, level)
+	level_label.size.y = 26
 	level_label.clip_text = false
-	upgrade_button = _button("UpgradeButton", Vector2(16, 90), Vector2(400, 42), level)
+	upgrade_button = _button("UpgradeButton", Vector2(16, 72), Vector2(400, 40), level)
 	upgrade_button.theme_type_variation = "InfoButton"
 	upgrade_button.pressed.connect(func(): ui._on_upgrade_pressed())
 	business.changed.connect(refresh)

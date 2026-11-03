@@ -4,6 +4,7 @@ const BargainMenu := preload("res://bargain_menu.gd")
 const SupplierMenu := preload("res://supplier_menu.gd")
 const CheckoutMenu := preload("res://checkout_menu.gd")
 const StaffDialog := preload("res://staff_dialog.gd")
+const ShopSaleDialog := preload("res://shop_sale_dialog.gd")
 const CustomerChat := preload("res://customer_chat.gd")
 const FriendChat := preload("res://friend_chat.gd")
 const HowToPlay := preload("res://how_to_play.gd")
@@ -14,6 +15,7 @@ const PauseMenu := preload("res://pause_menu.gd")
 var notifications: Control
 var tablet: Node3D
 var staff_dialog: Panel
+var shop_sale_dialog: Panel
 var customer_chat: Panel
 ## Counter order list on the right of the screen (order_panel.gd).
 var order_panel: Panel
@@ -38,6 +40,8 @@ var town_label: Label
 var interaction_label: Label
 var feedback_label: Label
 var controls_panel: Panel
+## Seconds the first-day task card stays up after the game starts.
+var first_day_show := 12.0
 ## True while the controller is the active device (controller.gd): the key hints show buttons.
 var pad_active := false
 var crosshair: Control
@@ -92,6 +96,16 @@ func _ready() -> void:
 	_build_first_day_guide(theme)
 	_build_day_report(theme)
 	_build_controls_hint()
+	var inventory_bar := preload("res://inventory_ui.gd").new()
+	inventory_bar.name = "InventoryBar"
+	add_child(inventory_bar)
+	var quests := preload("res://quest_ui.gd").new()
+	quests.name = "QuestJournal"
+	add_child(quests)
+	add_child(preload("res://world_map.gd").new())
+	var memory := preload("res://player_memory.gd").new()
+	memory.name = "PlayerMemory"
+	add_child(memory)
 	_label("FarmSummary", shop_menu)
 	_label("SeedQuantityLabel", shop_menu).text = "Seed packets"
 	shop_menu.get_node("SeedQuantityLabel").hide()
@@ -181,6 +195,11 @@ func _ready() -> void:
 	staff_dialog.set_script(StaffDialog)
 	staff_dialog.theme = theme
 	add_child(staff_dialog)
+	shop_sale_dialog = Panel.new()
+	shop_sale_dialog.name = "ShopSaleDialog"
+	shop_sale_dialog.set_script(ShopSaleDialog)
+	shop_sale_dialog.theme = theme
+	add_child(shop_sale_dialog)
 	customer_chat = Panel.new()
 	customer_chat.name = "CustomerChat"
 	customer_chat.set_script(CustomerChat)
@@ -270,10 +289,11 @@ func _build_controls_hint() -> void:
 	_place(move, 42, 118, 68, 24)
 	move.add_theme_font_size_override("font_size", 12)
 	_keycap("TAB", Vector2(112, 116))
+	controls_panel.get_node("KeyTAB").hide()
 	controls_panel.get_node("KeyTAB").add_theme_font_size_override("font_size", 10)
 	controls_panel.get_node("KeyTAB").size.x = 38
 	var tablet_text := _label("TabletText", controls_panel)
-	tablet_text.text = "TABLET"
+	tablet_text.text = ""
 	_place(tablet_text, 154, 118, 48, 24)
 	tablet_text.add_theme_font_size_override("font_size", 11)
 
@@ -498,6 +518,10 @@ func _layout() -> void:
 	_place(interaction_label, (viewport_size.x - minf(520, viewport_size.x - 32)) / 2.0, viewport_size.y / 2.0 + 18, minf(520, viewport_size.x - 32), 24)
 	_place(feedback_label, 16, viewport_size.y - 80, viewport_size.x - 32, 28)
 	_place(controls_panel, viewport_size.x - 218, viewport_size.y - 166, 202, 150)
+	# Small and see-through so it never hides the world.
+	controls_panel.pivot_offset = Vector2(202, 150)
+	controls_panel.scale = Vector2(0.65, 0.65)
+	controls_panel.modulate.a = 0.5
 	feedback_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	feedback_label.clip_text = true
 	if is_instance_valid(tablet): _layout_tablet()
@@ -531,6 +555,26 @@ func _tablet_theme(compact: bool) -> Theme:
 	# Kenney Future is wide: narrow (portrait) screens keep the compact standard font.
 	if compact: theme.set_font("font", "TabBar", ThemeDB.fallback_font)
 	theme.set_font_size("font_size", "TabBar", 14 if compact else 15)
+	# Bright bazaar (ui_bazaar.gd): dark ink on cream and white, buttons and tabs white with a
+	# cartoon outline, saffron when chosen, in the plain readable font.
+	var Bazaar := preload("res://ui_bazaar.gd")
+	for type in ["Label", "Button", "TabBar", "LineEdit", "SpinBox", "CheckButton"]:
+		theme.set_color("font_color", type, Bazaar.INK)
+		theme.set_color("font_hover_color", type, Bazaar.INK)
+		theme.set_color("font_pressed_color", type, Color.WHITE)
+		theme.set_color("font_selected_color", type, Color.WHITE)
+		theme.set_color("font_disabled_color", type, Bazaar.MUTED)
+	theme.set_color("font_unselected_color", "TabBar", Bazaar.INK)
+	theme.set_color("font_hovered_color", "TabBar", Bazaar.INK)
+	for type in ["Button", "TabBar", "CheckButton"]: theme.set_font("font", type, ThemeDB.fallback_font)
+	var looks := {"normal": Bazaar.CARD, "hover": Color("fff0c2"), "pressed": Bazaar.SAFFRON, "disabled": Color("efe6d6")}
+	var tab_states := {"normal": "tab_unselected", "hover": "tab_hovered", "pressed": "tab_selected", "disabled": "disabled"}
+	for state in looks:
+		var look := Bazaar.box(looks[state], 2, 10, Bazaar.INK if state != "disabled" else Bazaar.LINE)
+		for type in ["Button", "CheckButton"]: theme.set_stylebox(state, type, look)
+		theme.set_stylebox(tab_states[state], "TabBar", look.duplicate())
+	theme.set_stylebox("normal", "LineEdit", Bazaar.box(Bazaar.CARD, 2, 8, Bazaar.LINE))
+	for type in ["Button", "LineEdit", "TabBar"]: theme.set_stylebox("focus", type, Bazaar.box(Color(0, 0, 0, 0), 2, 10, Bazaar.SAFFRON))
 	for state in ["tab_unselected", "tab_hovered", "tab_selected", "disabled"]:
 		var style := theme.get_stylebox(state, "TabBar")
 		style.content_margin_left = 8 if compact else 16
@@ -555,6 +599,8 @@ func _layout_tablet() -> void:
 			child.add_theme_constant_override("shadow_offset_x", 0)
 			child.add_theme_constant_override("shadow_offset_y", 0)
 	shop_menu.get_node("TitleLabel").text = "SHOP MANAGER"
+	# White on the saffron header.
+	for header_label in [shop_menu.get_node("TitleLabel"), shop.money_label, shop.stock_label]: header_label.add_theme_color_override("font_color", Color.WHITE)
 	_place(shop_menu.get_node("TitleLabel"), 24, 16, width - 64, 36)
 	shop.close_button.text = ""
 	shop.close_button.icon = MenuSkin.texture("close")
@@ -570,7 +616,7 @@ func _layout_tablet() -> void:
 	_place(shop_menu.get_node("SectionLabel"), 24, 190, width, 28)
 	shop_menu.get_node("SectionLabel").text = ["BUSINESS SUMMARY", "INVENTORY & GROWTH", "EMPLOYEES", "CUSTOMER REACH", "DEMO GOALS", "FARM & SEEDS"][selected_tab]
 	shop_menu.get_node("SectionLabel").add_theme_font_size_override("font_size", 14)
-	shop_menu.get_node("SectionLabel").modulate = Color(0.38, 0.47, 0.5)
+	shop_menu.get_node("SectionLabel").modulate = Color("c8611a")
 	for tab_index in range(TAB_CONTROLS.size()):
 		for index in range(TAB_CONTROLS[tab_index].size()):
 			_place(shop_menu.get_node(TAB_CONTROLS[tab_index][index]), 24, 236 + index * 36, width, 28)
@@ -675,7 +721,7 @@ func _layout_tablet_cards(width: float) -> void:
 ## {rect, accent, progress}; progress is 0..1 on goal cards, -1 elsewhere.
 func tablet_tiles(tab: int) -> Array:
 	var groups: Array = [[], [["SalePriceLabel", "SalePriceInput"], ["ShopStatusLabel"], ["ShopHoursLabel"], ["ShopLevelLabel"]], [["WorkerLabel", "WorkerStatusLabel", "WorkSwitch", "WageLabel"], ["AutoCollectSwitch", "CollectDeliveryButton"]], [["MarketingLabel"], ["MissedSalesLabel"], ["LastVisitLabel"], ["ReputationLabel"]], [["DemoGoal0"], ["DemoGoal1"], ["DemoGoal2"], ["DemoGoal3"], ["DemoGoal4"]], [["FarmSummary"]]][clampi(tab, 0, 5)]
-	var accents := [Color("2563eb"), Color("16a34a"), Color("ea580c"), Color("7c3aed"), Color("0891b2"), Color("dc2626")]
+	var accents: Array = preload("res://ui_bazaar.gd").ACCENTS
 	var tiles: Array = []
 	for index in range(groups.size()):
 		var area := Rect2()
@@ -788,7 +834,9 @@ func _update_first_day_guide() -> void:
 	var lines: Array[String] = demo.goal_lines()
 	var flags: Array[bool] = demo.done_flags()
 	var next := flags.find(false)
-	first_day_panel.visible = next >= 0 and not player._menu_is_open()
+	# Never shown now: the quest tracker under the clock (quest_ui.gd) carries the goal and
+	# this live hint. The text is still kept up to date for the tablet and the tests.
+	first_day_panel.visible = false
 	if next >= 0:
 		first_day_label.text = "%d/5  %s\n%s" % [next + 1, actions[next], lines[next]]
 		first_day_step.text = "> " + demo.next_step(shop.business)
@@ -862,6 +910,7 @@ func _update_save_footer() -> void:
 
 func _process(delta: float) -> void:
 	_present_demo_completion()
+	first_day_show = maxf(0.0, first_day_show - delta)
 	feedback_seconds = maxf(0, feedback_seconds - delta)
 	feedback_label.visible = feedback_seconds > 0 and not shop_menu.visible and not bargain_menu.visible and not supplier_menu.visible and not checkout_menu.visible
 	_update_save_footer()
@@ -880,7 +929,8 @@ func _process(delta: float) -> void:
 	elif house.player_inside:
 		interaction_label.text = "My home" if shop.business.house_owned else "Home for sale"
 	elif shop.player_inside:
-		interaction_label.text = "Customer wants a discount" if shop.get_bargaining_customer() != null else ("My shop" if shop.business.shop_is_open() else "My shop (closed)")
+		# Only something worth knowing under the crosshair, not the name of the room.
+		interaction_label.text = "Customer wants a discount" if shop.get_bargaining_customer() != null else ("" if shop.business.shop_is_open() else "Shop closed - opens at 08:00")
 	var operations = get_tree().current_scene.get_node_or_null("ShopOperations")
 	if operations != null and operations.enabled:
 		var hint: String = operations.interaction_hint()

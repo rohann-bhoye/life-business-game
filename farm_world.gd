@@ -80,11 +80,11 @@ func _ready() -> void:
 
 func _build_entrance() -> void:
 	var paving: Material = world.get_node("ShopPresentation").surface(Vector2(0.5, 0.5), 1.6)
-	var path = builder._box("RoadToFarmPath", self, Vector3(2.0, 0.025, 5.45), Vector3(-24, 0.131, 0.975), Color(0.65, 0.69, 0.67))
+	var path = builder._box("RoadToFarmPath", self, StreetKit.pavement_size(2.0, 5.45), StreetKit.pavement_at(-24, 0.975), Color(0.65, 0.69, 0.67))
 	path.material_override = paving
 	get_node("FarmPath").material_override = paving
 	for x in [-25.05, -22.95]:
-		builder._box("PathKerb%s" % x, self, Vector3(0.09, 0.1, 4.0), Vector3(x, 0.17, 1.4), Color(0.66, 0.69, 0.68))
+		builder._box("PathKerb%s" % x, self, Vector3(0.09, 0.1, 4.0), Vector3(x, 0.2, 1.4), Color(0.66, 0.69, 0.68))
 	_fence_segment("FarmBackFence", Vector3(-29.5, 0.1, -12), Vector3(-16.8, 0.1, -12))
 	_fence_segment("FarmLeftFence", Vector3(-29.5, 0.1, -12), Vector3(-29.5, 0.1, -0.65))
 	_fence_segment("FarmRightFence", Vector3(-16.8, 0.1, -12), Vector3(-16.8, 0.1, -0.65))

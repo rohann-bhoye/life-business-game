@@ -69,19 +69,19 @@ func _roads() -> void:
 	for side in [-1, 1]:
 		var road := _box("RoadExtension%d" % side, Vector3(43, 0.012, 5.5), Vector3(side * 53.5, 0.111, 7), Color(0.16, 0.18, 0.19))
 		if road_material != null: road.material_override = road_material
-		_box("NorthPavementExt%d" % side, Vector3(43, 0.014, 1.6), Vector3(side * 53.5, 0.107, 3.4), paving)
-		_box("SouthPavementExt%d" % side, Vector3(43, 0.014, 1.6), Vector3(side * 53.5, 0.107, 10.6), paving)
+		_box("NorthPavementExt%d" % side, StreetKit.pavement_size(43, 1.6), StreetKit.pavement_at(side * 53.5, 3.4), paving)
+		_box("SouthPavementExt%d" % side, StreetKit.pavement_size(43, 1.6), StreetKit.pavement_at(side * 53.5, 10.6), paving)
 		for z in [4.35, 9.65]: _box("RoadEdgeExt%d_%s" % [side, z], Vector3(43, 0.008, 0.05), Vector3(side * 53.5, 0.124, z), Color(0.83, 0.86, 0.83))
 		for step in range(10):
 			var x: float = side * (34.0 + step * 4.0)
 			_box("LaneMark%s" % x, Vector3(1.8, 0.008, 0.09), Vector3(x, 0.124, 7), Color(0.88, 0.86, 0.68))
 	# Market street crossing the main road in the east (future phase).
 	for part in [[-21.3, 51.3], [33.8, 48.3]]:
-		var road := _box("MarketStreet%s" % part[0], Vector3(5.5, 0.012, part[1]), Vector3(MARKET_X, 0.112, part[0]), Color(0.16, 0.18, 0.19), false, future)
+		var road := _box("MarketStreet%s" % part[0], Vector3(5.5, 0.012, part[1]), Vector3(MARKET_X, 0.111, part[0]), Color(0.16, 0.18, 0.19), false, future)
 		if road_material != null: road.material_override = road_material
 	for side in [-1, 1]:
-		_box("MarketPavementN%d" % side, Vector3(1.6, 0.014, 50.0), Vector3(MARKET_X + side * 3.55, 0.107, -22.4), paving, false, future)
-		_box("MarketPavementS%d" % side, Vector3(1.6, 0.014, 46.0), Vector3(MARKET_X + side * 3.55, 0.107, 34.4), paving, false, future)
+		_box("MarketPavementN%d" % side, StreetKit.pavement_size(1.6, 50.0), StreetKit.pavement_at(MARKET_X + side * 3.55, -22.4), paving, false, future)
+		_box("MarketPavementS%d" % side, StreetKit.pavement_size(1.6, 46.0), StreetKit.pavement_at(MARKET_X + side * 3.55, 34.4), paving, false, future)
 	for stripe in range(7):
 		_box("MarketCrossing%d" % stripe, Vector3(2.0, 0.008, 0.28), Vector3(MARKET_X - 5.5, 0.124, 4.8 + stripe * 0.7), Color(0.85, 0.87, 0.83), false, future)
 	for x in [-70.0, -58.0, -46.0, 38.0, 62.0, 70.0]:
@@ -107,8 +107,8 @@ func _horizon_road() -> void:
 			var x0: float = side * (Horizon.START + step)
 			var x1: float = side * (Horizon.START + step + 1.0)
 			_slope_strip(road, x0, x1, 4.25, 9.75, 0.117, Color.WHITE)
-			_slope_strip(edges, x0, x1, 2.6, 4.2, 0.114, paving)
-			_slope_strip(edges, x0, x1, 9.8, 11.4, 0.114, paving)
+			_slope_strip(edges, x0, x1, 2.6, 4.2, StreetKit.PAVE_TOP, paving)
+			_slope_strip(edges, x0, x1, 9.8, 11.4, StreetKit.PAVE_TOP, paving)
 			for z in [4.35, 9.65]: _slope_strip(edges, x0, x1, z - 0.025, z + 0.025, 0.124, line)
 			if step % 4 < 2: _slope_strip(edges, x0, x1, 6.955, 7.045, 0.124, Color(0.88, 0.86, 0.68))
 		for part in [[road, road_material, "HorizonRoad"], [edges, IndianHouse._material(), "HorizonPavements"]]:
@@ -116,6 +116,8 @@ func _horizon_road() -> void:
 			mesh.name = "%s%d" % [part[2], side]
 			mesh.mesh = part[0].commit()
 			mesh.material_override = part[1]
+			# Sloped road and pavements over the hill: no grass on them (environment_details.gd).
+			mesh.add_to_group("no_grass")
 			town.add_child(mesh)
 	call_deferred("_hill_forest")
 
@@ -211,11 +213,11 @@ func _airport_road() -> void:
 	var paving := Color(0.66, 0.69, 0.67)
 	var white := Color(0.85, 0.87, 0.83)
 	var z := AIRPORT_ROAD_Z
-	var road := _box("AirportRoad", Vector3(17.3, 0.012, 5.5), Vector3(38.6, 0.112, z), Color(0.16, 0.18, 0.19))
+	var road := _box("AirportRoad", Vector3(17.3, 0.012, 5.5), Vector3(38.6, 0.111, z), Color(0.16, 0.18, 0.19))
 	if road_material != null: road.material_override = road_material
 	for edge in [z - 2.6, z + 2.6]: _box("AirportRoadEdge%d" % roundi(edge), Vector3(17.3, 0.008, 0.08), Vector3(38.6, 0.124, edge), white)
 	for step in range(5): _box("AirportRoadDash%d" % step, Vector3(1.8, 0.008, 0.1), Vector3(32.2 + step * 3.4, 0.124, z), Color(0.88, 0.86, 0.68))
-	_box("AirportRoadPavement", Vector3(15.6, 0.014, 1.4), Vector3(37.8, 0.107, z - 3.45), paving)
+	_box("AirportRoadPavement", StreetKit.pavement_size(15.6, 1.4), StreetKit.pavement_at(37.8, z - 3.45), paving)
 	for x in [33.0, 40.0]: town._streetlight(Vector3(x, 0.1, z - 3.5), 0.0, false)
 	# Car park north of the road, by the control tower.
 	_box("AirportCarPark", Vector3(10.0, 0.014, 6.0), Vector3(36.0, 0.109, z - 7.2), Color(0.58, 0.59, 0.58))

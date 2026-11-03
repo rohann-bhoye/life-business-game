@@ -24,7 +24,10 @@ var starting_racks := 3
 ## Sets the starting money, customers' queue patience and their budgets.
 var difficulty := 1
 const DIFFICULTY_NAMES := ["Aasaan", "Normal", "Mushkil"]
-const DIFFICULTY_MONEY := [15000, 10000, 6000]
+## Starting money per difficulty (the story tells the player this amount). Saves of the first
+## demo builds started with 15,000 / 10,000 / 6,000; those stay valid.
+const DIFFICULTY_MONEY := [20000, 15000, 10000]
+const OLD_DIFFICULTY_MONEY := [6000]
 var khata: Array = []
 var udhaar_given := 0
 var udhaar_collected := 0
@@ -33,6 +36,11 @@ const UDHAAR_DAYS := 2
 const UDHAAR_WRITE_OFF_DAYS := 5
 const UDHAAR_PAY_CHANCE := 0.7
 var expansion_expenses := 0
+## The story start: a new game begins with Apna Mart for sale (shop_sale.gd, Seth Ramlal) and
+## you buy it for SHOP_PRICES[difficulty]. Old saves and co-op games own the shop from the start.
+const SHOP_PRICES := [6000, 5000, 4000]
+var shop_owned := true
+var shop_cost := 0
 ## Carry bags for counter orders (customer.gd counter_order): packs bought on the
 ## shop PC go straight onto the bag stand at the counter; every game starts with
 ## STARTER_BAGS. One bag is used per order the player fills.
@@ -774,6 +782,31 @@ func expand_shop() -> bool:
 	changed.emit()
 	return true
 
+func shop_price() -> int:
+	return SHOP_PRICES[clampi(difficulty, 0, SHOP_PRICES.size() - 1)]
+
+## New story games: the shop is for sale until you buy it from Seth Ramlal.
+func start_unowned_shop() -> void:
+	shop_owned = false
+	shop_cost = 0
+
+func can_buy_shop() -> bool:
+	return not shop_owned and money >= shop_price()
+
+func buy_shop() -> bool:
+	if not can_buy_shop(): return false
+	var price := shop_price()
+	money -= price
+	shop_cost = price
+	shop_owned = true
+	if not save_progress():
+		money += price
+		shop_cost = 0
+		shop_owned = false
+		return false
+	changed.emit()
+	return true
+
 func next_upgrade_cost() -> int:
 	return UPGRADE_COSTS[shop_level - 1] if shop_level < CUSTOMER_INTERVALS.size() else 0
 
@@ -799,7 +832,7 @@ func reputation_traffic_factor() -> float:
 	return 1.0 - (customer_reviews.reputation - 50) / 200.0
 
 func shop_is_open() -> bool:
-	return minutes_of_day >= SHOP_OPEN_MINUTE and minutes_of_day < SHOP_CLOSE_MINUTE
+	return shop_owned and minutes_of_day >= SHOP_OPEN_MINUTE and minutes_of_day < SHOP_CLOSE_MINUTE
 
 func worker_on_duty() -> bool:
 	return staff.active(self, "cashier") and wages_due == 0
@@ -1184,7 +1217,7 @@ func finish_marketing() -> void:
 	_commit()
 
 func total_expenses() -> int:
-	return restocking_expenses + marketing_expenses + hiring_expenses + operating_expenses + wage_expenses + upgrade_expenses + overtime_expenses + furnishing_expenses + expansion_expenses + bag_expenses + licence_expenses + farm.expenses() + loan_interest_paid
+	return restocking_expenses + marketing_expenses + hiring_expenses + operating_expenses + wage_expenses + upgrade_expenses + overtime_expenses + furnishing_expenses + expansion_expenses + shop_cost + bag_expenses + licence_expenses + farm.expenses() + loan_interest_paid
 
 func place_rack(product: String, position: Vector2, turn: int, id := -1, from_delivery := false) -> bool:
 	if product not in Catalog.IDS or not position.is_finite() or turn < 0 or turn > 3: return false
@@ -1559,6 +1592,8 @@ func snapshot() -> Dictionary:
 	data["udhaar_given"] = udhaar_given
 	data["udhaar_collected"] = udhaar_collected
 	data["expansion_expenses"] = expansion_expenses
+	data["shop_owned"] = shop_owned
+	data["shop_cost"] = shop_cost
 	data["carry_bags"] = carry_bags
 	data["export"] = exports.snapshot()
 	data["treasure"] = treasure.snapshot()
@@ -1654,6 +1689,8 @@ func restore(data: Dictionary) -> void:
 	udhaar_given = int(data.get("udhaar_given", 0))
 	udhaar_collected = int(data.get("udhaar_collected", 0))
 	expansion_expenses = int(data.get("expansion_expenses", 0))
+	shop_owned = bool(data.get("shop_owned", true))
+	shop_cost = int(data.get("shop_cost", 0))
 	carry_bags = int(data.get("carry_bags", STARTER_BAGS))
 	exports.restore(data.get("export", {}))
 	treasure.restore(data.get("treasure", {}))
@@ -1861,6 +1898,12 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	var expected_expansion := 0
 	for index in range(int(expansion)): expected_expansion += EXPANSION_COSTS[index]
 	if not EmployeeRelations.whole(data.get("expansion_expenses", 0), MAX_SAVED_VALUE) or int(data.get("expansion_expenses", 0)) != expected_expansion: return false
+	# The shop sale: an unbought shop has cost nothing, a bought one cost exactly its price.
+	var sale_owned = data.get("shop_owned", true)
+	var sale_cost = data.get("shop_cost", 0)
+	if not sale_owned is bool or not EmployeeRelations.whole(sale_cost, MAX_SAVED_VALUE): return false
+	if int(sale_cost) != 0 and int(sale_cost) not in SHOP_PRICES: return false
+	if not sale_owned and int(sale_cost) != 0: return false
 	# Licences: known ones, paid at most their price, adding up to the licence spend.
 	var owned = data.get("licences", {})
 	var licence_cost = data.get("licence_expenses", 0)
@@ -2055,12 +2098,12 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	if extra_sold > sold or extra_stock > data.stock: return false
 	if revenue % 10 != 0 or revenue < sold * 50 or revenue > sold * 200:
 		return false
-	var expenses := int(data["restocking_expenses"]) + int(data["marketing_expenses"]) + int(data["hiring_expenses"]) + int(data["operating_expenses"]) + int(data["wage_expenses"]) + int(data["upgrade_expenses"]) + int(data.overtime_expenses) + int(furnishing) + expected_expansion + int(bag_cost) + int(licence_cost) + farm_state.expenses() + int(data.get("loan_interest_paid", 0))
+	var expenses := int(data["restocking_expenses"]) + int(data["marketing_expenses"]) + int(data["hiring_expenses"]) + int(data["operating_expenses"]) + int(data["wage_expenses"]) + int(data["upgrade_expenses"]) + int(data.overtime_expenses) + int(furnishing) + expected_expansion + int(sale_cost) + int(bag_cost) + int(licence_cost) + farm_state.expenses() + int(data.get("loan_interest_paid", 0))
 	# Loans: money received minus principal paid back.
 	if not _valid_loan(data): return false
 	expenses -= int(data.get("loan_received", 0)) - int(data.get("loan_principal_repaid", 0))
 	var start_money := int(data.get("starting_money", INITIAL_MONEY))
-	if start_money not in [INITIAL_MONEY] + DIFFICULTY_MONEY: return false
+	if start_money not in [INITIAL_MONEY] + DIFFICULTY_MONEY + OLD_DIFFICULTY_MONEY: return false
 	# The Darwaza Guild pays for dungeon treasure outside the shop's sales.
 	var guild_income := DungeonStore.income_of(data.get("treasure", {}))
 	if int(data["money"]) != start_money + revenue + guild_income - expenses - int(data["property_expenses"]) - (int(lent) - int(repaid)):

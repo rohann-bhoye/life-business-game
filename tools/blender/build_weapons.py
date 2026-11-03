@@ -75,6 +75,10 @@ def table(mat):
 	b.box((0, 0.55, top - 0.1), (2.7, 0.95, 0.06), "wood_dark")
 	for x in (-1.25, 1.25):
 		for y in (0.2, 0.9): b.box((x, y, (top - 0.1) / 2), (0.12, 0.12, top - 0.1), "wood_dark")
+	# Stretchers between the legs, and a slab under the whole table so it stands flat on the ground.
+	for y in (0.2, 0.9): b.box((0, y, 0.25), (2.4, 0.06, 0.06), "wood_dark")
+	for x in (-1.25, 1.25): b.box((x, 0.55, 0.25), (0.06, 0.7, 0.06), "wood_dark")
+	b.box((0, 0.55, -0.06), (3.3, 1.5, 0.12), "iron_light")
 	b.box((0, 0.55, top + 0.003), (2.6, 0.72, 0.006), "cloth")
 	for y in (0.2, 0.9): b.box((0, y, top + 0.004), (2.6, 0.03, 0.006), "cloth_trim")
 	# Board at the back on two posts, and a small rack of dummy hilts behind the cloth.

@@ -54,13 +54,21 @@ var table: Node3D
 var displays: Array[Node3D] = []
 var swing_ready := true
 var monsters: Array[Node3D] = []
-var hud: Label
+var hud: PanelContainer
+var hud_title: Label
+var hud_rank: Label
+var hud_gate: Label
+var hud_treasure_name: Label
+var hud_treasure: Label
+var hud_drops: Label
+var hud_monsters: Label
 var guild: Node3D
+var reader: CanvasLayer
 ## The weapons on the table outside the cave: damage per hit, seconds per swing, reach in
 ## metres. Taking one is saved; you need one to fight below.
 const WEAPON_IDS := ["lathi", "talwar", "gada"]
 const TABLE_SLOTS := [-0.8, 0.0, 0.8]
-const TABLE_AT := Vector3(-3.6, 0.0, 6.4)
+const TABLE_AT := Vector3(-3.6, 0.0, 2.4)
 const WEAPONS := {
 	"lathi": {"name": "Lathi", "damage": 1, "rate": 0.5, "reach": 2.6, "note": "1 damage, fast"},
 	"talwar": {"name": "Talwar", "damage": 2, "rate": 0.62, "reach": 2.9, "note": "2 damage, long reach"},
@@ -76,6 +84,9 @@ func _ready() -> void:
 	_build_guild()
 	_build_table()
 	_build_fade()
+	_build_area_notice()
+	reader = preload("res://dungeon_books.gd").new()
+	add_child(reader)
 	business.clock_changed.connect(_update_gate)
 	_update_gate()
 
@@ -97,7 +108,16 @@ func open_floors() -> Array[int]:
 		if open: result.append(index)
 	return result
 
+## The Darwaza (gate, weapon table, Guild counter) waits for the next update for everyone,
+## admin too. Set ADMIN_CAN_ENTER to true to let admin mode (admin_mode.gd) open it again
+## while that update is being built.
+const ADMIN_CAN_ENTER := false
+
+func sealed() -> bool:
+	return not (ADMIN_CAN_ENTER and preload("res://admin_mode.gd").enabled())
+
 func gate_open() -> bool:
+	if sealed(): return false
 	return not open_floors().is_empty() and get_tree().current_scene.get_node_or_null("CoopWorld") == null
 
 func _build_cave() -> void:
@@ -148,6 +168,16 @@ func _build_cave() -> void:
 		flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		cave.add_child(flame)
 		flames.append(flame)
+		# A real warm light with each flame, so the rock, the sign and the ground in front of
+		# the cave are lit at night (the flame picture alone gave no light).
+		var torch_light := OmniLight3D.new()
+		torch_light.name = "TorchLight"
+		torch_light.light_color = Color(1.0, 0.7, 0.35)
+		torch_light.light_energy = 1.6
+		torch_light.omni_range = 7.0
+		torch_light.shadow_enabled = false
+		torch_light.position = flame.position + Vector3(0, -0.2, 0.7)
+		cave.add_child(torch_light)
 	board_label = Label3D.new()
 	board_label.name = "GateRank"
 	board_label.position = Vector3(3.95, 1.52, 1.63)
@@ -214,14 +244,212 @@ func _build_fade() -> void:
 	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	fade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(fade)
-	hud = Label.new()
+	# The trip card (top left, where the money sits in town): floor and rank, when the gate
+	# shuts, and what this trip has found so far.
+	hud = PanelContainer.new()
 	hud.name = "DungeonHud"
-	hud.position = Vector2(16, 44)
-	hud.add_theme_font_size_override("font_size", 16)
-	hud.add_theme_color_override("font_color", Color(0.8, 0.95, 1.0))
-	hud.add_theme_color_override("font_shadow_color", Color.BLACK)
+	hud.position = Vector2(16, 14)
+	hud.custom_minimum_size.x = 240
+	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var card := StyleBoxFlat.new()
+	card.bg_color = Color(0.03, 0.04, 0.06, 0.72)
+	card.border_color = Color(0.85, 0.7, 0.37)
+	card.border_width_left = 3
+	card.set_corner_radius_all(8)
+	card.content_margin_left = 14
+	card.content_margin_right = 14
+	card.content_margin_top = 10
+	card.content_margin_bottom = 10
+	hud.add_theme_stylebox_override("panel", card)
 	hud.visible = false
 	layer.add_child(hud)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 3)
+	hud.add_child(column)
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 10)
+	column.add_child(top)
+	hud_title = _text(top, 18, Vector2.ZERO, 0)
+	hud_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var badge := PanelContainer.new()
+	var badge_style := StyleBoxFlat.new()
+	badge_style.bg_color = Color(0.85, 0.7, 0.37)
+	badge_style.set_corner_radius_all(4)
+	badge_style.content_margin_left = 7
+	badge_style.content_margin_right = 7
+	badge.add_theme_stylebox_override("panel", badge_style)
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(badge)
+	hud_rank = _text(badge, 12, Vector2.ZERO, 0)
+	hud_rank.add_theme_color_override("font_color", Color(0.1, 0.08, 0.04))
+	hud_rank.add_theme_constant_override("outline_size", 0)
+	hud_gate = _text(column, 13, Vector2.ZERO, 0)
+	hud_gate.modulate = Color(0.7, 0.76, 0.86)
+	var rule := ColorRect.new()
+	rule.color = Color(1, 1, 1, 0.12)
+	rule.custom_minimum_size.y = 1
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(rule)
+	var treasure_row := _stat_row(column)
+	hud_treasure_name = treasure_row[0]
+	hud_treasure = treasure_row[1]
+	var drops_row := _stat_row(column)
+	drops_row[0].text = "Monster drops"
+	hud_drops = drops_row[1]
+	var monster_row := _stat_row(column)
+	monster_row[0].text = "Monsters left"
+	hud_monsters = monster_row[1]
+	_build_combat_hud(layer)
+
+## A line of the trip card: [name, value] labels, the value gold on the right.
+func _stat_row(column: VBoxContainer) -> Array:
+	var row := HBoxContainer.new()
+	column.add_child(row)
+	var name_label := _text(row, 14, Vector2.ZERO, 0)
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.modulate = Color(0.85, 0.89, 0.95)
+	var value := _text(row, 14, Vector2.ZERO, 0)
+	value.add_theme_color_override("font_color", Color(1.0, 0.84, 0.45))
+	return [name_label, value]
+
+## Fights: the health bar of the monster you are fighting (top middle, with its name and
+## level) and your own health (bottom left). Monsters now wear you down instead of ending
+## the trip at the first touch; at 0 health they still throw you back to the entry stone.
+const PLAYER_MAX_HP := 100
+const MONSTER_DAMAGE := {"slime": 10, "bat": 8, "mushroom": 14, "boss": 25}
+var player_hp := PLAYER_MAX_HP
+var hit_cooldown := 0.0
+var target: Node3D
+var target_time := 0.0
+var monster_ratio := 1.0
+var player_ratio := 1.0
+var monster_root: Control
+var monster_name: Label
+var monster_fill: ColorRect
+var player_root: Control
+var player_text: Label
+var player_fill: ColorRect
+var hurt_flash: ColorRect
+
+func _bar(parent: Control, at: Vector2, width: float, height: float, fill_color: Color) -> ColorRect:
+	var frame := ColorRect.new()
+	frame.color = Color(0.86, 0.84, 0.78, 0.9)
+	frame.position = at - Vector2(2, 2)
+	frame.size = Vector2(width + 4, height + 4)
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(frame)
+	var back := ColorRect.new()
+	back.color = Color(0.07, 0.06, 0.06, 0.9)
+	back.position = at
+	back.size = Vector2(width, height)
+	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(back)
+	var fill := ColorRect.new()
+	fill.color = fill_color
+	fill.position = at
+	fill.size = Vector2(width, height)
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(fill)
+	return fill
+
+func _text(parent: Control, size: int, at: Vector2, width: float) -> Label:
+	var label := Label.new()
+	label.position = at
+	label.size = Vector2(width, size + 8)
+	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	label.add_theme_constant_override("outline_size", 5)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(label)
+	return label
+
+func _build_combat_hud(layer: CanvasLayer) -> void:
+	hurt_flash = ColorRect.new()
+	hurt_flash.color = Color(0.8, 0.05, 0.05, 0.0)
+	hurt_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hurt_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(hurt_flash)
+	monster_root = Control.new()
+	monster_root.anchor_left = 0.5
+	monster_root.anchor_right = 0.5
+	monster_root.offset_left = -190
+	monster_root.offset_right = 190
+	monster_root.offset_top = 40
+	monster_root.offset_bottom = 96
+	monster_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	monster_root.visible = false
+	layer.add_child(monster_root)
+	monster_name = _text(monster_root, 18, Vector2(0, 0), 380)
+	monster_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	monster_fill = _bar(monster_root, Vector2(2, 32), 376, 9, Color(0.95, 0.55, 0.15))
+	player_root = Control.new()
+	player_root.anchor_top = 1.0
+	player_root.anchor_bottom = 1.0
+	player_root.offset_left = 24
+	player_root.offset_right = 320
+	player_root.offset_top = -140
+	player_root.offset_bottom = -88
+	player_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	player_root.visible = false
+	layer.add_child(player_root)
+	var caption := _text(player_root, 13, Vector2(0, 0), 120)
+	caption.text = "HEALTH"
+	caption.modulate = Color(1, 1, 1, 0.8)
+	player_text = _text(player_root, 13, Vector2(176, 0), 120)
+	player_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	player_fill = _bar(player_root, Vector2(2, 28), 292, 12, Color(0.82, 0.16, 0.16))
+
+func _update_combat(delta: float) -> void:
+	var down := underground_floor >= 0
+	player_root.visible = down
+	if not down:
+		monster_root.visible = false
+		hurt_flash.color.a = 0.0
+		return
+	hit_cooldown = maxf(0.0, hit_cooldown - delta)
+	target_time -= delta
+	var shown: Node3D = null
+	if is_instance_valid(target) and target_time > 0.0:
+		shown = target
+	else:
+		var nearest := 12.0
+		for monster in monsters:
+			if not is_instance_valid(monster) or monster.dying or monster.state != "chase": continue
+			var distance: float = monster.global_position.distance_to(player.global_position)
+			if distance < nearest:
+				nearest = distance
+				shown = monster
+	monster_root.visible = shown != null
+	if shown != null:
+		monster_name.text = "Lv %d  %s%s" % [shown.level, "Elite " if shown.elite else "", shown.data.name]
+		monster_ratio = move_toward(monster_ratio, clampf(float(maxi(shown.hp, 0)) / float(shown.max_hp), 0.0, 1.0), delta * 2.5)
+		monster_fill.size.x = 376.0 * monster_ratio
+	player_ratio = move_toward(player_ratio, float(player_hp) / PLAYER_MAX_HP, delta * 1.5)
+	player_fill.size.x = 292.0 * player_ratio
+	player_text.text = "%d / %d" % [player_hp, PLAYER_MAX_HP]
+	hurt_flash.color.a = move_toward(hurt_flash.color.a, 0.0, delta * 0.9)
+
+## A hit on a monster: it becomes the one the top bar shows (starting from its old health).
+func target_hit(monster: Node3D, ratio_before: float) -> void:
+	if monster != target: monster_ratio = ratio_before
+	target = monster
+	target_time = 6.0
+
+## A monster touched you: it hurts (once a second at most) and is pushed back. At 0 health
+## the trip ends as before (caught).
+func monster_touch(monster: Node3D) -> void:
+	if busy or hit_cooldown > 0.0: return
+	hit_cooldown = 1.0
+	var damage: int = int(MONSTER_DAMAGE.get(monster.kind, 10) * (1.5 if monster.elite else 1.0))
+	player_hp = maxi(0, player_hp - damage)
+	hurt_flash.color.a = 0.4
+	sound("hit")
+	var away: Vector3 = monster.global_position - player.global_position
+	away.y = 0.0
+	monster.knock = away.normalized() * 7.0
+	_feedback("%s hits you! -%d health" % [monster.data.name, damage])
+	if player_hp <= 0: caught(monster)
 
 func _update_gate() -> void:
 	var floors := open_floors()
@@ -236,18 +464,67 @@ func _update_gate() -> void:
 	if get_tree().current_scene.get_node_or_null("CoopWorld") != null:
 		board_label.text = "co-op later"
 		board_label.modulate = Color(0.2, 0.2, 0.2)
+	elif sealed():
+		board_label.text = "SEALED"
+		board_label.modulate = Color(0.7, 0.12, 0.1)
 	elif open:
 		board_label.text = "%s  OPEN" % FLOORS[floors[floors.size() - 1]].rank
 		board_label.modulate = Color(0.1, 0.5, 0.15)
 	else:
-		board_label.text = "closed - 06:00"
+		board_label.text = "CLOSED"
 		board_label.modulate = Color(0.7, 0.12, 0.1)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_update_combat(delta)
+	_update_area_notice(delta)
 	if underground_floor >= 0 and is_instance_valid(audio): audio.tension = _tension()
 	var time := Time.get_ticks_msec() / 1000.0
 	for index in range(flames.size()):
 		flames[index].scale = Vector3(1.0, 1.0 + sin(time * 9.0 + index * 2.0) * 0.12, 1.0)
+
+## Testers walking up to the west hill see why everything here is shut: a banner that the
+## Gufa Darwaza (cave, weapon table, Guild) comes in the next update.
+var area_notice: PanelContainer
+
+func _build_area_notice() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 8
+	add_child(layer)
+	area_notice = PanelContainer.new()
+	var card := StyleBoxFlat.new()
+	card.bg_color = Color(1, 0.97, 0.9, 0.96)
+	card.border_color = Color("f28c28")
+	card.set_border_width_all(3)
+	card.border_width_top = 8
+	card.set_corner_radius_all(6)
+	card.content_margin_left = 28
+	card.content_margin_right = 28
+	card.content_margin_top = 12
+	card.content_margin_bottom = 14
+	area_notice.add_theme_stylebox_override("panel", card)
+	area_notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	area_notice.anchor_left = 0.5
+	area_notice.anchor_right = 0.5
+	area_notice.offset_top = 96
+	area_notice.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	area_notice.modulate.a = 0.0
+	layer.add_child(area_notice)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 2)
+	area_notice.add_child(column)
+	for line in [["COMING IN THE NEXT UPDATE", 13, Color("c8611a")], ["GUFA DARWAZA", 30, Color("3a2a1e")], ["The cave, the weapon table and the Darwaza Guild open soon.", 14, Color("8a7560")]]:
+		var label := Label.new()
+		label.text = line[0]
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.add_theme_font_size_override("font_size", line[1])
+		label.add_theme_color_override("font_color", line[2])
+		if line[1] == 30: label.add_theme_font_override("font", preload("res://kenney_theme.gd").heading_font())
+		column.add_child(label)
+
+func _update_area_notice(delta: float) -> void:
+	var near: bool = sealed() and underground_floor < 0 and is_instance_valid(cave) and player.global_position.distance_to(cave.global_position) < 30.0 and not player._menu_is_open()
+	area_notice.modulate.a = move_toward(area_notice.modulate.a, 1.0 if near else 0.0, delta * 2.5)
+	area_notice.visible = area_notice.modulate.a > 0.01
 
 func _portal_point() -> Vector3:
 	return cave.to_global(PORTAL + Vector3(0, -2.05, 0.6))
@@ -256,6 +533,7 @@ func _portal_point() -> Vector3:
 func hint() -> String:
 	if busy: return ""
 	if underground_floor < 0 and _table_slot() >= 0:
+		if sealed(): return "Weapon table - opens in the next update"
 		var id: String = WEAPON_IDS[_table_slot()]
 		var info: Dictionary = WEAPONS[id]
 		if business.treasure.weapon == id: return "You are holding the %s (%s)" % [info.name, info.note]
@@ -267,23 +545,35 @@ func hint() -> String:
 		if _near_stairs(): return "The stairs down to Neelam Mahal (Rank C) open in a later update"
 		return ""
 	if _near_guild():
+		if sealed(): return "Darwaza Guild: the counter opens in a later update"
 		var worth: int = business.treasure.value()
 		return "E - sell your treasure to the Darwaza Guild (%s%d)" % [String.chr(8377), worth] if worth > 0 else "Darwaza Guild: bring treasure from the Darwaza to sell here"
 	if not is_instance_valid(cave) or player.global_position.distance_to(_portal_point()) > REACH: return ""
 	if get_tree().current_scene.get_node_or_null("CoopWorld") != null: return "The Darwaza stays shut in co-op for now"
+	if sealed(): return "The Darwaza is sealed - it opens in a later update"
 	if not gate_open(): return "The Darwaza is shut - it opens at 06:00"
 	if _hands_full(): return "Put things down before going into the Darwaza"
 	var floor: Dictionary = FLOORS[open_floors()[0]]
 	return "E - enter the Darwaza (%s, Rank %s)" % [floor.name, floor.rank]
 
 func try_interact() -> bool:
+	if is_instance_valid(reader) and reader.visible:
+		close_book()
+		return true
 	if busy: return false
 	if underground_floor < 0 and _table_slot() >= 0:
+		if sealed():
+			_feedback("The weapons are locked away until the next update.")
+			return true
 		_take(_table_slot())
 		return true
 	if underground_floor >= 0:
 		if player.global_position.distance_to(exit_point) < REACH:
 			_leave()
+			return true
+		var page: int = floor_root.book_at(floor_root.to_local(player.global_position))
+		if page >= 0:
+			_read(page)
 			return true
 		var count: int = floor_root.interact_at(floor_root.to_local(player.global_position))
 		if count > 0:
@@ -294,6 +584,10 @@ func try_interact() -> bool:
 			return true
 		return _near_stairs()
 	if _near_guild():
+		# Testers: the Guild counter stays shut with the Darwaza (admin_mode.gd).
+		if sealed():
+			_feedback("The Darwaza Guild counter opens in a later update.")
+			return true
 		var paid: int = business.sell_treasure()
 		_feedback("The Darwaza Guild paid %s%d for your treasure." % [String.chr(8377), paid] if paid > 0 else "Bring treasure from the Darwaza to sell here.")
 		return true
@@ -301,6 +595,25 @@ func try_interact() -> bool:
 	if not gate_open() or _hands_full(): return true
 	_enter(open_floors()[0])
 	return true
+
+## A page of Dada-ji's diary: the cave holds still (busy) while it is open. The first read
+## of each page is saved.
+func _read(page: int) -> void:
+	var kind: String = reader.ORDER[page]
+	var pages: Array = business.treasure.books
+	if not kind in pages:
+		pages.append(kind)
+		business.save_progress()
+		_feedback("You found page %d of Dada-ji's diary (%d / %d)." % [page + 1, pages.size(), reader.ORDER.size()])
+	floor_root.mark_read(page)
+	sound("pick")
+	busy = true
+	reader.open_page(kind, int(MONSTER_DAMAGE.get(kind, 10)), pages.size())
+
+func close_book() -> void:
+	if not reader.visible: return
+	reader.close()
+	busy = false
 
 func _hands_full() -> bool:
 	if is_instance_valid(ops) and (ops.holding_bag or ops.shop.business.carried_stock > 0): return true
@@ -329,6 +642,9 @@ func _enter(index: int) -> void:
 	floor_root = preload("res://dungeon_floor.gd").create(index, UNDER)
 	add_child(floor_root)
 	finds = {}
+	player_hp = PLAYER_MAX_HP
+	player_ratio = 1.0
+	target = null
 	exit_point = UNDER + floor_root.get_meta("exit", Vector3.ZERO)
 	player.global_position = UNDER + floor_root.get_meta("entry", Vector3(0, 1, 0))
 	player.velocity = Vector3.ZERO
@@ -336,6 +652,8 @@ func _enter(index: int) -> void:
 	_spawn_monsters(index)
 	_feedback("%s - Rank %s. Find the treasure and keep away from the monsters!" % [FLOORS[index].name, FLOORS[index].rank])
 	hud.visible = true
+	get_tree().current_scene.get_node("Ui").set_meta("underground", true)
+	get_tree().current_scene.get_node("Ui").hud_money.visible = false
 	_update_hud()
 	await _fade_to(0.0)
 	busy = false
@@ -353,6 +671,8 @@ func _leave() -> void:
 	if total > 0: _feedback("You brought up %d treasure. Sell it at the Darwaza Guild." % total)
 	finds = {}
 	hud.visible = false
+	get_tree().current_scene.get_node("Ui").remove_meta("underground")
+	get_tree().current_scene.get_node("Ui").hud_money.visible = true
 	underground_floor = -1
 	for node in hidden:
 		if is_instance_valid(node): node.visible = true
@@ -394,6 +714,8 @@ func caught(monster: Node3D) -> void:
 	var dropped := 0
 	for kind in finds: dropped += int(finds[kind])
 	finds = {}
+	player_hp = PLAYER_MAX_HP
+	player_ratio = 1.0
 	for other in monsters:
 		if is_instance_valid(other) and not other.dying: other.reset()
 	for jar in floor_root.loot: jar.visible = true
@@ -424,6 +746,14 @@ func _build_table() -> void:
 	table.name = "WeaponTable"
 	table.position = TABLE_AT
 	cave.add_child(table)
+	# A lantern light over the weapons, so they can be seen at night.
+	var lantern := OmniLight3D.new()
+	lantern.name = "TableLantern"
+	lantern.light_color = Color(1.0, 0.82, 0.55)
+	lantern.light_energy = 1.4
+	lantern.omni_range = 5.0
+	lantern.position = Vector3(0, 2.4, -0.4)
+	table.add_child(lantern)
 	_body("TableTop", table, Vector3(2.9, 0.95, 1.2), Vector3(0, 0.475, -0.55))
 	var glow := StandardMaterial3D.new()
 	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -530,6 +860,14 @@ func _strike() -> void:
 ## Called by a monster that has just been beaten.
 func monster_died(monster: Node3D) -> void:
 	monsters.erase(monster)
+	target_time = minf(target_time, 1.2)
+	var drops := {"slime": "jelly", "bat": "wing", "mushroom": "cap"}
+	if drops.has(monster.kind):
+		var drop: String = drops[monster.kind]
+		var amount: int = 2 if monster.elite else 1
+		finds[drop] = int(finds.get(drop, 0)) + amount
+		_feedback("%s dropped +%d %s" % [monster.data.name, amount, preload("res://dungeon_store.gd").ITEMS[drop].name.to_lower()])
+		_update_hud()
 	if monster.kind == "boss":
 		var kind: String = FLOORS[underground_floor].treasure
 		finds[kind] = int(finds.get(kind, 0)) + 3
@@ -554,9 +892,21 @@ func _update_hud() -> void:
 	if underground_floor < 0: return
 	var entry: Dictionary = FLOORS[underground_floor]
 	var kind: String = entry.treasure
-	hud.text = "%s  -  Rank %s
-Treasure this trip: %d %s
-Gate shuts at %02d:%02d" % [entry.name, entry.rank, int(finds.get(kind, 0)), preload("res://dungeon_store.gd").ITEMS[kind].name.to_lower(), int(entry.close) / 60, int(entry.close) % 60]
+	var alive := 0
+	var strongest := 0
+	for monster in monsters:
+		if is_instance_valid(monster) and not monster.dying:
+			alive += 1
+			strongest = maxi(strongest, int(monster.level))
+	var drops := 0
+	for drop in ["jelly", "wing", "cap"]: drops += int(finds.get(drop, 0))
+	hud_title.text = entry.name
+	hud_rank.text = "RANK %s" % entry.rank
+	hud_gate.text = "Gate shuts at %02d:%02d" % [int(entry.close) / 60, int(entry.close) % 60]
+	hud_treasure_name.text = "%ss" % preload("res://dungeon_store.gd").ITEMS[kind].name
+	hud_treasure.text = str(int(finds.get(kind, 0)))
+	hud_drops.text = str(drops)
+	hud_monsters.text = "%d  (top Lv %d)" % [alive, strongest] if alive > 0 else "none - cave cleared!"
 
 func _fade_to(alpha: float) -> void:
 	var tween := create_tween()

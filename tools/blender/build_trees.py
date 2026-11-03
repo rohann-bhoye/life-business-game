@@ -22,7 +22,7 @@ def pine(mat):
 	tiers = [(0.85, 1.3, 1.5, "pine_low"), (1.65, 1.05, 1.4, "pine_mid"), (2.45, 0.8, 1.25, "pine_mid"), (3.2, 0.52, 1.2, "pine_high")]
 	for z0, r, h, top in tiers:
 		b.lathe((0, 0, 0), [(0.16, z0 + 0.3), (r, z0), (r * 0.9, z0 + 0.14), (0.0, z0 + h)], ["pine_under", top, top], 9)
-	return b.to_object("PineTree", mat)
+	return b.to_object("PineTree", mat, bevel=0)
 
 def puff(b, centre, r, seg=8):
 	cx, cy, cz = centre
@@ -37,7 +37,7 @@ def neem(mat):
 	for centre, r in (((0, 0, 3.55), 1.5), ((1.05, 0.25, 3.25), 1.05), ((-0.95, -0.35, 3.35), 1.1),
 			((0.2, -1.0, 3.45), 1.0), ((-0.3, 0.95, 3.6), 1.0), ((0.25, 0.1, 4.4), 1.0)):
 		puff(b, centre, r)
-	return b.to_object("NeemTree", mat)
+	return b.to_object("NeemTree", mat, bevel=0)
 
 project, render = project_args()
 out_dir = os.path.join(project, "assets", "props", "trees")

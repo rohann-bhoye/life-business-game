@@ -48,6 +48,7 @@ func build(owner: Node3D) -> void:
 	details.begin(Mesh.PRIMITIVE_TRIANGLES)
 	poles.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for colony in COLONIES: _colony(colony)
+	_road_smoke()
 	_streets()
 	_commit(details, "ColonyDetails", IndianHouse._material())
 	_commit(poles, "ColonyPoles", IndianHouse._material())
@@ -78,12 +79,12 @@ func _lane(colony: Dictionary) -> void:
 	for part in [[colony.far[0], MAIN_ROAD[0]], [MAIN_ROAD[1], colony.far[1]]]:
 		var length: float = part[1] - part[0]
 		var middle: float = (part[0] + part[1]) / 2.0
-		var road: MeshInstance3D = expansion._box("%sLane%d" % [colony.name, roundi(middle)], Vector3(LANE_W, 0.012, length), Vector3(x, 0.112, middle), Color(0.16, 0.18, 0.19), false, future)
+		var road: MeshInstance3D = expansion._box("%sLane%d" % [colony.name, roundi(middle)], Vector3(LANE_W, 0.012, length), Vector3(x, 0.111, middle), Color(0.16, 0.18, 0.19), false, future)
 		if road_material != null: road.material_override = road_material
 		var z0: float = part[0] if part[0] < MAIN_ROAD[0] else part[0] + 1.75
 		var z1: float = part[1] if part[1] > MAIN_ROAD[1] else part[1] - 1.75
 		for side in [-1, 1]:
-			IndianHouse.box(details, Vector3(x + side * (LANE_W / 2.0 + WALK / 2.0), 0.114, (z0 + z1) / 2.0), Vector3(WALK, 0.014, z1 - z0), PAVING)
+			IndianHouse.box(details, Vector3(x + side * (LANE_W / 2.0 + WALK / 2.0), StreetKit.PAVE_Y, (z0 + z1) / 2.0), Vector3(WALK, StreetKit.PAVE_THICK, z1 - z0), PAVING)
 			IndianHouse.box(details, Vector3(x + side * (LANE_W / 2.0 - 0.2), 0.119, (part[0] + part[1]) / 2.0), Vector3(0.05, 0.008, length), LINE)
 		for dash in range(int(length / 4.0)):
 			IndianHouse.box(details, Vector3(x, 0.119, part[0] + 2.0 + dash * 4.0), Vector3(0.1, 0.008, 1.8), Color(0.88, 0.86, 0.68))
@@ -177,13 +178,13 @@ func _turnaround(centre: Vector3, label: String) -> void:
 	var kerb_disc := CylinderMesh.new()
 	kerb_disc.top_radius = 8.4
 	kerb_disc.bottom_radius = 8.4
-	kerb_disc.height = 0.014
+	kerb_disc.height = StreetKit.PAVE_THICK
 	kerb_disc.radial_segments = 40
 	var paving := StandardMaterial3D.new()
 	paving.albedo_color = PAVING
 	kerb_disc.material = paving
 	kerb.mesh = kerb_disc
-	kerb.position = centre + Vector3(0, 0.107, 0)
+	kerb.position = centre + Vector3(0, StreetKit.PAVE_Y, 0)
 	future.add_child(kerb)
 	var road := MeshInstance3D.new()
 	road.name = "Turn%sRoad" % label
@@ -195,7 +196,7 @@ func _turnaround(centre: Vector3, label: String) -> void:
 	disc.material = road_material if road_material is StandardMaterial3D else paving
 	road.mesh = disc
 	road.material_override = road_material
-	road.position = centre + Vector3(0, 0.112, 0)
+	road.position = centre + Vector3(0, 0.111, 0)
 	future.add_child(road)
 	var island := MeshInstance3D.new()
 	island.name = "Turn%sIsland" % label
@@ -211,3 +212,11 @@ func _turnaround(centre: Vector3, label: String) -> void:
 	island.position = centre + Vector3(0, 0.13, 0)
 	future.add_child(island)
 	expansion.town._tree(centre + Vector3(0, 0.1, 0))
+
+## Smoke across the three road ends that lead out to unfinished land: the two welcome gates
+## on the Main Road and the far end of the North Road (road_smoke.gd; admin mode skips it).
+func _road_smoke() -> void:
+	var smoke := preload("res://road_smoke.gd")
+	smoke.build(expansion, future, Vector3(72.0, 0.0, 7.0), Vector3(1, 0, 0), "East")
+	smoke.build(expansion, future, Vector3(-72.0, 0.0, 7.0), Vector3(-1, 0, 0), "West")
+	smoke.build(expansion, future, Vector3(50.0, 0.0, -246.5), Vector3(0, 0, -1), "North")

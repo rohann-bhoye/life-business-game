@@ -8,7 +8,7 @@ static func save_summary(path: String) -> Dictionary:
 	var valid: bool = state.save_status in ["Save: Loaded", "Save: Backup recovered", "Save: Recovery loaded"]
 	return {"valid": valid, "state": state}
 
-static func new_game(path: String, difficulty := 1) -> String:
+static func new_game(path: String, difficulty := 1, story := false) -> String:
 	# Archive every prior save/recovery file before replacing the active slot.
 	var archive := path.get_base_dir().path_join("save_history")
 	for suffix in ["", ".bak", ".recovered", ".recovered.bak"]:
@@ -26,6 +26,8 @@ static func new_game(path: String, difficulty := 1) -> String:
 	state.start_with_one_rack()
 	# Licences: Kirana Basics to start; more on the shop PC (Licences).
 	state.start_with_licences()
+	# The story start: Apna Mart is for sale and you buy it at the shop door (shop_sale.gd).
+	if story: state.start_unowned_shop()
 	return "" if state.save_progress() else "Could not create a new save."
 
 static func launch_game(tree: SceneTree, path: String, settings_path: String) -> Error:

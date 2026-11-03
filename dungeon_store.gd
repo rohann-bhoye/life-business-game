@@ -8,17 +8,23 @@ const ITEMS := {
 	"jar": {"name": "Firefly jar", "price": 40},
 	"shard": {"name": "Crystal shard", "price": 120},
 	"coin": {"name": "Gold idol coin", "price": 300},
+	# Dropped by monsters (dungeon_world.gd monster_died).
+	"jelly": {"name": "Slime jelly", "price": 25},
+	"wing": {"name": "Bat wing", "price": 35},
+	"cap": {"name": "Khumbi cap", "price": 30},
 }
 const MAX_COUNT := 100000
 
-var held := {"jar": 0, "shard": 0, "coin": 0}
-var sold := {"jar": 0, "shard": 0, "coin": 0}
+var held := {"jar": 0, "shard": 0, "coin": 0, "jelly": 0, "wing": 0, "cap": 0}
+var sold := {"jar": 0, "shard": 0, "coin": 0, "jelly": 0, "wing": 0, "cap": 0}
 ## Deepest floor reached (1-3, 0 before the first visit).
 var deepest := 0
 ## The weapon taken from the table outside the cave (dungeon_world.gd WEAPONS), or empty.
 var weapon := ""
 const WEAPONS := ["", "lathi", "talwar", "gada"]
-
+## Pages of Dada-ji's diary read in the Darwaza (dungeon_books.gd ORDER ids).
+var books: Array = []
+const BOOKS := ["slime", "bat", "mushroom", "boss"]
 func add(kind: String, count: int) -> void:
 	if held.has(kind): held[kind] = mini(MAX_COUNT, held[kind] + maxi(0, count))
 
@@ -47,7 +53,7 @@ func sell_all() -> int:
 	return paid
 
 func snapshot() -> Dictionary:
-	return {"held": held.duplicate(), "sold": sold.duplicate(), "deepest": deepest, "weapon": weapon}
+	return {"held": held.duplicate(), "sold": sold.duplicate(), "deepest": deepest, "weapon": weapon, "books": books.duplicate()}
 
 func restore(data: Dictionary) -> void:
 	for kind in ITEMS:
@@ -55,6 +61,9 @@ func restore(data: Dictionary) -> void:
 		sold[kind] = int(data.get("sold", {}).get(kind, 0))
 	deepest = int(data.get("deepest", 0))
 	weapon = str(data.get("weapon", "")) if str(data.get("weapon", "")) in WEAPONS else ""
+	books = []
+	for id in data.get("books", []):
+		if str(id) in BOOKS and not str(id) in books: books.append(str(id))
 
 static func valid(data) -> bool:
 	if not data is Dictionary: return false
@@ -66,5 +75,9 @@ static func valid(data) -> bool:
 			var count = counts[kind]
 			if not (count is int or count is float) or int(count) != count or int(count) < 0 or int(count) > MAX_COUNT: return false
 	if not str(data.get("weapon", "")) in WEAPONS: return false
+	var pages = data.get("books", [])
+	if not pages is Array: return false
+	for id in pages:
+		if not str(id) in BOOKS: return false
 	var deepest = data.get("deepest", 0)
 	return (deepest is int or deepest is float) and int(deepest) >= 0 and int(deepest) <= 3

@@ -13,10 +13,10 @@
 [ext_resource type="Script" uid="uid://k87rphuvlwym" path="res://day_night.gd" id="11_daynight"]
 [ext_resource type="Script" uid="uid://suqi766j1emb" path="res://shop_operations.gd" id="12_operations"]
 [ext_resource type="PackedScene" path="res://neighbourhood_landscape.tscn" id="13_landscape"]
-[ext_resource type="Script" path="res://shop_presentation.gd" id="14_presentation"]
-[ext_resource type="Script" path="res://rack_furnishing.gd" id="15_furnishing"]
-[ext_resource type="Script" path="res://warehouse.gd" id="16_warehouse"]
-[ext_resource type="Script" path="res://editor_preview.gd" id="17_editor_preview"]
+[ext_resource type="Script" uid="uid://c3t7vye5w6ggh" path="res://shop_presentation.gd" id="14_presentation"]
+[ext_resource type="Script" uid="uid://dtee5054j8vr4" path="res://rack_furnishing.gd" id="15_furnishing"]
+[ext_resource type="Script" uid="uid://bjbg7no6e5t5v" path="res://warehouse.gd" id="16_warehouse"]
+[ext_resource type="Script" uid="uid://w61auebonxxq" path="res://editor_preview.gd" id="17_editor_preview"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_wp5od"]
 size = Vector3(150, 0.2, 120)
@@ -499,16 +499,16 @@ theme_override_constants/shadow_offset_y = 1
 text = "Day 1 | 08:00"
 horizontal_alignment = 2
 
-[node name="Landscape" parent="." instance=ExtResource("13_landscape")]
+[node name="Landscape" parent="." unique_id=1962692244 instance=ExtResource("13_landscape")]
 
-[node name="ShopPresentation" type="Node" parent="."]
+[node name="ShopPresentation" type="Node" parent="." unique_id=2093163853]
 script = ExtResource("14_presentation")
 
-[node name="RackFurnishing" type="Node3D" parent="."]
+[node name="RackFurnishing" type="Node3D" parent="." unique_id=431648128]
 script = ExtResource("15_furnishing")
 
-[node name="Warehouse" type="Node3D" parent="."]
+[node name="Warehouse" type="Node3D" parent="." unique_id=1224459165]
 script = ExtResource("16_warehouse")
 
-[node name="EditorPreview" type="Node3D" parent="."]
+[node name="EditorPreview" type="Node3D" parent="." unique_id=359599456]
 script = ExtResource("17_editor_preview")

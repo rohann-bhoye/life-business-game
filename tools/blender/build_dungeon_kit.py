@@ -50,7 +50,7 @@ def rubble(mat):
 		rock(b, (d * math.cos(a), d * math.sin(a), size * 0.3), (size * 1.2, size, size * 0.8), rng, "rock" if k % 3 else "rock_dark", 5, "rock_light")
 	b.box((1.1, -0.5, 0.06), (0.9, 0.7, 0.12), "rock_dark", rot_z=24)
 	b.box((1.1, -0.5, 0.125), (0.9, 0.06, 0.02), "crack", rot_z=24)
-	return b.to_object("Rubble", mat)
+	return b.to_object("Rubble", mat, bevel=0)
 
 def ore_rock(mat):
 	"""A rock to break open: a rough boulder with glowing pale-blue veins and dark cracks."""
@@ -63,7 +63,7 @@ def ore_rock(mat):
 		b.box((0.78 * math.cos(a), 0.78 * math.sin(a), 0.45 + 0.1 * k), (0.2, 0.2, 0.34), "ore", rot_z=math.degrees(a))
 	b.box((0, -0.8, 0.55), (0.04, 0.03, 0.7), "crack")
 	b.box((0.1, -0.78, 0.3), (0.3, 0.03, 0.04), "crack")
-	return b.to_object("OreRock", mat)
+	return b.to_object("OreRock", mat, bevel=0)
 
 def floor_tile(mat):
 	rng = random.Random(1)
@@ -133,12 +133,12 @@ def bridge(mat):
 def mushroom_stem(mat):
 	b = Builder(SHEET)
 	b.lathe((0, 0, 0), [(0.12, 0.0), (0.08, 0.35), (0.07, 0.62)], ["stem", "stem"], 7)
-	return b.to_object("MushroomStem", mat)
+	return b.to_object("MushroomStem", mat, bevel=0)
 
 def mushroom_cap(mat):
 	b = Builder(SHEET)
 	b.lathe((0, 0, 0), [(0.08, 0.56), (0.36, 0.6), (0.3, 0.74), (0.16, 0.83), (0.02, 0.86)], ["cap", "cap", "cap", "cap_spot"], 8)
-	return b.to_object("MushroomCap", mat)
+	return b.to_object("MushroomCap", mat, bevel=0)
 
 def boulder(mat):
 	rng = random.Random(8)
@@ -146,13 +146,13 @@ def boulder(mat):
 	rock(b, (0, 0, 0.55), (1.3, 1.1, 1.2), rng)
 	rock(b, (0.9, 0.4, 0.3), (0.7, 0.6, 0.6), rng)
 	rock(b, (-0.2, -0.1, 1.05), (0.9, 0.8, 0.35), rng, "moss", 6, "moss_dark")
-	return b.to_object("Boulder", mat)
+	return b.to_object("Boulder", mat, bevel=0)
 
 def stalagmite(mat):
 	b = Builder(SHEET)
 	b.lathe((0, 0, 0), [(0.45, 0.0), (0.3, 0.8), (0.14, 1.7), (0.02, 2.4)], ["rock", "rock", "rock_light"], 7)
 	b.lathe((0.5, 0.2, 0), [(0.22, 0.0), (0.12, 0.6), (0.02, 1.1)], ["rock", "rock_light"], 6)
-	return b.to_object("Stalagmite", mat)
+	return b.to_object("Stalagmite", mat, bevel=0)
 
 def entry_stone(mat):
 	b = Builder(SHEET)

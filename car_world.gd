@@ -15,7 +15,10 @@ var ops: Node
 var player: CharacterBody3D
 var cars: Array[CharacterBody3D] = []
 var driving: CharacterBody3D
-var hud: Label
+var hud: PanelContainer
+var gear_label: Label
+var speed_label: Label
+var name_label: Label
 var saved_layers := Vector2i.ZERO
 var last_yaw := 0.0
 ## Third person (the default) follows the car from behind and above; C (or a click of the right
@@ -28,25 +31,67 @@ func _ready() -> void:
 	player = get_tree().current_scene.get_node("Player")
 	_build_lot()
 	var layer := CanvasLayer.new()
-	layer.layer = 12
+	layer.layer = -1
 	add_child(layer)
-	hud = Label.new()
-	hud.name = "DriveHud"
-	hud.add_theme_font_size_override("font_size", 22)
-	hud.add_theme_color_override("font_color", Color(1, 0.97, 0.85))
-	hud.add_theme_color_override("font_shadow_color", Color.BLACK)
-	hud.add_theme_constant_override("shadow_offset_x", 2)
-	hud.add_theme_constant_override("shadow_offset_y", 2)
-	hud.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	hud.position += Vector2(-130, -90)
-	hud.visible = false
-	layer.add_child(hud)
+	_build_hud(layer)
 	chase_cam = Camera3D.new()
 	chase_cam.name = "ChaseCamera"
 	chase_cam.far = 800.0
 	chase_cam.near = 0.1
 	add_child(chase_cam)
 	get_tree().current_scene.get_node("Shop/ShopArea").business.clock_changed.connect(_update_lamps)
+
+## The driving panel above the hotbar: gear, speed, car name, and the keys that work now.
+func _build_hud(layer: CanvasLayer) -> void:
+	hud = PanelContainer.new()
+	hud.name = "DriveHud"
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.035, 0.05, 0.07, 0.78)
+	style.border_color = Color(1, 1, 1, 0.2)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(10)
+	style.content_margin_left = 18
+	style.content_margin_right = 18
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	hud.add_theme_stylebox_override("panel", style)
+	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.anchor_left = 0.5
+	hud.anchor_right = 0.5
+	hud.anchor_top = 1.0
+	hud.anchor_bottom = 1.0
+	hud.offset_top = -100
+	hud.offset_bottom = -100
+	hud.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	hud.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	hud.visible = false
+	layer.add_child(hud)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 4)
+	hud.add_child(column)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	column.add_child(row)
+	gear_label = _hud_label(row, 34, Color(0.45, 0.9, 0.55))
+	gear_label.custom_minimum_size.x = 34
+	gear_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	speed_label = _hud_label(row, 34, Color(1, 0.97, 0.85))
+	speed_label.custom_minimum_size.x = 150
+	name_label = _hud_label(row, 16, Color(0.7, 0.78, 0.88))
+	var keys := _hud_label(column, 13, Color(0.62, 0.7, 0.8))
+	keys.text = "W / S  gas and brake      A / D  steer      Space  handbrake      C  change view      E  get out"
+	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+func _hud_label(parent: Node, size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	label.add_theme_constant_override("outline_size", 4)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	parent.add_child(label)
+	return label
 
 ## Your two bays by the home: a paved driveway from the Main Road's pavement north
 ## between white lines, a sign post, and the cars parked nose to the road.
@@ -121,10 +166,11 @@ func _near_car() -> CharacterBody3D:
 	return best
 
 func hint() -> String:
-	if is_instance_valid(driving): return "E - get out of the car   (C - change view)"
+	# While driving, the panel above the hotbar already lists every key.
+	if is_instance_valid(driving): return ""
 	var car := _near_car()
 	if car == null: return ""
-	return "E - drive the %s  (W/S gas and brake, A/D steer, Space handbrake)" % car.data.name
+	return "E - drive the %s" % car.data.name
 
 func try_interact() -> bool:
 	if is_instance_valid(driving):
@@ -208,5 +254,8 @@ func _physics_process(delta: float) -> void:
 	player.global_position = driving.seat_position()
 	if third_person: _chase(minf(1.0, delta * 7.0))
 	var gear := "N" if absf(driving.speed) < 0.4 else ("D" if driving.speed > 0.0 else "R")
-	hud.text = "%s   %d km/h   %s" % [gear, roundi(absf(driving.speed) * 3.6), driving.data.name]
+	gear_label.text = gear
+	gear_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.35) if gear == "R" else (Color(0.8, 0.85, 0.9) if gear == "N" else Color(0.45, 0.9, 0.55)))
+	speed_label.text = "%d km/h" % roundi(absf(driving.speed) * 3.6)
+	name_label.text = driving.data.name
 	if player.global_position.y < -20.0: _get_out()

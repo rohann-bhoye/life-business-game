@@ -26,6 +26,9 @@ var kind := "normal1"
 var data: Dictionary
 ## Repaint colour for the body; alpha 0 keeps the model's own paint (taxi yellow, police white).
 var paint := Color(0, 0, 0, 0)
+## Livery pattern (car_paint.gdshader): -1 picks one at random.
+var livery := -1
+const LIVERY_COLOURS := [Color(0.95, 0.95, 0.93), Color(0.08, 0.08, 0.09), Color(0.85, 0.12, 0.1), Color(0.95, 0.7, 0.15), Color(0.1, 0.3, 0.75)]
 var speed := 0.0
 var steer := 0.0
 var spinners: Array[Node3D] = []
@@ -87,15 +90,24 @@ func _ready() -> void:
 						lamp_materials.append(material)
 				part.set_surface_override_material(index, material)
 				continue
+			# The pack's materials arrive with alpha 0 in alpha-scissor mode, which draws
+			# nothing (the bodies were invisible): every surface but the windows is solid.
+			material.albedo_color.a = 1.0
+			material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 			match str(source.resource_name):
 				"Paint":
-					if paint.a > 0.0: material.albedo_color = paint
-					material.metallic = 0.3
-					material.roughness = 0.35
+					part.set_surface_override_material(index, _livery(part, material.albedo_color))
+					continue
 				"Windows":
 					material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-					material.albedo_color = Color(material.albedo_color, 0.4)
-					material.roughness = 0.1
+					material.albedo_color = Color(0.1, 0.13, 0.17, 0.62)
+					material.metallic = 0.6
+					material.roughness = 0.05
+				"Grey":
+					material.metallic = 0.75
+					material.roughness = 0.3
+				"Black":
+					material.roughness = 0.65
 				"Headlights", "TailLights", "WhiteLights", "BlueLights":
 					material.emission_enabled = true
 					material.emission = material.albedo_color
@@ -113,6 +125,33 @@ func _ready() -> void:
 			spinners.append(part)
 			if str(part.name).begins_with("Wheel_F"): front_wheels.append(part)
 	_build_cabin()
+
+## The body paint (car_paint.gdshader): a colour and a livery over it. Taxis are
+## kaali-peeli (black with a yellow roof), police cars white with a blue band; the rest get
+## a random livery in a second colour that stands out from the first.
+func _livery(part: MeshInstance3D, model_colour: Color) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://assets/materials/car_paint.gdshader")
+	var box := part.mesh.get_aabb()
+	material.set_shader_parameter("box_pos", box.position)
+	material.set_shader_parameter("box_size", box.size)
+	var base := paint if paint.a > 0.0 else model_colour
+	var second: Color = LIVERY_COLOURS[randi() % LIVERY_COLOURS.size()]
+	var pattern := randi() % 4 if livery < 0 else livery
+	if kind == "taxi":
+		base = Color(0.07, 0.07, 0.08)
+		second = Color(0.98, 0.78, 0.1)
+		pattern = 2
+	elif kind == "cop":
+		base = Color(0.95, 0.95, 0.95)
+		second = Color(0.1, 0.25, 0.7)
+		pattern = 3
+	elif Vector3(base.r - second.r, base.g - second.g, base.b - second.b).length() < 0.35:
+		second = Color(0.08, 0.08, 0.09) if base.get_luminance() > 0.5 else Color(0.95, 0.95, 0.93)
+	material.set_shader_parameter("base", base)
+	material.set_shader_parameter("second", second)
+	material.set_shader_parameter("pattern", pattern)
+	return material
 
 ## Inside: a dark floor and dashboard and a black steering wheel (rim and two spokes) that
 ## turns with the steering.

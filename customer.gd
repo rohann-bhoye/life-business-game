@@ -199,8 +199,8 @@ func _physics_process(delta: float) -> void:
 					if town:
 						# Start at one end of the street and walk along the pavement to the door.
 						arrival_side = 1.0 if randf() < 0.5 else -1.0
-						global_position = Vector3(arrival_side * randf_range(22.0, 28.0), 0.1, pavement_lane)
-						points.push_front(Vector3(points[0].x, 0.1, pavement_lane))
+						global_position = Vector3(arrival_side * randf_range(22.0, 28.0), StreetKit.PAVE_TOP, pavement_lane)
+						points.push_front(Vector3(points[0].x, StreetKit.PAVE_TOP, pavement_lane))
 					_set_route(points)
 					if counter_order: state = State.TO_COUNTER
 		State.ARRIVING:
@@ -438,8 +438,8 @@ func leave_shop() -> void:
 		var start_x: float = points[-1].x if not points.is_empty() else global_position.x
 		var came := arrival_side if arrival_side != 0.0 else (1.0 if randf() < 0.5 else -1.0)
 		var side := -came if randf() < 0.7 else came
-		points.append(Vector3(start_x, 0.1, pavement_lane))
-		points.append(Vector3(side * STREET_END_X, 0.1, pavement_lane))
+		points.append(Vector3(start_x, StreetKit.PAVE_TOP, pavement_lane))
+		points.append(Vector3(side * STREET_END_X, StreetKit.PAVE_TOP, pavement_lane))
 	elif points.is_empty(): points = [exit_point.global_position]
 	_set_route(points)
 

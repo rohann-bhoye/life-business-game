@@ -1,4 +1,4 @@
-[gd_resource type="Terrain3DMaterial" format=3]
+[gd_resource type="Terrain3DMaterial" format=3 uid="uid://drl767ptabkgk"]
 
 [sub_resource type="Gradient" id="Gradient_w42gh"]
 offsets = PackedFloat32Array(0.2, 1)

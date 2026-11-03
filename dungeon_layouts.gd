@@ -9,6 +9,7 @@ extends RefCounted
 #   o  ore rock (break it with the lathi)  x  rubble
 #   m  glowing mushrooms      r  boulder               T  torch on a nearby wall
 #   S  monster spawn          b  boss                  B  boss chamber floor
+#   1-4  a page of Dada-ji's diary on a stand (dungeon_books.gd)
 const CELL := 4.0
 
 ## Jugnu Gufa, the firefly cave: the entry hall (south-west) leads up to a mushroom
@@ -17,16 +18,16 @@ const CELL := 4.0
 const FLOOR_1 := [
 	"########################",
 	"##.......###ww##########",
-	"#..m..L..o.#ww#.......T#",
+	"#3.m..L..o.#ww#.......T#",
 	"#.m...S..m.#ww#..L..S..#",
 	"#T.......m..pp.........#",
 	"##.....r..x#ww#..r..o..#",
 	"###.S......#ww##...m..##",
 	"####..m..###ww###..#####",
-	"####.....###ww###..#####",
+	"####.2...###ww###..#####",
 	"###.x.#####.ww.#BBBBBB##",
 	"##..S..####.ww.BBBBBBBB#",
-	"#...r..T....pp.BBBbBBCB#",
+	"#.1.r..T....pp4BBBbBBCB#",
 	"#..E.o.S.##.ww.BBBBBBBT#",
 	"##.....#####ww#BBBBBBXB#",
 	"###..#######ww##########",

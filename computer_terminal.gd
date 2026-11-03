@@ -213,8 +213,8 @@ func _build_desktop() -> void:
 		glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		glow.add_theme_stylebox_override("panel", _round(Color(1, 1, 1, 0.05), 230))
 		desktop.add_child(glow)
-	greeting = _text(desktop, "", Vector2(40, 26), 520, 30, Color.WHITE)
-	_text(desktop, "APNA OS | Apna Kirana Store", Vector2(42, 68), 520, 14, Color("99f6e4"))
+	greeting = _text(desktop, "", Vector2(40, 22), 520, 28, Color.WHITE)
+	_text(desktop, "APNA OS | Apna Kirana Store", Vector2(42, 60), 520, 14, Color("99f6e4"))
 	var apps := [
 		["store", "Wholesale", Color("16a34a"), ""],
 		["staff", "Staff", Color("7c3aed"), "res://assets/ui/staff/cashier.png"],
@@ -229,10 +229,11 @@ func _build_desktop() -> void:
 		var entry: Array = apps[index]
 		var tile := Button.new()
 		tile.name = "App_" + entry[0]
-		# Eight tiles fit beside the Today card at 58% size.
-		tile.position = Vector2(40 + index * 69, 112)
+		# A 4 x 2 grid of 72 px tiles (116 px drawn at 62%) beside the Today card.
+		var cell_x := 40 + (index % 4) * 130
+		tile.position = Vector2(cell_x + 29, 92 + (index / 4) * 108)
 		tile.size = Vector2(116, 116)
-		tile.scale = Vector2.ONE * 0.58
+		tile.scale = Vector2.ONE * 0.62
 		tile.focus_mode = Control.FOCUS_NONE
 		tile.clip_contents = true
 		tile.tooltip_text = "Open " + entry[1]
@@ -322,14 +323,16 @@ func _build_desktop() -> void:
 					box.size = Vector2(16, 14)
 					box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 					tile.add_child(box)
-		var label := _text(desktop, entry[1], Vector2(tile.position.x - 8, 186), 90, 13, Color.WHITE)
+		var label := _text(desktop, entry[1], Vector2(cell_x, tile.position.y + 76), 130, 14, Color.WHITE)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.35))
+		label.add_theme_constant_override("shadow_offset_y", 1)
 		tile.pressed.connect(show_app.bind(entry[0]))
 	# Shelf stock card: the products on the racks with the fewest items left.
 	var shelf_card := Panel.new()
 	shelf_card.name = "ShelfCard"
-	shelf_card.position = Vector2(40, 272)
-	shelf_card.size = Vector2(518, 210)
+	shelf_card.position = Vector2(40, 312)
+	shelf_card.size = Vector2(520, 170)
 	shelf_card.add_theme_stylebox_override("panel", _round(Color(1, 1, 1, 0.95), 16))
 	desktop.add_child(shelf_card)
 	var shelf_title := _text(shelf_card, "SHELF STOCK", Vector2(18, 12), 300, 16, Color("0f766e"))
@@ -338,21 +341,21 @@ func _build_desktop() -> void:
 	restock.name = "RestockButton"
 	restock.text = "Restock"
 	restock.theme_type_variation = "PrimaryButton"
-	restock.position = Vector2(384, 10)
-	restock.size = Vector2(120, 32)
+	restock.position = Vector2(388, 10)
+	restock.size = Vector2(114, 30)
 	restock.focus_mode = Control.FOCUS_NONE
-	restock.add_theme_font_size_override("font_size", 14)
+	restock.add_theme_font_size_override("font_size", 13)
 	restock.pressed.connect(open_store)
 	shelf_card.add_child(restock)
 	for index in range(4):
 		var row := Control.new()
-		row.position = Vector2(18, 50 + index * 38)
-		row.size = Vector2(482, 36)
+		row.position = Vector2(18, 50 + index * 29)
+		row.size = Vector2(484, 28)
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		shelf_card.add_child(row)
-		var icon := _picture(row, "res://assets/ui/products/bottle.png", Rect2(0, 0, 34, 34))
-		var name_label := _text(row, "", Vector2(44, 6), 190, 15, KenneyTheme.TEXT)
-		var count := _text(row, "", Vector2(240, 6), 240, 14, KenneyTheme.MUTED)
+		var icon := _picture(row, "res://assets/ui/products/bottle.png", Rect2(0, 1, 26, 26))
+		var name_label := _text(row, "", Vector2(38, 1), 200, 15, KenneyTheme.TEXT)
+		var count := _text(row, "", Vector2(244, 2), 240, 14, KenneyTheme.MUTED)
 		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		low_rows.append({"row": row, "icon": icon, "name": name_label, "count": count})
 	# Today card.
@@ -385,38 +388,55 @@ func _build_desktop() -> void:
 	taskbar.position = Vector2(0, 500)
 	taskbar.size = Vector2(SCREEN.x, 40)
 	desktop.add_child(taskbar)
-	var buttons := [["home", "APNA", 60], ["store", "Wholesale", 108], ["staff", "Staff", 66], ["manager", "Shop", 62], ["bank", "Bank", 62], ["builders", "Build", 66], ["export", "Export", 74], ["licences", "Licences", 90], ["business", "Business", 84]]
+	var edge := ColorRect.new()
+	edge.color = Color(0.6, 1.0, 0.95, 0.14)
+	edge.position = Vector2(0, 500)
+	edge.size = Vector2(SCREEN.x, 1)
+	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	desktop.add_child(edge)
+	# Flat pill buttons sized to their text; the open app's button turns teal.
+	var buttons := [["home", "APNA"], ["store", "Wholesale"], ["staff", "Staff"], ["manager", "Shop"], ["bank", "Bank"], ["builders", "Build"], ["export", "Export"], ["licences", "Licences"], ["business", "Business"]]
 	var x := 8.0
 	for entry in buttons:
-		var button := Button.new()
-		button.name = "Task_" + entry[0]
-		button.text = entry[1]
-		button.position = Vector2(x, 504)
-		button.size = Vector2(entry[2], 32)
-		button.focus_mode = Control.FOCUS_NONE
-		button.add_theme_font_size_override("font_size", 12)
+		var button := _task_button("Task_" + entry[0], entry[1], x, Color(1, 1, 1, 0.07))
 		button.pressed.connect(show_app.bind(entry[0]))
-		desktop.add_child(button)
 		task_buttons[entry[0]] = button
-		x += entry[2] + 6
-	var exit := Button.new()
-	exit.name = "ExitButton"
-	exit.text = "Exit PC"
-	exit.theme_type_variation = "DangerButton"
-	exit.position = Vector2(x + 18, 504)
-	exit.size = Vector2(104, 32)
-	exit.focus_mode = Control.FOCUS_NONE
-	exit.add_theme_font_size_override("font_size", 12)
-	exit.tooltip_text = "Leave the computer (E / Esc)"
-	exit.pressed.connect(close)
-	desktop.add_child(exit)
+		x += button.size.x + 4
 	clock = Label.new()
-	clock.position = Vector2(780, 508)
-	clock.size = Vector2(168, 24)
+	clock.position = Vector2(846, 508)
+	clock.size = Vector2(104, 24)
 	clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	clock.add_theme_font_size_override("font_size", 15)
 	clock.add_theme_color_override("font_color", Color("e2e8f0"))
 	desktop.add_child(clock)
+	var exit := _task_button("ExitButton", "Exit PC", 0, Color("dc2626"))
+	exit.position.x = clock.position.x - 10 - exit.size.x
+	exit.tooltip_text = "Leave the computer (E / Esc)"
+	exit.pressed.connect(close)
+
+func _task_button(button_name: String, text: String, x: float, colour: Color) -> Button:
+	var button := Button.new()
+	button.name = button_name
+	button.text = text
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_font_size_override("font_size", 11)
+	for state in [["normal", colour], ["hover", colour.lightened(0.2) if colour.a == 1.0 else Color(1, 1, 1, 0.16)], ["pressed", colour.darkened(0.15) if colour.a == 1.0 else Color(1, 1, 1, 0.22)]]:
+		button.add_theme_stylebox_override(state[0], _task_style(state[1]))
+	button.add_theme_stylebox_override("hover_pressed", button.get_theme_stylebox("pressed"))
+	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	for state in ["font_color", "font_focus_color"]: button.add_theme_color_override(state, Color("cbd5e1") if colour.a < 1.0 else Color.WHITE)
+	for state in ["font_hover_color", "font_pressed_color", "font_hover_pressed_color"]: button.add_theme_color_override(state, Color.WHITE)
+	desktop.add_child(button)
+	var font := button.get_theme_font("font")
+	button.position = Vector2(x, 505)
+	button.size = Vector2(font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 20, 30)
+	return button
+
+func _task_style(colour: Color) -> StyleBoxFlat:
+	var style := _round(colour, 8)
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	return style
 
 # APNA Wholesale (pc_store.gd), APNA Bank (bank_page.gd) and APNA Jobs
 # (staff_page.gd) are full pages over the desktop; Back returns home.
@@ -513,7 +533,9 @@ func show_app(target: String) -> void:
 	if is_instance_valid(staff):
 		staff.visible = target == "staff"
 		if staff.visible: staff.select_role(staff.selected)
-	for key in task_buttons: task_buttons[key].theme_type_variation = "PrimaryButton" if key == target else ""
+	for key in task_buttons:
+		task_buttons[key].add_theme_stylebox_override("normal", _task_style(Color("0d9488") if key == target else Color(1, 1, 1, 0.07)))
+		task_buttons[key].add_theme_color_override("font_color", Color.WHITE if key == target else Color("cbd5e1"))
 	for card_name in ["ShelfCard", "TodayCard"]: desktop.get_node(card_name).visible = target == "home"
 	_refresh_desktop()
 	if active: _sync()

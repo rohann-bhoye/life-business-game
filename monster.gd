@@ -33,6 +33,7 @@ var alert: Label3D
 var alert_time := 0.0
 var notice := 6.0
 var hp := 1
+var max_hp := 1
 var dying := false
 var knock := Vector3.ZERO
 
@@ -47,6 +48,7 @@ static func create(type: String, lvl: int, at: Vector3, is_elite: bool, world: N
 	monster.player = who
 	monster.notice = monster.data.notice * (1.5 if is_elite else 1.0)
 	monster.hp = int(monster.data.hp) * (2 if is_elite else 1)
+	monster.max_hp = monster.hp
 	return monster
 
 func _ready() -> void:
@@ -86,8 +88,8 @@ func _ready() -> void:
 	tag = Label3D.new()
 	tag.text = "Lv %d %s%s" % [level, "Elite " if elite else "", data.name]
 	tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	tag.font_size = 40
-	tag.pixel_size = 0.005
+	tag.font_size = 30
+	tag.pixel_size = 0.0035
 	tag.outline_size = 8
 	tag.modulate = Color(1, 0.95, 0.6) if elite else Color(0.9, 1.0, 1.0)
 	tag.no_depth_test = true
@@ -163,7 +165,7 @@ func _physics_process(delta: float) -> void:
 	knock = knock.move_toward(Vector3.ZERO, 40.0 * delta)
 	move_and_slide()
 	if state == "chase" and Vector2(global_position.x - player.global_position.x, global_position.z - player.global_position.z).length() < CATCH + data.radius:
-		dungeon.caught(self)
+		dungeon.monster_touch(self)
 	_animate(delta, moving)
 
 func _animate(delta: float, moving: bool) -> void:
@@ -196,6 +198,7 @@ func _animate(delta: float, moving: bool) -> void:
 ## the monster dissolves into smoke (dungeon_effects.gd) and is gone.
 func hurt(damage: int, from: Vector3) -> void:
 	if dying: return
+	dungeon.target_hit(self, float(hp) / float(max_hp))
 	hp -= damage
 	state = "chase"
 	lost = 0.0
@@ -206,10 +209,14 @@ func hurt(damage: int, from: Vector3) -> void:
 		var piece = parts[key]
 		if piece is MeshInstance3D and piece.material_override is ShaderMaterial: piece.material_override.set_shader_parameter("glow", Color(0.8, 0.8, 0.8))
 	get_tree().create_timer(0.1).timeout.connect(_unflash)
+	_damage_number(damage, hp <= 0)
 	if hp > 0:
 		dungeon.sound("hit")
 		return
 	dying = true
+	# Nothing to bump into while it melts away.
+	for child in get_children():
+		if child is CollisionShape3D: child.set_deferred("disabled", true)
 	dungeon.monster_died(self)
 	dungeon.sound("poof")
 	var big: float = 2.4 if data.get("boss", false) else 1.0
@@ -221,6 +228,24 @@ func hurt(damage: int, from: Vector3) -> void:
 	fade.tween_property(self, "scale", Vector3(1.25, 0.05, 1.25), 0.7).set_ease(Tween.EASE_IN)
 	fade.tween_property(self, "position:y", position.y + 0.8, 0.7)
 	fade.chain().tween_callback(queue_free)
+
+## The damage of a hit rising off the monster: white, or big and gold on the killing blow.
+func _damage_number(damage: int, killing: bool) -> void:
+	var number := Label3D.new()
+	number.text = "-%d" % damage if not killing else "-%d  KO!" % damage
+	number.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	number.no_depth_test = true
+	number.font_size = 64 if killing else 48
+	number.pixel_size = 0.005
+	number.outline_size = 12
+	number.modulate = Color(1.0, 0.82, 0.25) if killing else Color(1, 1, 1)
+	number.position = position + Vector3(randf_range(-0.25, 0.25), tag.position.y - 0.2, 0)
+	dungeon.floor_root.add_child(number)
+	var rise := number.create_tween().set_parallel(true)
+	rise.tween_property(number, "position:y", number.position.y + 0.9, 0.8).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	rise.tween_property(number, "modulate:a", 0.0, 0.35).set_delay(0.45)
+	rise.tween_property(number, "outline_modulate:a", 0.0, 0.35).set_delay(0.45)
+	rise.chain().tween_callback(number.queue_free)
 
 func _unflash() -> void:
 	for key in parts:

@@ -33,6 +33,7 @@ func goal_lines() -> Array[String]:
 # Live "what to do right now" hint for the current goal, read from backend state.
 func next_step(business) -> String:
 	if completed(): return ""
+	if not business.shop_owned: return "Walk to Apna Mart, talk to the shop owner Seth Ramlal (E) and buy the shop."
 	var has_box: bool = business.boxed_stock > 0 or not business.queued_boxes.is_empty()
 	var stored: bool = not business.logistics.storage.is_empty()
 	var box_step := ""
@@ -42,14 +43,14 @@ func next_step(business) -> String:
 	elif business.supply_in_transit > 0: box_step = "Delivery truck is on the way to the warehouse."
 	match done_flags().find(false):
 		0:
-			return "Cross the road to the warehouse office. Aim at the PC, press E and open Orders."
+			return "Aim at the PC on your shop desk (or in the warehouse office), press E and open Orders."
 		1:
-			return box_step if not box_step.is_empty() else "Order another box at the warehouse PC."
+			return box_step if not box_step.is_empty() else "Order another box on the shop PC."
 		3:
-			if not business.stock_worker_hired: return "Hire Sunil: warehouse PC > Team (Rs1,000)."
+			if not business.stock_worker_hired: return "Hire Sunil: shop PC > Team (Rs1,000)."
 			if not business.stock_worker_on_shift(): return "Wait for Sunil's shift, or change his hours on the PC."
 			if business.worker_carried_stock > 0: return "Sunil is carrying a box to the shelves."
-			if has_box: return "Open the tablet (E in shop) > Staff and press Collect delivery."
+			if has_box: return "Open the tablet (Tab) > Staff and press Collect delivery."
 			return "Order a box so Sunil has something to stock."
 	# Goals 2 and 4: serve customers / reach sales.
 	if not business.shop_is_open(): return "Shop opens at 08:00. Sleep at home or wait."

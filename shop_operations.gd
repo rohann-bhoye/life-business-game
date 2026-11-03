@@ -5,6 +5,15 @@ extends Node3D
 enum DeliveryState { IDLE, ARRIVING, UNLOADING, LEAVING }
 var delivery_state := DeliveryState.IDLE
 var unload_seconds := 0.0
+## Floating status over the delivery van: box count, then unloading progress.
+var van_status: Label3D
+const UNLOAD_TIME := 2.5
+## How long the van waits for the player to unload it by hand before doing it itself.
+const VAN_WAIT_TIME := 45.0
+var van_wait := 0.0
+
+func van_ready_to_unload() -> bool:
+	return delivery_state == DeliveryState.UNLOADING and van_wait > 0.0 and _near(van.global_position, 5.0)
 var queue: Array[Node3D] = []
 var extra_delivery_boxes: Array[Node3D] = []
 var rack_bottles: Array[Node3D] = []
@@ -23,6 +32,8 @@ var holding_bag := false
 var export_world: Node3D
 ## Gufa Darwaza: the cave on the west hill and its dungeon (dungeon_world.gd).
 var dungeon_world: Node3D
+## The shop for sale at the start of a story game (shop_sale.gd).
+var shop_sale: Node3D
 ## The parking lot and the cars you can drive (car_world.gd).
 var car_world: Node3D
 ## The doorway from the shop into the packing room, in the left wall (world z).
@@ -616,6 +627,9 @@ func _ready() -> void:
 	dungeon_world = preload("res://dungeon_world.gd").new()
 	dungeon_world.ops = self
 	get_parent().add_child.call_deferred(dungeon_world)
+	shop_sale = preload("res://shop_sale.gd").new()
+	shop_sale.ops = self
+	get_parent().add_child.call_deferred(shop_sale)
 	var audio := Node.new()
 	audio.name = "ShopAudio"
 	audio.set_script(load("res://shop_audio.gd"))
@@ -803,6 +817,15 @@ func _build_van() -> void:
 			wheel.radial_segments = 10
 			var instance := _mesh(van, "Wheel%s_%s" % [x, z], wheel, Vector3(x, 0.43, z), Color(0.08, 0.1, 0.11))
 			instance.rotation.x = PI / 2
+	van_status = Label3D.new()
+	van_status.name = "VanStatus"
+	van_status.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	van_status.font_size = 48
+	van_status.pixel_size = 0.01
+	van_status.outline_size = 10
+	van_status.modulate = Color(1.0, 0.85, 0.3)
+	van_status.position = Vector3(0, 2.7, 0)
+	van.add_child(van_status)
 	van.hide()
 
 func _sync_state() -> void:
@@ -846,6 +869,7 @@ func _sync_state() -> void:
 	_refresh_ground_boxes()
 	if shop.business.supply_in_transit > 0 and delivery_state == DeliveryState.IDLE and lane_available:
 		delivery_state = DeliveryState.ARRIVING
+		if ui.feedback_label != null: ui.show_feedback("Delivery van is coming with %d items." % shop.business.supply_in_transit)
 		van.position = Vector3(-26, 0.1, 8.6)
 		van.show()
 	update_rack()
@@ -990,18 +1014,27 @@ func _process(delta: float) -> void:
 		DeliveryState.IDLE:
 			if shop.business.supply_in_transit > 0: _sync_state()
 		DeliveryState.ARRIVING:
+			van_status.text = "DELIVERY VAN\nArriving..."
 			van.position.x = move_toward(van.position.x, -9.4, delta * 4.0)
 			if is_equal_approx(van.position.x, -9.4):
 				delivery_state = DeliveryState.UNLOADING
-				unload_seconds = 1.5
+				unload_seconds = UNLOAD_TIME
+				van_wait = VAN_WAIT_TIME
 		DeliveryState.UNLOADING:
+			if van_wait > 0.0:
+				# The driver waits for you at the van (E); if nobody comes it unloads itself.
+				van_wait -= delta
+				van_status.text = "DELIVERY VAN\nPress E to unload (%ds)" % ceili(van_wait)
+				return
 			unload_seconds -= delta
+			van_status.text = "UNLOADING  %d%%" % int(100.0 * (1.0 - maxf(unload_seconds, 0.0) / UNLOAD_TIME))
 			if unload_seconds <= 0:
 				delivery_state = DeliveryState.LEAVING
 				if shop.business.receive_delivery():
 					ui.show_feedback("Delivery arrived in the warehouse product bay.")
 					play_sound("delivery")
 		DeliveryState.LEAVING:
+			van_status.text = "Delivered!\nCheck the product bay"
 			van.position.x = move_toward(van.position.x, 29.0, delta * 5.0)
 			if is_equal_approx(van.position.x, 29.0):
 				van.hide()
@@ -1336,12 +1369,15 @@ func interaction_hint() -> String:
 	if is_instance_valid(furnishing) and furnishing.active: return "Place %s" % furnishing.target_name().to_lower()
 	var car_hint: String = car_world.hint() if is_instance_valid(car_world) and car_world.is_inside_tree() else ""
 	if not car_hint.is_empty(): return car_hint
+	var sale_hint: String = shop_sale.hint() if is_instance_valid(shop_sale) and shop_sale.is_inside_tree() else ""
+	if not sale_hint.is_empty(): return sale_hint
 	var dungeon_hint: String = dungeon_world.hint() if is_instance_valid(dungeon_world) and dungeon_world.is_inside_tree() else ""
 	if not dungeon_hint.is_empty(): return dungeon_hint
 	var export_hint: String = export_world.hint() if is_instance_valid(export_world) else ""
 	if not export_hint.is_empty(): return export_hint
 	var order_hint := _counter_order_hint() if enabled else ""
 	if not order_hint.is_empty(): return order_hint
+	if van_ready_to_unload(): return "Unload the delivery van"
 	if shop.business.carried_stock == 0 and ground_box_target() >= 0: return "Pick up ground box"
 	var warehouse = get_parent().get_node_or_null("Warehouse")
 	if is_instance_valid(warehouse):
@@ -1381,9 +1417,13 @@ func try_interact() -> bool:
 	if not enabled or player._menu_is_open():
 		return false
 	if is_instance_valid(car_world) and car_world.is_inside_tree() and car_world.try_interact(): return true
+	if is_instance_valid(shop_sale) and shop_sale.is_inside_tree() and shop_sale.try_interact(): return true
 	if is_instance_valid(dungeon_world) and dungeon_world.is_inside_tree() and dungeon_world.try_interact(): return true
 	if is_instance_valid(export_world) and export_world.try_interact(): return true
 	if _try_counter_order(): return true
+	if van_ready_to_unload():
+		van_wait = 0.0
+		return true
 	if shop.business.carried_stock == 0:
 		var ground_index := ground_box_target()
 		if ground_index >= 0:

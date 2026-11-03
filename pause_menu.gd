@@ -5,9 +5,11 @@ const SettingsMenu := preload("res://settings_menu.gd")
 const UiStyle := preload("res://ui_style.gd")
 const KenneyTheme := preload("res://kenney_theme.gd")
 const Coop := preload("res://coop.gd")
+const Bazaar := preload("res://ui_bazaar.gd")
 var settings_menu: Panel
 var coop_code: Label
 var form: VBoxContainer
+var dim: ColorRect
 var status: Label
 @onready var ui = get_parent()
 
@@ -15,26 +17,39 @@ func _ready() -> void:
 	# Co-op never pauses the game, so the menu must work while it runs.
 	process_mode = Node.PROCESS_MODE_ALWAYS if Coop.active else Node.PROCESS_MODE_WHEN_PAUSED
 	hide()
-	# Same dark glass look as the lobby, so white text stays readable.
-	add_theme_stylebox_override("panel", UiStyle.glass_box(0.9))
+	# Bright bazaar (ui_bazaar.gd): a cream card with a cartoon outline and a saffron top.
+	var card := Bazaar.box(Bazaar.CREAM, 3, 14)
+	card.border_color = Bazaar.SAFFRON
+	card.border_width_top = 8
+	card.shadow_color = Color(0, 0, 0, 0.35)
+	card.shadow_size = 26
+	add_theme_stylebox_override("panel", card)
+	# The whole screen dims behind the menu, so the HUD and the name tags step back.
+	dim = ColorRect.new()
+	dim.color = Color(0.05, 0.03, 0.02, 0.5)
+	dim.show_behind_parent = true
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(dim)
 	form = VBoxContainer.new()
-	form.add_theme_constant_override("separation", 12)
+	form.add_theme_constant_override("separation", 8)
 	add_child(form)
 	var title := Label.new()
 	title.name = "Title"
 	title.text = "PAUSED"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 28)
+	title.add_theme_font_size_override("font_size", 26)
 	title.add_theme_font_override("font", KenneyTheme.heading_font())
-	title.add_theme_color_override("font_color", Color.WHITE)
+	title.add_theme_color_override("font_color", Bazaar.INK)
 	form.add_child(title)
 	var hint := Label.new()
-	hint.text = "Co-op: the shop keeps running" if Coop.active else "Game time is stopped"
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_font_size_override("font_size", 14)
-	hint.add_theme_color_override("font_color", Color("94a3b8"))
+	hint.text = "Co-op: the shop keeps running" if Coop.active else "Dholkarpur Gaon  -  game time is stopped"
+	hint.add_theme_font_size_override("font_size", 13)
+	hint.add_theme_color_override("font_color", Bazaar.MUTED)
 	form.add_child(hint)
-	_button("Resume", close_menu, "PrimaryButton").name = "ResumeButton"
+	var rule := ColorRect.new()
+	rule.color = Bazaar.LINE
+	rule.custom_minimum_size.y = 1
+	form.add_child(rule)
+	_button("Resume", close_menu, true).name = "ResumeButton"
 	if Coop.hosting:
 		coop_code = Label.new()
 		coop_code.name = "CoopCode"
@@ -53,7 +68,16 @@ func _ready() -> void:
 		copy.name = "CopyCoopCode"
 	_button("How to Play", func(): ui.get_node("HowToPlay").open()).name = "HowToPlayButton"
 	_button("Settings", _settings).name = "SettingsButton"
-	_button("Save & Main Menu", _return_menu, "InfoButton").name = "ReturnButton"
+	_button("Unstuck  (stuck or outside the map)", _unstuck).name = "UnstuckButton"
+	var leave := _button("Save & Main Menu", _return_menu)
+	leave.name = "ReturnButton"
+	leave.add_theme_color_override("font_color", Bazaar.PINK)
+	var keys := Label.new()
+	keys.text = "Esc   Resume"
+	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	keys.add_theme_font_size_override("font_size", 12)
+	keys.add_theme_color_override("font_color", Bazaar.MUTED)
+	form.add_child(keys)
 	status = Label.new()
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status.add_theme_color_override("font_color", Color("fca5a5"))
@@ -67,11 +91,32 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout)
 	_layout()
 
-func _button(text: String, action: Callable, variation := "") -> Button:
+## Closes the menu and moves the player to the nearest free spot, or back into the city when
+## outside the map (player_memory.gd; the U key does the same).
+func _unstuck() -> void:
+	close_menu()
+	var memory := ui.get_node_or_null("PlayerMemory")
+	if memory != null: memory.unstuck()
+
+func _style(fill: Color, border: Color, width := 1, radius := 4) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = fill
+	style.border_color = border
+	style.set_border_width_all(width)
+	style.set_corner_radius_all(radius)
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	return style
+
+## A menu row: white with a cartoon outline, warm yellow under the pointer; the first
+## (Resume) is saffron (ui_bazaar.gd).
+func _button(text: String, action: Callable, primary := false) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.custom_minimum_size.y = 44
-	button.theme_type_variation = variation
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_font_size_override("font_size", 17)
+	Bazaar.button(button, primary)
 	button.pressed.connect(action)
 	form.add_child(button)
 	return button
@@ -83,6 +128,8 @@ func _layout() -> void:
 	# Fit the panel to its contents (no empty space at the bottom).
 	size = Vector2(width, form.get_combined_minimum_size().y + 44)
 	position = (get_viewport().get_visible_rect().size - size) / 2
+	dim.position = -position
+	dim.size = get_viewport().get_visible_rect().size
 
 func open_menu() -> void:
 	status.text = ""

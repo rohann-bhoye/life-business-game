@@ -1,4 +1,4 @@
-[gd_resource type="Terrain3DAssets" format=3]
+[gd_resource type="Terrain3DAssets" format=3 uid="uid://bbb8eho8r068d"]
 
 [ext_resource type="Texture2D" path="res://assets/terrain/neighbourhood/grass_albedo.res" id="1_j7gxj"]
 [ext_resource type="Texture2D" path="res://assets/terrain/neighbourhood/grass_normal.res" id="2_v6tvh"]

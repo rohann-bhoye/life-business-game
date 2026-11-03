@@ -133,8 +133,8 @@ func _lower_valley(data) -> void:
 ## A level apron in front of the cave mouth, the hill cut away under its tunnel (the
 ## tunnel's own floor and the mouth's rocks cover the cut), and the guild's pad.
 func _cave_ground(data) -> void:
-	for z in range(int(CAVE_Z) - 10, int(CAVE_Z) + 11):
-		for x in range(int(CAVE_X) - 6, int(CAVE_X) + 12):
+	for z in range(int(CAVE_Z) - 16, int(CAVE_Z) + 17):
+		for x in range(int(CAVE_X) - 6, int(CAVE_X) + 20):
 			var index := _land_index(x, z)
 			var across := absf(z - CAVE_Z)
 			var ahead := x - CAVE_X
@@ -142,7 +142,7 @@ func _cave_ground(data) -> void:
 			if ahead < 0.5 and ahead > -4.5 and across < 2.6:
 				height = CAVE_FLOOR - 0.4
 			elif ahead >= 0.5:
-				height = lerpf(height, CAVE_FLOOR, (1.0 - smoothstep(3.0, 9.0, across)) * (1.0 - smoothstep(6.0, 11.0, ahead)))
+				height = lerpf(height, CAVE_FLOOR, (1.0 - smoothstep(7.0, 13.0, across)) * (1.0 - smoothstep(10.0, 17.0, ahead)))
 			land_heights[index] = height
 			data.set_height(Vector3(x, 0, z), height)
 	for z in range(int(GUILD_Z) - 14, int(GUILD_Z) + 9):
@@ -160,6 +160,23 @@ func _village_ground(data) -> void:
 			var index := _land_index(x, z)
 			land_heights[index] = lerpf(land_heights[index], VILLAGE_FLOOR, 1.0 - smoothstep(0.0, 12.0, away))
 			data.set_height(Vector3(x, 0, z), land_heights[index])
+
+## The village footpath: from the Main Road's west end past the guild office, up to the cave
+## plaza. Painted into the land colours so it follows the ground. Each point is x, z.
+const PATH := [Vector2(-73.0, 3.0), Vector2(-72.5, -4.0), Vector2(-72.0, -12.0), Vector2(-71.0, -22.0), Vector2(-71.5, -30.0), Vector2(-80.0, -31.0), Vector2(-87.5, -30.0)]
+const PATH_HALF := 1.2
+const PLAZA := Vector2(-89.0, -30.0)
+const GUILD_YARD := Vector2(-80.0, -15.0)
+
+func _path_distance(x: float, z: float) -> float:
+	var best := 1000.0
+	var point := Vector2(x, z)
+	for k in range(PATH.size() - 1):
+		var a: Vector2 = PATH[k]
+		var b: Vector2 = PATH[k + 1]
+		var along := clampf((point - a).dot(b - a) / (b - a).length_squared(), 0.0, 1.0)
+		best = minf(best, point.distance_to(a + (b - a) * along))
+	return best
 
 func _steepness(x: int, z: int) -> float:
 	var height := land_heights[_land_index(x, z)]
@@ -189,5 +206,11 @@ func _paint_land(data) -> void:
 			colour = colour.lerp(snow, smoothstep(44.0, 52.0, height))
 			# Wet mud and sand down the river banks.
 			colour = colour.lerp(Color(0.42, 0.37, 0.28) / 0.92, 1.0 - smoothstep(WATER_Y - 0.5, WATER_Y + 1.6, height))
+			# Packed earth footpath, stone paving round the cave and in front of the guild.
+			var earth := Color(0.55, 0.46, 0.32) / 0.92
+			var stone := Color(0.58, 0.57, 0.53) / 0.92
+			colour = colour.lerp(earth, 1.0 - smoothstep(PATH_HALF - 0.3, PATH_HALF + 0.4, _path_distance(x, z)))
+			colour = colour.lerp(stone, 1.0 - smoothstep(5.0, 6.0, Vector2(x, z).distance_to(PLAZA)))
+			colour = colour.lerp(stone, (1.0 - smoothstep(5.0, 6.0, absf(x - GUILD_YARD.x) * 0.6)) * (1.0 - smoothstep(2.0, 3.0, absf(z - GUILD_YARD.y))))
 			colour.a = 1.0
 			data.set_color(point, colour)

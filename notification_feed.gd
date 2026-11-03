@@ -105,7 +105,7 @@ func refresh() -> void:
 		for state in ["normal", "pressed", "hover"]: row.add_theme_stylebox_override(state, style)
 		list.move_child(row, index)
 		index += 1
-	visible = not entries.is_empty() and not ui.player._menu_is_open()
+	visible = not entries.is_empty() and not ui.player._menu_is_open() and not ui.has_meta("underground")
 
 func _add_row(key: String) -> void:
 	var row := Button.new()
@@ -126,7 +126,7 @@ func _add_row(key: String) -> void:
 		if not role.is_empty(): ui.staff_dialog.open_for(role))
 
 func _process(delta: float) -> void:
-	visible = not entries.is_empty() and not ui.player._menu_is_open()
+	visible = not entries.is_empty() and not ui.player._menu_is_open() and not ui.has_meta("underground")
 	refresh_seconds -= delta
 	if refresh_seconds <= 0:
 		refresh_seconds = 0.25

@@ -4,9 +4,9 @@ const DISTANCE := 0.9
 const KenneyTheme := preload("res://kenney_theme.gd")
 # Tablet look, drawn on the screen panel behind its controls (no extra nodes, so
 # the layout stays exactly the shop menu's): teal header, light page, white cards.
-const HEADER := Color("0f766e")
-const PAGE := Color("eef2f4")
-const STAT_ACCENTS := [Color("2563eb"), Color("16a34a"), Color("ea580c"), Color("15803d"), Color("7c3aed"), Color("dc2626")]
+const HEADER := Color("f28c28")
+const PAGE := Color("fff4e0")
+const STAT_ACCENTS := preload("res://ui_bazaar.gd").ACCENTS
 var ui: CanvasLayer
 var source: Panel
 var screen_viewport: SubViewport
@@ -220,7 +220,7 @@ func _rounded(colour: Color, radius: int, border := Color.TRANSPARENT) -> StyleB
 	style.set_corner_radius_all(radius)
 	if border.a > 0:
 		style.border_color = border
-		style.set_border_width_all(1)
+		style.set_border_width_all(2)
 	return style
 
 func _draw_chrome() -> void:
@@ -237,14 +237,14 @@ func _draw_chrome() -> void:
 		for index in range(6):
 			var label := screen_menu.get_node(ui.TAB_CONTROLS[0][index]) as Control
 			var rect := Rect2(label.position - Vector2(12, 12), Vector2(label.size.x + 16, 56))
-			screen_menu.draw_style_box(_rounded(Color.WHITE, 10, Color("dbe3e7")), rect)
+			screen_menu.draw_style_box(_rounded(Color.WHITE, 10, Color("3a2a1e")), rect)
 			screen_menu.draw_rect(Rect2(rect.position + Vector2(0, 8), Vector2(5, rect.size.y - 16)), STAT_ACCENTS[index])
 	elif wide:
 		# Every other tab: white cards with a coloured edge; goals get a progress bar
 		# and a tick once done (game_ui.gd tablet_tiles).
 		for tile in ui.tablet_tiles(tab):
 			var rect: Rect2 = tile.rect
-			screen_menu.draw_style_box(_rounded(Color.WHITE, 10, Color("dbe3e7")), rect)
+			screen_menu.draw_style_box(_rounded(Color.WHITE, 10, Color("3a2a1e")), rect)
 			screen_menu.draw_rect(Rect2(rect.position + Vector2(0, 8), Vector2(5, rect.size.y - 16)), tile.accent)
 			var progress: float = tile.progress
 			if progress < 0.0: continue
@@ -255,7 +255,7 @@ func _draw_chrome() -> void:
 			screen_menu.draw_circle(centre, 15, Color("16a34a") if progress >= 1.0 else Color("e5e7eb"))
 			if progress >= 1.0: screen_menu.draw_polyline(PackedVector2Array([centre + Vector2(-7, 0), centre + Vector2(-2, 6), centre + Vector2(8, -6)]), Color.WHITE, 3.0)
 	else:
-		screen_menu.draw_style_box(_rounded(Color.WHITE, 12, Color("dbe3e7")), Rect2(12, 180, size.x - 24, 362))
+		screen_menu.draw_style_box(_rounded(Color.WHITE, 12, Color("3a2a1e")), Rect2(12, 180, size.x - 24, 362))
 
 func commit_input() -> void:
 	if not is_instance_valid(screen_menu): return

@@ -9,16 +9,19 @@ func _ready() -> void:
 	layer = 100
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	label = Label.new()
-	label.add_theme_font_size_override("font_size", 15)
+	label.add_theme_font_size_override("font_size", 12)
+	label.modulate.a = 0.7
 	label.add_theme_color_override("font_color", Color("86efac"))
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 	label.add_theme_constant_override("outline_size", 4)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	label.offset_left = -120
-	label.offset_right = -10
-	label.offset_top = 6
+	# Bottom-left corner, clear of the day/time readout at the top right.
+	label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	label.offset_left = 8
+	label.offset_right = 100
+	label.offset_top = -24
+	label.offset_bottom = -4
 	add_child(label)
 
 func _process(delta: float) -> void:
