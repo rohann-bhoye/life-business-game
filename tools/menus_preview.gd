@@ -42,5 +42,12 @@ func _run() -> void:
 	for frame in range(4): await process_frame
 	menu._layout()
 	await _shot("lobby_small")
+	# The loading screen over the same picture (never launches: the call does nothing).
+	root.size = Vector2i(1152, 648)
+	var loading = load("res://loading_screen.gd").new()
+	root.add_child(loading)
+	loading.begin(func(): return OK, "New shop  |  Slot 2  |  Day 1  |  " + String.chr(8377) + "20,000  |  Aasaan", "")
+	for frame in range(20): await process_frame
+	await _shot("loading")
 	print("PASS: menus preview")
 	quit()

@@ -62,6 +62,18 @@ static func button(target: Button, primary := false) -> void:
 	target.add_theme_color_override("font_pressed_color", Color.WHITE)
 	target.add_theme_color_override("font_disabled_color", MUTED)
 
+static var name_font_cache: FontVariation
+
+## A bold, plainly readable font for the town's name in big titles. The pixel heading font
+## draws A and R almost alike, so "DHOLKARPUR" read as "Dholkapur".
+static func name_font() -> Font:
+	if name_font_cache == null:
+		name_font_cache = FontVariation.new()
+		name_font_cache.base_font = ThemeDB.fallback_font
+		name_font_cache.variation_embolden = 1.0
+		name_font_cache.spacing_glyph = 4
+	return name_font_cache
+
 ## A dim over the whole screen behind a menu (add as the menu's first child).
 static func dim() -> ColorRect:
 	var shade := ColorRect.new()

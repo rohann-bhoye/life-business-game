@@ -19,7 +19,8 @@ const SPEAKERS := {
 	"PILOT": ["Iapetus", "Speak as a calm, friendly Indian airline pilot making a cabin announcement over the PA, in Indian English.", "Say calmly, like an Indian airline pilot on the PA"],
 }
 
-## id: [speaker, words].
+## id: [speaker, words]. The town's name is in Devanagari inside English lines too: spelt
+## "Dholkarpur", the pilot's voice said "Dholakpur".
 const LINES := {
 	"you_seat": ["YOU", "Seat fourteen A. Somewhere over India. Nobody on this plane knows me."],
 	"papa": ["PAPA", "बेटा, बहुत हो गया। घर बैठके कुछ नहीं मिलता। जा, अपना काम ढूंढ।"],
@@ -27,7 +28,7 @@ const LINES := {
 	"you_why": ["YOU", "Why me? Why now? I don't even know what I'm good at."],
 	"dadaji_letter": ["DADAJI", "बेटा, जब भी खो जाओ, ढोलकरपुर गाँव चले जाना। वहीं से सब कुछ शुरू होता है।"],
 	"you_town_money": ["YOU", "A town I have never seen. A letter. A little money. That is all I have."],
-	"pilot": ["PILOT", "Ladies and gentlemen, we are now landing at Dholkarpur. Local time is eight A M, weather sunny. Thank you for flying Apna Air."],
+	"pilot": ["PILOT", "Ladies and gentlemen, we are now landing at ढोलकरपुर. Local time is eight A M, weather sunny. Thank you for flying Apna Air."],
 }
 
 ## Every file to make: [file id, speaker, words].

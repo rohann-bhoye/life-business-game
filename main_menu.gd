@@ -47,7 +47,7 @@ func _ready() -> void:
 	preload("res://background_music.gd").ensure(get_tree())
 	var background := TextureRect.new()
 	background.name = "ShopBackground"
-	background.texture = load("res://assets/ui/main_menu_shop_v2.png")
+	background.texture = load("res://assets/ui/main_menu_town.png")
 	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE

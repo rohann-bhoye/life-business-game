@@ -155,7 +155,7 @@ func _build() -> void:
 	screen.add_child(base)
 	base.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	background = TextureRect.new()
-	background.texture = load("res://assets/ui/main_menu_shop_v2.png")
+	background.texture = load("res://assets/ui/main_menu_town.png")
 	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -169,7 +169,9 @@ func _build() -> void:
 	logo_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	screen.add_child(logo_rule)
 	entering = _label("NOW ENTERING", 14, GOLD)
-	title = _label("DHOLKARPUR GAON", 54, Color.WHITE, true)
+	title = _label("DHOLKARPUR GAON", 52, Color.WHITE)
+	# A plain bold font: the pixel heading font made the name read as "Dholkapur".
+	title.add_theme_font_override("font", preload("res://ui_bazaar.gd").name_font())
 	tagline = _label("Run your shop. Build your life.", 19, BEIGE)
 	info = _label("", 15, BEIGE)
 	info.hide()

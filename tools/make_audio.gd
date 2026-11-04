@@ -2,38 +2,57 @@ extends SceneTree
 
 # Composes the game's original music and ambience and saves them as WAV files in
 # assets/audio/generated/ (no third-party audio, so no licence questions).
-#  - music_indian.wav: calm Indian music for the whole game: a tanpura drone, a
-#    bansuri playing raag Bhupali with glides, soft keherwa on the tabla, santoor
-#    runs and a few distant birds; a seamless 96 s loop
+#  - music_indian.wav: calm, smooth music for the whole game (it plays for hours, so
+#    nothing in it may nag): warm pad chords that change every 8 s (Cmaj7, Bm7, Am7,
+#    Gadd9), a soft low bansuri on the G major pentatonic (raag Bhupali's notes) with long
+#    rests, mellow santoor plucks, a faint tanpura and no drums; room reverb and softened
+#    highs. A 128 s loop that starts and ends quietly, so the repeat is not heard.
 #  - ambience_street.wav: breeze, birds, distant traffic, an auto-rickshaw and a
 #    scooter horn and a far-off temple bell
 #  - ambience_night.wav: crickets and a soft night breeze
 #  - rain.wav: steady rain for rainy days
-# Run once: Godot --headless --path . --script res://tools/make_audio.gd
+# Run: Godot --headless --path . --script res://tools/make_audio.gd [-- only=music]
 const RATE := 22050
-const SA := 196.0
-const BEAT := 0.75
-# Raag Bhupali (S R G P D) from lower Dha up to upper Pa, as ratios to Sa.
-const BHUPALI := [5.0 / 6.0, 1.0, 9.0 / 8.0, 5.0 / 4.0, 3.0 / 2.0, 5.0 / 3.0, 2.0, 9.0 / 4.0, 5.0 / 2.0, 3.0]
-# Bansuri phrases as [degree in BHUPALI, beats]; most come home to Sa or Pa.
-const PHRASES := [
-	[[3, 1], [2, 1], [1, 1.5], [0, 0.5], [1, 3]],
-	[[1, 1], [2, 1], [3, 1], [4, 2], [3, 2]],
-	[[3, 1], [4, 1], [5, 1], [6, 2], [5, 1], [4, 2]],
-	[[4, 1.5], [3, 0.5], [2, 1], [3, 1], [2, 1], [1, 3]],
-	[[5, 1], [6, 1], [7, 1], [6, 1.5], [5, 0.5], [4, 3]],
-	[[3, 1], [2, 0.5], [3, 0.5], [4, 2], [3, 1], [2, 1], [1, 2]],
+const CHORD_SECONDS := 8.0
+const LOOP_SECONDS := 128.0
+## Pad chords (Hz, low to high, a soft bass note first), one per 8 s, round and round:
+## Cmaj7, Bm7, Am7, Gadd9.
+const CHORDS := [
+	[65.41, 130.81, 196.0, 246.94, 329.63],
+	[61.74, 123.47, 185.0, 220.0, 293.66],
+	[55.0, 110.0, 164.81, 196.0, 261.63],
+	[49.0, 98.0, 146.83, 220.0, 246.94],
 ]
-# Keherwa, eight beats a cycle (6 s at 80 bpm): Dha Ge Na Ti | Na Ka Dhi Na.
-const KEHERWA := ["dha", "ge", "na", "ti", "na", "ka", "dhi", "na"]
+## The bansuri's notes, low and warm: G major pentatonic from D4 to D5.
+const FLUTE := [293.66, 329.63, 392.0, 440.0, 493.88, 587.33]
+## Phrases as [index in FLUTE, beats of 0.9 s]; most come to rest on G or D.
+const PHRASES := [
+	[[2, 2], [3, 1], [4, 3]],
+	[[4, 2], [3, 1], [2, 1], [1, 3]],
+	[[1, 1], [2, 1], [3, 2], [2, 3]],
+	[[3, 2], [4, 1], [5, 2], [4, 1], [3, 3]],
+	[[2, 1.5], [1, 0.5], [0, 1], [1, 1], [2, 4]],
+	[[5, 2], [4, 1], [3, 1], [2, 4]],
+]
+## Santoor arpeggio notes for each chord (mid register, mellow).
+const ARPEGGIOS := [
+	[261.63, 329.63, 392.0, 493.88],
+	[246.94, 293.66, 369.99, 440.0],
+	[220.0, 261.63, 329.63, 392.0],
+	[196.0, 246.94, 293.66, 440.0],
+]
 var rng := RandomNumberGenerator.new()
 
 func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://assets/audio/generated"))
-	_save("music_indian", _indian_music(96.0))
-	_save("ambience_street", _street(24.0))
-	_save("ambience_night", _night(16.0))
-	_save("rain", _rain(12.0))
+	var only := ""
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("only="): only = arg.trim_prefix("only=")
+	if only == "" or only == "music": _save("music_indian", _calm_music())
+	if only == "" or only == "ambience":
+		_save("ambience_street", _street(24.0))
+		_save("ambience_night", _night(16.0))
+		_save("rain", _rain(12.0))
 	print("PASS: generated music and ambience")
 	quit()
 
@@ -65,154 +84,143 @@ func _pluck(out: PackedFloat32Array, start: int, frequency: float, gain: float, 
 		buffer[slot] = (value * brightness + buffer[(slot + 1) % period] * (1.0 - brightness)) * decay
 		out[start + index] += (value + buzz * value * absf(value)) * gain
 
-func _indian_music(seconds: float) -> PackedFloat32Array:
+
+# --- Calm music ---
+
+func _calm_music() -> PackedFloat32Array:
 	rng.seed = 2026
-	var fade := 3.0
+	var fade := 4.0
 	var out := PackedFloat32Array()
-	out.resize(int((seconds + fade) * RATE))
-	_drone(out)
-	_tanpura(out)
-	_tabla(out)
-	_bansuri(out, seconds)
-	_santoor(out, seconds)
-	_birds(out)
-	# Drone, tanpura and tala repeat every 6 s and 96 s holds sixteen cycles, so the
-	# tail lines up with the head and the crossfade loops without a seam.
+	out.resize(int((LOOP_SECONDS + fade) * RATE))
+	_pads(out)
+	_tanpura_soft(out)
+	_santoor_soft(out)
+	_flute(out)
+	out = _reverb(out, 0.32)
+	_soften(out, 5000.0)
 	return _crossfade(out, fade)
 
-## Soft sustained Sa and Pa underneath everything, breathing slowly.
-func _drone(out: PackedFloat32Array) -> void:
-	for index in range(out.size()):
-		var t := index / float(RATE)
-		var swell := 0.8 + 0.2 * sin(TAU * t / 12.0)
-		var value := sin(TAU * SA * 0.5 * t) * 0.5 + sin(TAU * SA * 0.5 * 1.003 * t) * 0.3 + sin(TAU * SA * 0.75 * t) * 0.25 + sin(TAU * SA * t) * 0.15
-		out[index] += value * swell * 0.05
+## 0 -> 1 over `ramp` seconds after `start` and back to 0 over the last `ramp` seconds
+## before `end`, along a smooth curve.
+static func _window(t: float, start: float, end: float, ramp: float) -> float:
+	return smoothstep(start, start + ramp, t) * (1.0 - smoothstep(end - ramp, end, t))
 
-## Tanpura: Pa, Sa, Sa and low Sa plucked round and round, each string ringing long.
-func _tanpura(out: PackedFloat32Array) -> void:
-	var strings := [SA * 0.75, SA, SA, SA * 0.5]
-	for step in range(int(out.size() / float(RATE) / 0.375)):
-		_pluck(out, int(step * 0.375 * RATE), strings[step % 4], 0.07 if step % 4 != 3 else 0.09, 0.9992, 3.5, 0.62, 0.35)
+## Warm pads: each chord swells in over 3 s and lets go over 3 s into the next. Every
+## voice is a soft sine with a quiet octave and a slightly detuned twin (a gentle chorus).
+func _pads(out: PackedFloat32Array) -> void:
+	var count := out.size()
+	var chords := int(ceil(count / float(RATE) / CHORD_SECONDS)) + 1
+	for index in range(chords):
+		var notes: Array = CHORDS[index % CHORDS.size()]
+		var start := index * CHORD_SECONDS - 1.5
+		var end := start + CHORD_SECONDS + 3.0
+		var first := maxi(0, int(start * RATE))
+		var last := mini(count, int(end * RATE))
+		for voice in range(notes.size()):
+			var frequency: float = notes[voice]
+			var gain := 0.05 if voice == 0 else 0.032
+			var step := TAU * frequency / RATE
+			var twin := TAU * frequency * 1.0025 / RATE
+			for sample in range(first, last):
+				var t := sample / float(RATE)
+				var level := _window(t, start, end, 3.0) * (0.92 + 0.08 * sin(TAU * t / 9.0 + voice))
+				var value := sin(step * sample) + sin(twin * sample) * 0.6 + sin(step * sample * 2.0) * 0.12
+				out[sample] += value * level * gain
 
-## Soft keherwa on the tabla, with a little "tirakita" fill every fourth cycle.
-func _tabla(out: PackedFloat32Array) -> void:
-	for beat in range(int(out.size() / float(RATE) / BEAT)):
-		var cycle := beat / 8
-		var position := beat % 8
-		var time := beat * BEAT
-		var gain := 0.2 if position == 0 else (0.11 if position == 4 else 0.15)
-		if cycle % 4 == 3 and position >= 6:
-			var fill: Array = ["ti", "ti", "ka", "na"] if position == 6 else ["ti", "ka", "dha", "ge"]
-			for stroke in range(4):
-				_bol(out, time + stroke * BEAT / 4.0, fill[stroke], gain * 0.8)
-			continue
-		_bol(out, time, KEHERWA[position], gain)
+## A faint tanpura (D, G, G, low G) without the jawari buzz, slowly round and round.
+func _tanpura_soft(out: PackedFloat32Array) -> void:
+	var strings := [146.83, 196.0, 196.0, 98.0]
+	for step in range(int(out.size() / float(RATE) / 0.9)):
+		_pluck(out, int(step * 0.9 * RATE), strings[step % 4], 0.018, 0.9994, 4.0, 0.35, 0.0)
 
-func _bol(out: PackedFloat32Array, time: float, bol: String, gain: float) -> void:
-	var start := int(time * RATE)
-	match bol:
-		"dha":
-			_bayan(out, start, gain)
-			_dayan(out, start, gain, 0.3)
-		"dhi":
-			_bayan(out, start, gain)
-			_dayan(out, start, gain * 0.8, 0.18)
-		"ge": _bayan(out, start, gain)
-		"na": _dayan(out, start, gain, 0.26)
-		"ti": _dayan(out, start, gain * 0.7, 0.05)
-		"ka": _slap(out, start, gain)
+## Mellow santoor: a slow arpeggio on the chord's notes, one note a second with some left
+## out, quieter near the start and end of the loop so it begins and ends softly.
+func _santoor_soft(out: PackedFloat32Array) -> void:
+	var seconds := out.size() / float(RATE)
+	var beat := 0
+	while beat < seconds - 3.0:
+		var time := float(beat)
+		var notes: Array = ARPEGGIOS[int(time / CHORD_SECONDS) % ARPEGGIOS.size()]
+		var edge := minf(time, LOOP_SECONDS - time)
+		var gain := 0.05 * clampf(edge / 24.0, 0.35, 1.0)
+		if rng.randf() > 0.28:
+			_pluck(out, int((time + rng.randf_range(-0.02, 0.02)) * RATE), notes[beat % notes.size()], gain, 0.9975, 3.0, 0.3)
+		beat += 1
 
-## Bayan (bass drum): a deep tone that rises as the palm presses the skin.
-func _bayan(out: PackedFloat32Array, start: int, gain: float) -> void:
-	var phase := 0.0
-	for index in range(mini(int(0.9 * RATE), out.size() - start)):
-		var t := index / float(RATE)
-		phase += TAU * (76.0 + 30.0 * (1.0 - exp(-t / 0.12))) / RATE
-		out[start + index] += sin(phase) * exp(-t / 0.28) * minf(1.0, t / 0.004) * gain * 1.4
-
-## Dayan (treble drum) tuned to Sa: a ringing tone with harmonic overtones.
-func _dayan(out: PackedFloat32Array, start: int, gain: float, ring: float) -> void:
-	var frequency := SA * 2.0
-	for index in range(mini(int((ring * 4.0 + 0.05) * RATE), out.size() - start)):
-		var t := index / float(RATE)
-		var value := sin(TAU * frequency * t) * exp(-t / ring) + sin(TAU * frequency * 2.0 * t) * 0.45 * exp(-t / (ring * 0.6))
-		value += sin(TAU * frequency * 3.0 * t) * 0.3 * exp(-t / (ring * 0.4)) + sin(TAU * frequency * 4.02 * t) * 0.18 * exp(-t / (ring * 0.3))
-		if t < 0.004: value += rng.randf_range(-1.0, 1.0) * 0.5
-		out[start + index] += value * gain * 0.5
-
-## "Ka": a flat slap on the bayan, a short thud of noise.
-func _slap(out: PackedFloat32Array, start: int, gain: float) -> void:
-	var low := 0.0
-	for index in range(mini(int(0.08 * RATE), out.size() - start)):
-		low += (rng.randf_range(-1.0, 1.0) - low) * 0.25
-		out[start + index] += low * exp(-index / (0.018 * RATE)) * gain * 1.6
-
-## Bansuri: Bhupali phrases on the beat, sliding between notes (meend), with a quick
-## grace note now and then (kan), slow vibrato on long notes and a breathy tone.
-func _bansuri(out: PackedFloat32Array, seconds: float) -> void:
-	var time := 8 * BEAT
-	var breath := 0.0
-	while true:
+## A soft low bansuri: short phrases with long rests, gliding between notes, a breathy
+## tone and a slow vibrato on long notes. It rests through the first and last 26 s.
+func _flute(out: PackedFloat32Array) -> void:
+	var time := 26.0
+	while time < LOOP_SECONDS - 26.0:
 		var phrase: Array = PHRASES[rng.randi_range(0, PHRASES.size() - 1)]
-		var starts: Array[float] = []
-		var frequencies: Array[float] = []
-		var total := 0.0
+		var notes := []
+		var at := time
 		for note in phrase:
-			starts.append(total)
-			frequencies.append(SA * 2.0 * BHUPALI[note[0]])
-			total += note[1] * BEAT
-		if time + total > seconds - 4.0: break
-		var first := int(time * RATE)
-		var phase := 0.0
-		var pointer := 0
-		var current := frequencies[0]
-		var glide_from := current
-		var kan := rng.randf() < 0.4
-		for index in range(int(total * RATE)):
-			var t := index / float(RATE)
-			if pointer + 1 < starts.size() and t >= starts[pointer + 1]:
-				pointer += 1
-				glide_from = current
-				kan = rng.randf() < 0.3
-			var since := t - starts[pointer]
-			var target := frequencies[pointer]
-			current = target
-			if pointer > 0 and since < 0.16:
-				current = lerpf(glide_from, target, smoothstep(0.0, 1.0, since / 0.16))
-			elif kan and since < 0.06:
-				current = target * 9.0 / 8.0
-			var vibrato := 0.006 * sin(TAU * 5.0 * t) * clampf((since - 0.45) / 0.5, 0.0, 1.0)
-			phase += TAU * current * (1.0 + vibrato) / RATE
-			breath += (rng.randf_range(-1.0, 1.0) - breath) * 0.25
-			var envelope := minf(1.0, t / 0.3) * minf(1.0, (total - t) / 0.8)
-			var articulation := 0.85 + 0.15 * minf(1.0, since / 0.08)
-			out[first + index] += (sin(phase) + 0.12 * sin(2.0 * phase) + 0.04 * sin(3.0 * phase) + breath * 0.14) * envelope * articulation * 0.2
-		time += total + rng.randi_range(2, 4) * BEAT
+			notes.append([at, FLUTE[note[0]], note[1] * 0.9])
+			at += note[1] * 0.9
+		_flute_phrase(out, notes)
+		time = at + rng.randf_range(4.0, 8.0)
 
-## Santoor: a shimmering run of double-struck high notes every twelve seconds.
-func _santoor(out: PackedFloat32Array, seconds: float) -> void:
-	var time := 4.5
-	while time < seconds - 5.0:
-		var degree := rng.randi_range(5, 9)
-		var falling := rng.randf() < 0.6
-		for note in range(6):
-			var frequency: float = SA * 2.0 * BHUPALI[clampi(degree, 1, BHUPALI.size() - 1)]
-			for strike in range(2):
-				_pluck(out, int((time + note * BEAT / 4.0 + strike * 0.05) * RATE), frequency, 0.05 if strike == 0 else 0.03, 0.9975, 1.4, 0.6)
-			degree += -1 if falling else 1
-		time += 12.0
+## One phrase: `notes` are [start, frequency, seconds].
+func _flute_phrase(out: PackedFloat32Array, notes: Array) -> void:
+	var start: float = notes[0][0]
+	var last: Array = notes[notes.size() - 1]
+	var end: float = last[0] + last[2] + 0.6
+	var phase := 0.0
+	var breath := 0.0
+	for sample in range(int(start * RATE), mini(out.size(), int(end * RATE))):
+		var t := sample / float(RATE)
+		# The note sounding now, gliding over 0.12 s from the one before.
+		var index := 0
+		while index + 1 < notes.size() and t >= notes[index + 1][0]: index += 1
+		var frequency: float = notes[index][1]
+		var into: float = t - notes[index][0]
+		if index > 0 and into < 0.12: frequency = lerpf(notes[index - 1][1], frequency, into / 0.12)
+		frequency *= 1.0 + 0.004 * sin(TAU * 4.8 * t) * smoothstep(0.4, 1.0, into)
+		phase += TAU * frequency / RATE
+		var level := smoothstep(start, start + 0.25, t) * (1.0 - smoothstep(end - 0.8, end, t))
+		breath += (rng.randf_range(-1.0, 1.0) - breath) * 0.08
+		var value := sin(phase) + 0.18 * sin(phase * 2.0) + 0.05 * sin(phase * 3.0) + breath * 0.25
+		out[sample] += value * level * 0.07
 
-## A few distant bird calls.
-func _birds(out: PackedFloat32Array) -> void:
-	var time := 3.0
-	while time < out.size() / float(RATE) - 1.0:
-		var base := rng.randf_range(2200.0, 3200.0)
-		for chirp in range(rng.randi_range(2, 3)):
-			var start := int((time + chirp * 0.18) * RATE)
-			for index in range(mini(int(0.12 * RATE), out.size() - start)):
-				var t := index / float(RATE)
-				out[start + index] += sin(TAU * (base + 4000.0 * t) * t) * sin(PI * t / 0.12) * 0.025
-		time += rng.randf_range(7.0, 13.0)
+## Room reverb (Schroeder: four damped combs into two all-passes), `wet` of it mixed in.
+func _reverb(dry: PackedFloat32Array, wet: float) -> PackedFloat32Array:
+	var count := dry.size()
+	var sum := PackedFloat32Array()
+	sum.resize(count)
+	for delay in [1116, 1188, 1277, 1356]:
+		var line := PackedFloat32Array()
+		line.resize(delay)
+		var store := 0.0
+		var at := 0
+		for index in range(count):
+			var held := line[at]
+			store = held * 0.75 + store * 0.25
+			line[at] = dry[index] + store * 0.8
+			sum[index] += held
+			at = (at + 1) % delay
+	for delay in [278, 113]:
+		var line := PackedFloat32Array()
+		line.resize(delay)
+		var at := 0
+		for index in range(count):
+			var held := line[at]
+			var value := sum[index] + held * 0.5
+			line[at] = value
+			sum[index] = held - value * 0.5
+			at = (at + 1) % delay
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for index in range(count): out[index] = dry[index] + sum[index] * wet * 0.25
+	return out
+
+## Takes the edge off the highs: a gentle low-pass at `cutoff` Hz.
+func _soften(samples: PackedFloat32Array, cutoff: float) -> void:
+	var amount := 1.0 - exp(-TAU * cutoff / RATE)
+	var low := 0.0
+	for index in range(samples.size()):
+		low += (samples[index] - low) * amount
+		samples[index] = low
 
 func _crossfade(samples: PackedFloat32Array, fade_seconds: float) -> PackedFloat32Array:
 	# Blend the tail into the head so noise-based loops repeat without a click.

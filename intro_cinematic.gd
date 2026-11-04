@@ -162,7 +162,9 @@ func _build_letter() -> void:
 	letter_card.modulate.a = 0.0
 
 func _build_title() -> void:
-	title_label = _text(stage_view, 64, Color("fde68a"), true)
+	title_label = _text(stage_view, 60, Color("fde68a"))
+	# A plain bold font: the pixel heading font made the name read as "Dholkapur".
+	title_label.add_theme_font_override("font", preload("res://ui_bazaar.gd").name_font())
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.text = "DHOLKARPUR GAON"
 	sub_label = _text(stage_view, 24, Color("e2e8f0"))
