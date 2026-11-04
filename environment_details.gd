@@ -55,7 +55,9 @@ func _ready() -> void:
 
 func _limit_draw_distance() -> void:
 	for frame in range(2): await get_tree().process_frame
-	if is_inside_tree(): preload("res://draw_distance.gd").apply(get_tree().current_scene)
+	if is_inside_tree():
+		preload("res://draw_distance.gd").apply(get_tree().current_scene)
+		preload("res://occluders.gd").rebuild(get_tree().current_scene)
 
 func _process(delta: float) -> void:
 	for index in range(clouds.size()):

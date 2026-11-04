@@ -480,6 +480,8 @@ func _update_room_size() -> void:
 	var business = get_parent().get_node("Shop/ShopArea").business
 	if room_expansion == business.shop_expansion: return
 	room_expansion = business.shop_expansion
+	# The back wall moves, so the wall occluders are rebuilt once the room has been resized.
+	preload("res://occluders.gd").rebuild.call_deferred(get_parent())
 	var building: Node3D = get_parent().get_node("Shop")
 	var depth: float = 10.0 + room_expansion * Store.EXPANSION_DEPTH
 	var extension := depth - 5.0
