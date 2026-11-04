@@ -11,7 +11,7 @@ func _ready() -> void:
 	_update_shop_upgrade()
 	_build_streets()
 	_build_garden()
-	for point in [Vector3(-11, 0.1, -8), Vector3(-18, 0.1, 12), Vector3(11, 0.1, -11), Vector3(27, 0.1, -3), Vector3(17.8, 0.1, 13.4), Vector3(-17, 0.1, 0), Vector3(-21, 0.1, -14), Vector3(25.5, 0.1, -9.5), Vector3(25, 0.1, 3), Vector3(-24, 0.1, 16)]:
+	for point in [Vector3(-11, 0.1, -8), Vector3(-18, 0.1, 12), Vector3(11, 0.1, -11), Vector3(27, 0.1, -3), Vector3(17.8, 0.1, 13.4), Vector3(-17, 0.1, 0), Vector3(-21, 0.1, -14), Vector3(25.5, 0.1, -9.5), Vector3(25, 0.1, 3)]:
 		_tree(point)
 	# Not at -8: that is the packing room door (export_world.gd).
 	for x in [-18.0, -12.6, 8.0, 18.0]:
@@ -150,7 +150,8 @@ func _build_streets() -> void:
 	_box("NorthPavement", self, StreetKit.pavement_size(64, 1.6), StreetKit.pavement_at(0, 3.4), paving)
 	_box("SouthPavement", self, StreetKit.pavement_size(64, 1.6), StreetKit.pavement_at(0, 10.6), paving)
 	_box("ShopForecourt", self, StreetKit.pavement_size(6.5, 1.2), StreetKit.pavement_at(-3, 2.6), paving)
-	_box("HomePath", self, StreetKit.pavement_size(2.2, 5.2), StreetKit.pavement_at(4, 0.25), Color(0.72, 0.73, 0.7))
+	# The old driveway to the home; the home now stands in West Colony, so it is hidden.
+	_box("HomePath", self, StreetKit.pavement_size(2.2, 5.2), StreetKit.pavement_at(4, 0.25), Color(0.72, 0.73, 0.7)).hide()
 	for x in range(-30, 31, 4):
 		_box("LaneMark%d" % x, self, Vector3(1.8, 0.008, 0.09), Vector3(x, 0.124, 7), Color(0.88, 0.86, 0.68))
 	for z in [4.35, 9.65]:

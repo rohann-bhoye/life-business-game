@@ -24,8 +24,8 @@ const KINDS := {
 const PLACES := [
 	["Apna Mart", "shop", Vector2(-3, 0), "first_day"],
 	["Apna Storage", "shop", Vector2(-6, 18), ""],
-	["Your Home", "home", Vector2(6, -7), ""],
-	["Car Lot", "town", Vector2(14, -1), ""],
+	["Your Home", "home", Vector2(-60, -6), ""],
+	["Car Lot", "town", Vector2(-58, 0.4), ""],
 	["Bus Stop", "travel", Vector2(-24, 12), ""],
 	["School", "town", Vector2(-24, -44), ""],
 	["Bazaar", "town", Vector2(50, 6), ""],

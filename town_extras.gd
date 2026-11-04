@@ -165,12 +165,14 @@ func _maidan(at: Vector3) -> void:
 	_label("MaidanSign", "GRAM MAIDAN", at + Vector3(-17.5, GROUND + 2.6, 10.5), 40, Color(0.12, 0.3, 0.18))
 	_box(at + Vector3(-17.5, GROUND + 1.3, 10.6), Vector3(0.12, 2.6, 0.12), WOOD)
 	_box(at + Vector3(-17.5, GROUND + 2.6, 10.5), Vector3(3.4, 0.8, 0.08), WHITE)
-	for tree in [Vector3(at.x - 17.0, 0.1, at.z - 6.0), Vector3(at.x + 17.0, 0.1, at.z - 5.0), Vector3(at.x + 16.5, 0.1, at.z + 9.0)]: town._tree(tree)
+	for tree in [Vector3(at.x - 17.0, 0.1, at.z - 6.0), Vector3(at.x + 17.0, 0.1, at.z - 5.0), Vector3(at.x + 12.0, 0.1, at.z + 11.0)]: town._tree(tree)
 
 # --- Benches and dustbins at the lane mouths ---
 
 func _street_furniture(lane_x: float) -> void:
 	for spot in [[-4.2, -3.0, 1.0], [4.2, 13.8, -1.0], [-4.2, 13.8, 1.0], [4.2, -3.0, -1.0]]:
+		# West Colony's north-west corner is the home plot and its bays, so that corner has no bench or bin.
+		if lane_x < 0.0 and spot[0] < 0.0 and spot[1] < 0.0: continue
 		var base := Vector3(lane_x + spot[0], GROUND, spot[1])
 		var face: float = spot[2]
 		# A bench: slatted seat and back on two concrete legs, facing the lane.

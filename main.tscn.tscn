@@ -212,7 +212,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.8, 0.1, 2.8)
 shop_area_path = NodePath("../Shop/ShopArea")
 
 [node name="House" parent="." unique_id=192175459 instance=ExtResource("6_house")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0.1, -4)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -62.1, 0.1, -6)
 
 [node name="Neighbourhood" type="Node3D" parent="." unique_id=1244416149]
 script = ExtResource("10_neighbourhood")

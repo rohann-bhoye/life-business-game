@@ -28,7 +28,8 @@ const CUSTOMER_INTERVAL := 0.1
 ## Checkout actions a friend may ask the host's customer to do.
 const CUSTOMER_ACTIONS := ["scan_item", "resolve_bargain", "complete_checkout"]
 ## Friends start on the home path, in front of the gate, side by side.
-const FRIEND_SPAWN := Vector3(3.2, 1.1, 0.9)
+## Where a friend arrives: in the home yard, just inside the gate (house-local, so it follows the home).
+const FRIEND_SPAWN_LOCAL := Vector3(-0.8, 1.0, 4.9)
 ## id -> {"name", "model", "avatar", "visual", "target", "yaw"}
 var peers := {}
 var send_wait := 0.0
@@ -67,6 +68,9 @@ var toast: Label
 @onready var operations = world.get_node("ShopOperations")
 @onready var sleep_area: Area3D = world.get_node_or_null("House/Bed/SleepArea")
 
+func friend_spawn() -> Vector3:
+	return world.get_node("House").to_global(FRIEND_SPAWN_LOCAL)
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_hud()
@@ -79,7 +83,7 @@ func _ready() -> void:
 		add_to_group("coop_team")
 		team_day = business.day
 	else:
-		player.global_position = FRIEND_SPAWN + Vector3((multiplayer.get_unique_id() % 3) * 0.9, 0, 0)
+		player.global_position = friend_spawn() + Vector3((multiplayer.get_unique_id() % 3) * 0.9, 0, 0)
 		_become_friend()
 	_refresh_list()
 	# Everyone already in the game answers with their own introduction.
@@ -94,7 +98,7 @@ func _introduce(peer_name: String, peer_model: String, peer_hosting: bool) -> vo
 	if peers.has(id): return
 	var avatar := Node3D.new()
 	avatar.name = "CoopPeer%d" % id
-	avatar.position = FRIEND_SPAWN
+	avatar.position = friend_spawn()
 	var visual := MeshInstance3D.new()
 	visual.name = "CharacterVisual"
 	visual.set_script(preload("res://character_visual.gd"))
@@ -127,7 +131,7 @@ func _introduce(peer_name: String, peer_model: String, peer_hosting: bool) -> vo
 	visual.add_child(box)
 	visual.carry_target = box
 	add_child(avatar)
-	peers[id] = {"name": Coop.clean_name(peer_name), "model": visual.model, "avatar": avatar, "visual": visual, "box": box, "target": FRIEND_SPAWN, "yaw": 0.0}
+	peers[id] = {"name": Coop.clean_name(peer_name), "model": visual.model, "avatar": avatar, "visual": visual, "box": box, "target": friend_spawn(), "yaw": 0.0}
 	if id == 1: host_name = peers[id].name
 	_show_toast("%s joined the shop" % peers[id].name)
 	_refresh_list()

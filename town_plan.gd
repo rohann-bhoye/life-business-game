@@ -19,7 +19,7 @@ const BAY_WIDTH := 2.8
 const MAIN_ROAD := [4.35, 9.65]
 const COLONIES := [
 	{"name": "West", "label": "COLONY 1\nWest Lane", "x": -52.0, "far": [-34.0, 44.0],
-		"west": [-26.0, -16.0, -6.0, 17.0, 27.0], "east": [-26.0, -16.0, -6.0, 17.0]},
+		"west": [-26.0, -16.0, 17.0, 27.0], "east": [-26.0, -16.0, -6.0, 17.0]},
 	{"name": "East", "label": "COLONY 2\nEast Lane", "x": 62.5, "far": [-40.0, 44.0],
 		"west": [], "east": [-36.0, -26.0, -16.0, -6.0, 17.0, 27.0, 37.0]},
 ]
@@ -68,8 +68,9 @@ func _colony(colony: Dictionary) -> void:
 	for index in range(1, pole_zs.size()): _span(Vector3(x + 3.35, 0.1, pole_zs[index - 1]), Vector3(x + 3.35, 0.1, pole_zs[index]))
 	for row in [["west", -1], ["east", 1]]:
 		for z in colony[row[0]]: _house(colony, x + row[1] * HOUSE_OFFSET, z, -row[1], pole_zs)
-	for z in [-22.0, -7.0, 21.0, 37.0]: town._streetlight(Vector3(x - 3.35, 0.1, z), PI / 2.0, false)
-	expansion._road_sign("%sColonySignWest" % colony.name, Vector3(x - 4.4, 0.1, 1.2), 0.0, colony.label)
+	for z in [-22.0, -11.0, 21.0, 37.0]: town._streetlight(Vector3(x - 3.35, 0.1, z), PI / 2.0, false)
+	# West Colony's sign stands on the east verge: the west verge beside the Main Road holds the home bays.
+	expansion._road_sign("%sColonySignWest" % colony.name, Vector3(x + (4.4 if colony.name == "West" else -4.4), 0.1, 1.2), 0.0, colony.label)
 	expansion._road_sign("%sColonySignEast" % colony.name, Vector3(x + 4.4, 0.1, 12.8), PI, colony.label)
 
 ## The lane: a road on each side of the Main Road, pavements, edge lines and centre dashes.
@@ -155,7 +156,9 @@ func _pole_line(a: Vector3, b: Vector3, step: float) -> void:
 ## Poles and wires along every other street, and turning circles where roads end.
 func _streets() -> void:
 	# Main Road: the north pavement line the shop's own poles (z 2.45) already use.
-	_pole_line(Vector3(-73.0, 0.1, 2.45), Vector3(-37.0, 0.1, 2.45), 9.0)
+	# Split round West Colony: no pole in front of the home bays or in the lane mouth.
+	_pole_line(Vector3(-73.0, 0.1, 2.45), Vector3(-62.5, 0.1, 2.45), 10.5)
+	_pole_line(Vector3(-47.5, 0.1, 2.45), Vector3(-37.0, 0.1, 2.45), 10.5)
 	_pole_line(Vector3(39.5, 0.1, 2.45), Vector3(47.0, 0.1, 2.45), 7.5)
 	_pole_line(Vector3(57.5, 0.1, 2.45), Vector3(73.0, 0.1, 2.45), 7.7)
 	# Market Street, west kerb, both halves; North Road and its far end; Airport Road;

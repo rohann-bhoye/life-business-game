@@ -19,7 +19,8 @@ const SAFFRON := Color(1.0, 0.55, 0.1)
 const GREEN := Color(0.1, 0.5, 0.25)
 ## [x, z, seed]: every new house faces +z (towards the lanes and the road).
 const HOUSES := [
-	[-15.0, -26.5, 21], [-6.0, -26.5, 22], [3.0, -26.5, 23], [12.0, -26.5, 24],
+	# (Two houses at x -15 and -6 were dropped: they stood inside the school's south wall.)
+	[3.0, -26.5, 23], [12.0, -26.5, 24],
 	[19.5, -18.0, 25], [27.5, -18.0, 26], [19.5, -26.5, 27], [27.5, -26.5, 28],
 ]
 const LANES := [
