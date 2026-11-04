@@ -18,3 +18,18 @@ static func pavement_size(w: float, d: float) -> Vector3:
 
 static func pavement_at(x: float, z: float) -> Vector3:
 	return Vector3(x, PAVE_Y, z)
+
+## The parts [from, to] of the span `start`..`end` left after cutting out `gaps`
+## ([from, to] pairs): a sidewalk or edge line stops at every road that joins it, so the
+## asphalt runs straight through the junction.
+static func pieces(start: float, end: float, gaps: Array) -> Array:
+	var sorted := gaps.duplicate()
+	sorted.sort_custom(func(a, b): return a[0] < b[0])
+	var result := []
+	var at := start
+	for gap in sorted:
+		if gap[1] <= at or gap[0] >= end: continue
+		if gap[0] > at: result.append([at, gap[0]])
+		at = maxf(at, gap[1])
+	if at < end: result.append([at, end])
+	return result

@@ -18,7 +18,8 @@ func _run() -> void:
 	current_scene.get_node("DayClock").set_process(false)
 	current_scene.get_node("CustomerSpawner/SpawnTimer").stop()
 	var business = current_scene.get_node("Shop/ShopArea").business
-	assert(business.grant_home())
+	# Story games rent the home now; the free home only matters for the bed.
+	business.grant_home()
 	assert(business.order_stock("snack") and business.receive_delivery() and business.pick_up_box() and business.shelve_box())
 	for quantity in [3, 2]: assert(business.sell_basket(quantity, 1000, -1, "snack"))
 	assert(business.sell_basket(2, 1000))
@@ -26,7 +27,8 @@ func _run() -> void:
 	business.advance_clock(1260.0 - business.minutes_of_day)
 	var player = current_scene.get_node("Player")
 	player.indoors = true
-	player.global_position = Vector3(3.0, 1.1, -4.7)
+	# Beside the bed, wherever the home stands now.
+	player.global_position = current_scene.get_node("House").to_global(preload("res://home_decor.gd").SPAWN)
 	player.rotation.y = PI
 	for frame in range(3): await physics_frame
 	assert(current_scene.get_node("House/Bed/SleepArea").try_sleep())

@@ -1,7 +1,7 @@
 extends RefCounted
 
 # Admin (developer) mode. Testers get the demo with the unfinished parts shut: the Gufa
-# Darwaza is sealed and the road ends are hidden in smoke (road_smoke.gd). Admin mode opens
+# Darwaza is sealed and the road ends are closed with barricades (road_block.gd). Admin mode opens
 # them. It is on when the game runs from the Godot editor, with the --admin argument, or
 # when a file named admin.txt sits beside the .exe (or in the game's user folder).
 static func enabled() -> bool:

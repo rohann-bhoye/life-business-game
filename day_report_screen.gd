@@ -2,13 +2,14 @@ extends Control
 
 # Full-screen end-of-day report shown after sleeping. The game stays paused (time,
 # customers, player) until the player presses Space/Enter or the Start button.
-const UiStyle := preload("res://ui_style.gd")
 const KenneyTheme := preload("res://kenney_theme.gd")
 const Catalog := preload("res://product_catalog.gd")
 const DayReport := preload("res://day_report.gd")
-const GREEN := Color("4ade80")
-const RED := Color("f87171")
-const MUTED := Color("94a3b8")
+const Bazaar := preload("res://ui_bazaar.gd")
+const GREEN := Bazaar.GREEN_DEEP
+const RED := Bazaar.RED_DEEP
+const MUTED := Bazaar.MUTED
+const INK := Bazaar.INK
 
 var business
 var format_money: Callable
@@ -35,16 +36,18 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	hide()
 	shade = ColorRect.new()
-	shade.color = Color(0.01, 0.02, 0.05, 0.72)
+	# The pause menu's look (ui_bazaar.gd) over a warm dim.
+	theme = Bazaar.make_theme()
+	shade.color = Color(0.05, 0.03, 0.02, 0.6)
 	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(shade)
 	panel = Panel.new()
-	panel.add_theme_stylebox_override("panel", UiStyle.glass_box(0.94))
+	panel.add_theme_stylebox_override("panel", Bazaar.card())
 	add_child(panel)
 	form = VBoxContainer.new()
 	form.add_theme_constant_override("separation", 10)
 	panel.add_child(form)
-	title = _label("", 26, Color.WHITE, form)
+	title = _label("", 26, INK, form)
 	title.name = "Title"
 	title.add_theme_font_override("font", KenneyTheme.heading_font())
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -60,14 +63,14 @@ func _ready() -> void:
 	form.add_child(columns)
 	income = _column("INCOME", GREEN, columns)
 	costs = _column("EXPENSES", RED, columns)
-	status_label = _label("", 14, Color.WHITE, form)
+	status_label = _label("", 14, INK, form)
 	status_label.name = "Status"
-	team_label = _label("", 14, Color("fde68a"), form)
+	team_label = _label("", 14, Bazaar.SAFFRON_DEEP, form)
 	team_label.name = "Team"
 	team_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tomorrow = _label("", 14, Color("93c5fd"), form)
+	tomorrow = _label("", 14, Color("158a84"), form)
 	tomorrow.name = "Tomorrow"
-	tip = _label("", 14, Color("fcd34d"), form)
+	tip = _label("", 14, Bazaar.SAFFRON_DEEP, form)
 	tip.name = "Tip"
 	start_button = Button.new()
 	start_button.name = "StartDayButton"
@@ -89,7 +92,7 @@ func _label(text: String, font_size: int, colour: Color, parent: Control) -> Lab
 func _column(heading: String, colour: Color, parent: Control) -> GridContainer:
 	var box := PanelContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var style := UiStyle.box(Color(1, 1, 1, 0.05), 10)
+	var style := Bazaar.box(Bazaar.CARD, 2, 10, Bazaar.LINE)
 	style.content_margin_left = 12
 	style.content_margin_right = 12
 	style.content_margin_top = 8
@@ -110,8 +113,8 @@ func _column(heading: String, colour: Color, parent: Control) -> GridContainer:
 func _money(value: int) -> String:
 	return String.chr(8377) + (format_money.call(value) if format_money.is_valid() else str(value))
 
-func _row(grid: GridContainer, text: String, value: String, colour := Color.WHITE) -> void:
-	_label(text, 14, Color("cbd5e1"), grid).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+func _row(grid: GridContainer, text: String, value: String, colour := INK) -> void:
+	_label(text, 14, Color("5a4434"), grid).size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_label(value, 14, colour, grid).horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 func is_open() -> bool:
@@ -126,7 +129,7 @@ func open(business_ref, money_format := Callable(), team: Array = []) -> bool:
 	var profit: int = int(report.profit)
 	title.text = "END OF DAY %d" % report.day
 	result.text = ("PROFIT  +%s" if profit > 0 else "LOSS  -%s" if profit < 0 else "NO PROFIT  %s") % _money(absi(profit))
-	var banner := UiStyle.box(Color(0.09, 0.4, 0.2, 0.85) if profit > 0 else Color(0.5, 0.11, 0.11, 0.85) if profit < 0 else Color(0.25, 0.3, 0.36, 0.85), 10)
+	var banner := Bazaar.box(GREEN if profit > 0 else RED if profit < 0 else MUTED, 2, 10)
 	banner.content_margin_top = 6
 	banner.content_margin_bottom = 6
 	result_box.add_theme_stylebox_override("panel", banner)
@@ -137,12 +140,12 @@ func open(business_ref, money_format := Callable(), team: Array = []) -> bool:
 	_row(income, "Sales revenue", _money(int(report.revenue)), GREEN)
 	_row(income, "Items sold", str(report.items_sold))
 	_row(income, "Best seller", "%s (%d)" % [Catalog.NAMES[report.best], report.best_count] if report.best != "" else "none")
-	_row(income, "Missed sales", str(report.missed), RED if int(report.missed) > 0 else Color.WHITE)
+	_row(income, "Missed sales", str(report.missed), RED if int(report.missed) > 0 else INK)
 	var breakdown: Dictionary = report.get("costs", {})
 	for key in DayReport.COSTS:
 		if int(breakdown.get(key, 0)) != 0: _row(costs, DayReport.COST_NAMES[key], _money(int(breakdown[key])))
 	if int(report.expenses) == 0: _row(costs, "No spending today", "")
-	_row(costs, "Total", _money(int(report.expenses)), RED if int(report.expenses) > 0 else Color.WHITE)
+	_row(costs, "Total", _money(int(report.expenses)), RED if int(report.expenses) > 0 else INK)
 	var change: int = int(report.reputation_change)
 	status_label.text = "Money now: %s   |   Reputation: %d/100 (%s%d)   |   New reviews: %d" % [_money(int(business.money)), report.reputation, "+" if change >= 0 else "", change, report.reviews]
 	if business.loan_left() > 0: status_label.text += "\nBank loan left: %s (%s per day)" % [_money(business.loan_left()), _money(business.loan_daily_payment())]
@@ -157,6 +160,7 @@ func open(business_ref, money_format := Callable(), team: Array = []) -> bool:
 " + "
 ".join(team.map(func(entry): return "%s: sold %s to %d customer%s, shelved %d item%s" % [entry[0], _money(int(entry[1])), int(entry[2]), "" if int(entry[2]) == 1 else "s", int(entry[3]), "" if int(entry[3]) == 1 else "s"]))
 	start_button.text = "START DAY %d" % next_day
+	preload("res://pause_menu.gd").hide_overlays(get_parent())
 	move_to_front()
 	show()
 	_layout()
@@ -190,7 +194,7 @@ func _layout() -> void:
 	for label in [status_label, team_label, tomorrow, tip]:
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.custom_minimum_size.x = width - 48
-	form.position = Vector2(24, 20)
+	form.position = Vector2(24, 26)
 	form.size = Vector2(width - 48, 0)
 	form.reset_size()
 	panel.size = Vector2(width, form.get_combined_minimum_size().y + 40)

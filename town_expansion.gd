@@ -63,28 +63,55 @@ func unlock_future_town() -> void:
 func _box(node_name: String, size: Vector3, position: Vector3, colour: Color, solid := false, parent: Node3D = null) -> MeshInstance3D:
 	return town._box(node_name, town if parent == null else parent, size, position, colour, solid)
 
+## Side roads that join the Main Road, as [x from, x to]: the market street and the two
+## colony lanes. The Main Road's pavements and edge lines stop at each mouth, so the side
+## road's asphalt meets the Main Road's with no kerb across it.
+func _mouths() -> Array:
+	var plan := preload("res://town_plan.gd")
+	var mouths := [[MARKET_X - 2.75, MARKET_X + 2.75]]
+	for colony in plan.COLONIES: mouths.append([colony.x - plan.LANE_W / 2.0, colony.x + plan.LANE_W / 2.0])
+	return mouths
+
 func _roads() -> void:
 	var road_material := _road_material()
 	var paving := Color(0.66, 0.69, 0.67)
+	var white := Color(0.83, 0.86, 0.83)
+	var mouths := _mouths()
 	for side in [-1, 1]:
 		var road := _box("RoadExtension%d" % side, Vector3(43, 0.012, 5.5), Vector3(side * 53.5, 0.111, 7), Color(0.16, 0.18, 0.19))
 		if road_material != null: road.material_override = road_material
-		_box("NorthPavementExt%d" % side, StreetKit.pavement_size(43, 1.6), StreetKit.pavement_at(side * 53.5, 3.4), paving)
-		_box("SouthPavementExt%d" % side, StreetKit.pavement_size(43, 1.6), StreetKit.pavement_at(side * 53.5, 10.6), paving)
-		for z in [4.35, 9.65]: _box("RoadEdgeExt%d_%s" % [side, z], Vector3(43, 0.008, 0.05), Vector3(side * 53.5, 0.124, z), Color(0.83, 0.86, 0.83))
+		var start: float = 32.0 if side > 0 else -75.0
+		for piece in StreetKit.pieces(start, start + 43.0, mouths):
+			var length: float = piece[1] - piece[0]
+			var middle: float = (piece[0] + piece[1]) / 2.0
+			_box("NorthPavementExt%d_%d" % [side, roundi(middle)], StreetKit.pavement_size(length, 1.6), StreetKit.pavement_at(middle, 3.4), paving)
+			_box("SouthPavementExt%d_%d" % [side, roundi(middle)], StreetKit.pavement_size(length, 1.6), StreetKit.pavement_at(middle, 10.6), paving)
+			for z in [4.35, 9.65]: _box("RoadEdgeExt%d_%d_%s" % [side, roundi(middle), z], Vector3(length, 0.008, 0.05), Vector3(middle, 0.124, z), white)
 		for step in range(10):
 			var x: float = side * (34.0 + step * 4.0)
 			_box("LaneMark%s" % x, Vector3(1.8, 0.008, 0.09), Vector3(x, 0.124, 7), Color(0.88, 0.86, 0.68))
+	# Give-way lines where each side road meets the Main Road, across the half that drives
+	# towards it (traffic keeps left).
+	for mouth in mouths:
+		var centre: float = (mouth[0] + mouth[1]) / 2.0
+		var half: float = (mouth[1] - mouth[0]) / 2.0
+		_box("GiveWayN%d" % roundi(centre), Vector3(half - 0.25, 0.008, 0.3), Vector3(centre + half / 2.0, 0.124, 3.6), white, false, future)
+		_box("GiveWayS%d" % roundi(centre), Vector3(half - 0.25, 0.008, 0.3), Vector3(centre - half / 2.0, 0.124, 10.4), white, false, future)
 	# Market street crossing the main road in the east (future phase).
 	for part in [[-21.3, 51.3], [33.8, 48.3]]:
 		var road := _box("MarketStreet%s" % part[0], Vector3(5.5, 0.012, part[1]), Vector3(MARKET_X, 0.111, part[0]), Color(0.16, 0.18, 0.19), false, future)
 		if road_material != null: road.material_override = road_material
 	for side in [-1, 1]:
 		_box("MarketPavementN%d" % side, StreetKit.pavement_size(1.6, 50.0), StreetKit.pavement_at(MARKET_X + side * 3.55, -22.4), paving, false, future)
-		_box("MarketPavementS%d" % side, StreetKit.pavement_size(1.6, 46.0), StreetKit.pavement_at(MARKET_X + side * 3.55, 34.4), paving, false, future)
+		# The west pavement stops at the mouth of Airport Road.
+		var gaps := [[AIRPORT_ROAD_Z - 2.75, AIRPORT_ROAD_Z + 2.75]] if side < 0 else []
+		for piece in StreetKit.pieces(11.4, 57.4, gaps):
+			var length: float = piece[1] - piece[0]
+			_box("MarketPavementS%d_%d" % [side, roundi(piece[0])], StreetKit.pavement_size(1.6, length), StreetKit.pavement_at(MARKET_X + side * 3.55, (piece[0] + piece[1]) / 2.0), paving, false, future)
 	for stripe in range(7):
 		_box("MarketCrossing%d" % stripe, Vector3(2.0, 0.008, 0.28), Vector3(MARKET_X - 5.5, 0.124, 4.8 + stripe * 0.7), Color(0.85, 0.87, 0.83), false, future)
-	for x in [-70.0, -58.0, -46.0, 38.0, 62.0, 70.0]:
+	# Lamps stand on the pavements, clear of the junction mouths.
+	for x in [-70.0, -58.0, -46.0, 38.0, 57.0, 70.0]:
 		town._streetlight(Vector3(x, 0.1, 3.3), 0.0, false)
 		town._streetlight(Vector3(x + 1.0, 0.1, 10.7), PI, false)
 

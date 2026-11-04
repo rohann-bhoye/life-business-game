@@ -8,6 +8,7 @@ extends Control
 signal closed
 
 const KenneyTheme = preload("res://kenney_theme.gd")
+const Bazaar := preload("res://ui_bazaar.gd")
 const SEEN_FILE := "user://help.cfg"
 const PAGES := [
 	{"picture": "shop", "title": "Your own kirana shop", "text": "Welcome to Apna Mart in Dholkarpur Gaon! Buy stock, fill the shelves, serve customers and grow a small kirana into a Mega Mart.", "keys": []},
@@ -41,25 +42,26 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var page_theme := Theme.new()
-	page_theme.default_font_size = 16
-	KenneyTheme.apply(page_theme)
-	theme = page_theme
+	# The pause menu's look (ui_bazaar.gd): a cream card with a saffron header.
+	theme = Bazaar.make_theme()
 	var shade := ColorRect.new()
-	shade.color = Color(0.01, 0.02, 0.04, 0.78)
+	shade.color = Color(0.05, 0.03, 0.02, 0.6)
 	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(shade)
 	card = Panel.new()
-	card.add_theme_stylebox_override("panel", _round(Color("f8fafc"), 16))
+	var card_style := Bazaar.box(Bazaar.CREAM, 3, 16)
+	card_style.shadow_color = Color(0, 0, 0, 0.35)
+	card_style.shadow_size = 26
+	card.add_theme_stylebox_override("panel", card_style)
 	add_child(card)
 	var header := Panel.new()
 	header.name = "Header"
-	header.add_theme_stylebox_override("panel", _round(Color("0f766e"), 16, true))
+	header.add_theme_stylebox_override("panel", _round(Bazaar.SAFFRON, 14, true))
 	card.add_child(header)
 	var heading := _label(header, "HOW TO PLAY", 22, Color.WHITE)
 	heading.name = "Heading"
 	heading.add_theme_font_override("font", KenneyTheme.heading_font())
-	counter = _label(header, "", 15, Color("ccfbf1"))
+	counter = _label(header, "", 15, Color("ffe9cc"))
 	counter.name = "Counter"
 	counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	close_button = Button.new()
@@ -71,17 +73,17 @@ func _ready() -> void:
 	var frame := Panel.new()
 	frame.name = "PictureFrame"
 	frame.clip_contents = true
-	frame.add_theme_stylebox_override("panel", _round(Color("0f172a"), 12))
+	frame.add_theme_stylebox_override("panel", Bazaar.box(Bazaar.INK, 3, 12))
 	card.add_child(frame)
 	picture = TextureRect.new()
 	picture.name = "Picture"
 	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	frame.add_child(picture)
-	title = _label(card, "", 24, Color("0f172a"))
+	title = _label(card, "", 24, Bazaar.INK)
 	title.name = "Title"
 	title.add_theme_font_override("font", KenneyTheme.heading_font())
-	body = _label(card, "", 16, Color("334155"))
+	body = _label(card, "", 16, Color("5a4434"))
 	body.name = "Body"
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	keys = HBoxContainer.new()
@@ -138,8 +140,9 @@ func _layout() -> void:
 	card.position = ((view - Vector2(width, height)) / 2.0).floor()
 	card.size = Vector2(width, height)
 	var header: Panel = card.get_node("Header")
-	header.position = Vector2.ZERO
-	header.size = Vector2(width, 54)
+	# Inside the card's outline.
+	header.position = Vector2(3, 3)
+	header.size = Vector2(width - 6, 51)
 	header.get_node("Heading").position = Vector2(20, 12)
 	header.get_node("Heading").size = Vector2(width * 0.5, 30)
 	counter.position = Vector2(width - 250, 16)
@@ -196,16 +199,16 @@ func show_page(index: int) -> void:
 		chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		chip.custom_minimum_size = Vector2(maxf(44, key.length() * 11 + 22), 32)
 		chip.add_theme_font_size_override("font_size", 14)
-		chip.add_theme_color_override("font_color", Color("0f172a"))
+		chip.add_theme_color_override("font_color", Bazaar.INK)
 		var style := _round(Color.WHITE, 6)
-		style.border_color = Color("94a3b8")
+		style.border_color = Bazaar.INK
 		style.set_border_width_all(2)
 		style.border_width_bottom = 4
 		chip.add_theme_stylebox_override("normal", style)
 		keys.add_child(chip)
 	for dot_index in range(dots.get_child_count()):
 		var dot: Panel = dots.get_child(dot_index)
-		dot.add_theme_stylebox_override("panel", _round(Color("0f766e") if dot_index == page else Color("cbd5e1"), 5))
+		dot.add_theme_stylebox_override("panel", _round(Bazaar.SAFFRON if dot_index == page else Bazaar.LINE, 5))
 	back_button.disabled = page == 0
 	next_button.text = "Start playing" if page == PAGES.size() - 1 else "Next"
 

@@ -48,7 +48,7 @@ func build(owner: Node3D) -> void:
 	details.begin(Mesh.PRIMITIVE_TRIANGLES)
 	poles.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for colony in COLONIES: _colony(colony)
-	_road_smoke()
+	_road_blocks()
 	_streets()
 	_commit(details, "ColonyDetails", IndianHouse._material())
 	_commit(poles, "ColonyPoles", IndianHouse._material())
@@ -176,19 +176,10 @@ func _streets() -> void:
 
 func _turnaround(centre: Vector3, label: String) -> void:
 	var road_material: Material = expansion._road_material()
-	var kerb := MeshInstance3D.new()
-	kerb.name = "Turn%sKerb" % label
-	var kerb_disc := CylinderMesh.new()
-	kerb_disc.top_radius = 8.4
-	kerb_disc.bottom_radius = 8.4
-	kerb_disc.height = StreetKit.PAVE_THICK
-	kerb_disc.radial_segments = 40
 	var paving := StandardMaterial3D.new()
 	paving.albedo_color = PAVING
-	kerb_disc.material = paving
-	kerb.mesh = kerb_disc
-	kerb.position = centre + Vector3(0, StreetKit.PAVE_Y, 0)
-	future.add_child(kerb)
+	# The road comes in from the town side; the North Road is wider than the lanes.
+	_kerb_ring(centre, -signf(centre.z), 2.75 if label == "NorthRoad" else LANE_W / 2.0)
 	var road := MeshInstance3D.new()
 	road.name = "Turn%sRoad" % label
 	var disc := CylinderMesh.new()
@@ -216,10 +207,41 @@ func _turnaround(centre: Vector3, label: String) -> void:
 	future.add_child(island)
 	expansion.town._tree(centre + Vector3(0, 0.1, 0))
 
-## Smoke across the three road ends that lead out to unfinished land: the two welcome gates
-## on the Main Road and the far end of the North Road (road_smoke.gd; admin mode skips it).
-func _road_smoke() -> void:
-	var smoke := preload("res://road_smoke.gd")
-	smoke.build(expansion, future, Vector3(72.0, 0.0, 7.0), Vector3(1, 0, 0), "East")
-	smoke.build(expansion, future, Vector3(-72.0, 0.0, 7.0), Vector3(-1, 0, 0), "West")
-	smoke.build(expansion, future, Vector3(50.0, 0.0, -246.5), Vector3(0, 0, -1), "North")
+## The pavement round a turning circle: a flat ring from radius 7 to 8.4 with its kerb
+## faces (it used to be a full disc that hid the asphalt), open where the road comes in
+## (`toward` is the road's side along z, `opening` its half width) so the asphalt runs on.
+func _kerb_ring(centre: Vector3, toward: float, opening: float) -> void:
+	var inner := 7.0
+	var outer := 8.4
+	var low := Vector3(0, 0.1, 0)
+	var high := Vector3(0, StreetKit.PAVE_TOP, 0)
+	var segments := 72
+	var open := []
+	for index in range(segments):
+		var middle := (index + 0.5) * TAU / segments
+		open.append(sin(middle) * toward > 0.0 and absf(cos(middle)) * inner < opening)
+	for index in range(segments):
+		if open[index]: continue
+		var a0 := index * TAU / segments
+		var a1 := (index + 1) * TAU / segments
+		var d0 := Vector3(cos(a0), 0, sin(a0))
+		var d1 := Vector3(cos(a1), 0, sin(a1))
+		var middle := Vector3(cos((a0 + a1) / 2.0), 0, sin((a0 + a1) / 2.0))
+		IndianHouse._quad(details, centre + d0 * inner + high, centre + d1 * inner + high, centre + d1 * outer + high, centre + d0 * outer + high, Vector3.UP, PAVING)
+		IndianHouse._quad(details, centre + d0 * inner + low, centre + d1 * inner + low, centre + d1 * inner + high, centre + d0 * inner + high, -middle, PAVING)
+		IndianHouse._quad(details, centre + d0 * outer + low, centre + d1 * outer + low, centre + d1 * outer + high, centre + d0 * outer + high, middle, PAVING)
+		# Closed ends beside the road's mouth.
+		for end in [[a1, open[(index + 1) % segments], 1.0], [a0, open[(index - 1 + segments) % segments], -1.0]]:
+			if not end[1]: continue
+			var angle: float = end[0]
+			var d := Vector3(cos(angle), 0, sin(angle))
+			var side: Vector3 = Vector3(-sin(angle), 0, cos(angle)) * float(end[2])
+			IndianHouse._quad(details, centre + d * inner + low, centre + d * outer + low, centre + d * outer + high, centre + d * inner + high, side, PAVING)
+
+## "Road closed" barricades just outside the two welcome gates on the Main Road, where it
+## leads out to unfinished land (road_block.gd; admin mode skips them). The North Road is
+## already closed at the edge of town (neighbourhood.gd _close_north).
+func _road_blocks() -> void:
+	var block := preload("res://road_block.gd")
+	block.build(future, Vector3(70.0, 0.0, 7.0), Vector3(1, 0, 0), "East", "Aage kaam chalu hai")
+	block.build(future, Vector3(-70.0, 0.0, 7.0), Vector3(-1, 0, 0), "West", "Aage kaam chalu hai")

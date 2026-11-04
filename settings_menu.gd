@@ -6,7 +6,7 @@ extends Panel
 # and the options it sets underneath; changing any of them makes the preset Custom.
 signal closed
 const Settings := preload("res://game_settings.gd")
-const MenuSkin := preload("res://menu_skin.gd")
+const Bazaar := preload("res://ui_bazaar.gd")
 const RENDER_SCALES := [0.5, 0.6, 0.75, 0.85, 1.0]
 const FPS_LIMITS := [30, 60, 120, 0]
 const PRESET_HELP := [
@@ -37,12 +37,17 @@ var status: Label
 var form: VBoxContainer
 var scroll: ScrollContainer
 var footer: HBoxContainer
+var dim: ColorRect
 var detected := 0
 
 func _ready() -> void:
 	hide()
-	# Dark glass panel (lobby style) so the white labels are readable everywhere.
-	add_theme_stylebox_override("panel", preload("res://ui_style.gd").glass_box(0.92))
+	# The pause menu's look (ui_bazaar.gd): a cream card with a saffron top, outlined
+	# buttons, green switches and saffron sliders, over a dimmed screen.
+	theme = Bazaar.make_theme()
+	add_theme_stylebox_override("panel", Bazaar.card())
+	dim = Bazaar.dim()
+	add_child(dim)
 	scroll = ScrollContainer.new()
 	scroll.follow_focus = true
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -54,31 +59,24 @@ func _ready() -> void:
 	var title := _label("SETTINGS", 26)
 	title.add_theme_font_override("font", preload("res://kenney_theme.gd").heading_font())
 	title.name = "Title"
+	var hint := _label("Changes take effect when you press Apply.", 13)
+	hint.add_theme_color_override("font_color", Bazaar.MUTED)
 	_section("SOUND")
-	volume = _slider("Master volume", 0, 100, 1)
-	music = _slider("Music volume", 0, 100, 1)
+	volume = _slider("Master volume", 0, 100, 1, "%")
+	music = _slider("Music volume", 0, 100, 1, "%")
 	_section("CONTROLS")
 	sensitivity = _slider("Look sensitivity", 1, 10, 0.5)
-	fov = _slider("Camera FOV", 50, 90, 1)
+	fov = _slider("Camera FOV", 50, 90, 1, String.chr(176))
 	invert = _check("Invert vertical look")
 	_section("GAMEPLAY")
 	day_length = _choice("Day length", ["Fast (6 min)", "Normal (9 min)", "Relaxed (12 min)"])
-	var day_help := Label.new()
-	day_help.text = "How long the shop day (8 AM to 8 PM) lasts in real time."
-	day_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	day_help.add_theme_font_size_override("font_size", 13)
-	day_help.add_theme_color_override("font_color", Color(0.72, 0.8, 0.86))
-	form.add_child(day_help)
+	_help("How long the shop day (8 AM to 8 PM) lasts in real time.")
 	_section("GRAPHICS")
 	graphics = _choice("Preset", ["Auto", "Low", "Normal", "High", "Custom"])
 	graphics.name = "GraphicsPreset"
 	graphics.item_selected.connect(_on_preset)
-	preset_help = Label.new()
+	preset_help = _help("")
 	preset_help.name = "PresetHelp"
-	preset_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	preset_help.add_theme_font_size_override("font_size", 13)
-	preset_help.add_theme_color_override("font_color", Color(0.72, 0.8, 0.86))
-	form.add_child(preset_help)
 	render_scale = _choice("3D resolution", RENDER_SCALES.map(func(value): return "%d%%" % roundi(value * 100)))
 	shadows = _choice("Shadows", ["Off", "Short", "Far"])
 	grass = _choice("Grass", ["Off", "Light", "Medium", "Full"])
@@ -92,24 +90,29 @@ func _ready() -> void:
 	fps_limit = _choice("FPS limit", ["30", "60", "120", "Unlimited"])
 	show_fps = _check("Show FPS")
 	status = Label.new()
-	status.add_theme_font_size_override("font_size", 14)
-	status.add_theme_color_override("font_color", Color("86efac"))
+	status.name = "Status"
+	status.add_theme_font_size_override("font_size", 13)
 	add_child(status)
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	footer = HBoxContainer.new()
 	footer.add_theme_constant_override("separation", 10)
 	add_child(footer)
 	var apply := Button.new()
+	apply.name = "ApplyButton"
 	apply.text = "Apply"
-	apply.icon = MenuSkin.texture("checkmark", 16)
-	apply.custom_minimum_size.y = 40
+	apply.custom_minimum_size.y = 44
+	apply.add_theme_font_size_override("font_size", 17)
 	apply.theme_type_variation = "PrimaryButton"
+	apply.focus_mode = Control.FOCUS_NONE
 	apply.pressed.connect(_apply)
 	apply.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	footer.add_child(apply)
 	var back := Button.new()
+	back.name = "BackButton"
 	back.text = "Back"
-	back.custom_minimum_size.y = 40
+	back.custom_minimum_size.y = 44
+	back.add_theme_font_size_override("font_size", 17)
+	back.focus_mode = Control.FOCUS_NONE
 	back.pressed.connect(close_menu)
 	back.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	footer.add_child(back)
@@ -120,80 +123,103 @@ func _label(text: String, size: int) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_font_size_override("font_size", size)
-	label.add_theme_color_override("font_color", Color(0.95, 0.97, 0.98))
 	form.add_child(label)
 	return label
 
-## A small coloured heading with a thin line, between groups of settings.
+## A muted line of help under a setting.
+func _help(text: String) -> Label:
+	var help := _label(text, 13)
+	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	help.add_theme_color_override("font_color", Bazaar.MUTED)
+	return help
+
+## A small saffron heading with a thin line, between groups of settings.
 func _section(text: String) -> void:
 	var gap := Control.new()
-	gap.custom_minimum_size.y = 4
+	gap.custom_minimum_size.y = 6
 	form.add_child(gap)
 	var heading := _label(text, 14)
-	heading.add_theme_color_override("font_color", Color("fbbf24"))
+	heading.add_theme_font_override("font", preload("res://kenney_theme.gd").heading_font())
+	heading.add_theme_color_override("font_color", Bazaar.SAFFRON_DEEP)
 	var line := ColorRect.new()
-	line.color = Color(1, 1, 1, 0.14)
-	line.custom_minimum_size.y = 1
+	line.color = Bazaar.LINE
+	line.custom_minimum_size.y = 2
 	form.add_child(line)
 
-func _slider(title: String, minimum: float, maximum: float, step: float) -> HSlider:
-	var label := _label(title, 16)
-	var slider := HSlider.new()
-	slider.name = title.replace(" ", "") + "Slider"
-	slider.min_value = minimum
-	slider.max_value = maximum
-	slider.step = step
-	slider.custom_minimum_size.y = 20
-	slider.value_changed.connect(func(value): label.text = "%s: %s" % [title, str(value)])
-	form.add_child(slider)
-	return slider
-
-## A row with the setting's name on the left and `control` on the right. Rows use
-## the plain label font (the pixel button font has no "%" and shouts in capitals).
-func _row(title: String, control: Control) -> void:
+## The setting's name with its value on the right, and the slider underneath. The value
+## always shows (also at 0, which never fires value_changed).
+func _slider(title: String, minimum: float, maximum: float, step: float, unit := "") -> HSlider:
 	var row := HBoxContainer.new()
 	form.add_child(row)
 	var label := Label.new()
 	label.text = title
 	label.add_theme_font_size_override("font_size", 16)
-	label.add_theme_color_override("font_color", Color(0.95, 0.97, 0.98))
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(label)
-	var font := label.get_theme_font("font")
-	control.add_theme_font_override("font", font)
+	var amount := Label.new()
+	amount.name = "Value"
+	amount.add_theme_font_size_override("font_size", 15)
+	amount.add_theme_color_override("font_color", Bazaar.SAFFRON_DEEP)
+	row.add_child(amount)
+	var slider := HSlider.new()
+	slider.name = title.replace(" ", "") + "Slider"
+	slider.min_value = minimum
+	slider.max_value = maximum
+	slider.step = step
+	slider.custom_minimum_size.y = 26
+	slider.focus_mode = Control.FOCUS_NONE
+	var show := func(value: float): amount.text = ("%d%s" % [roundi(value), unit]) if step >= 1.0 else "%.1f%s" % [value, unit]
+	slider.value_changed.connect(show)
+	show.call(slider.value)
+	form.add_child(slider)
+	return slider
+
+## A row with the setting's name on the left and `control` on the right.
+func _row(title: String, control: Control) -> void:
+	var row := HBoxContainer.new()
+	row.custom_minimum_size.y = 36
+	form.add_child(row)
+	var label := Label.new()
+	label.text = title
+	label.add_theme_font_size_override("font_size", 16)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(label)
 	control.add_theme_font_size_override("font_size", 15)
-	if control is OptionButton:
-		control.get_popup().add_theme_font_override("font", font)
-		control.get_popup().add_theme_font_size_override("font_size", 15)
+	control.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if control is OptionButton: control.get_popup().add_theme_font_size_override("font_size", 15)
 	row.add_child(control)
 
 func _choice(title: String, items: Array) -> OptionButton:
 	var option := OptionButton.new()
 	option.name = title.replace(" ", "") + "Option"
 	for item in items: option.add_item(item)
-	option.custom_minimum_size = Vector2(150, 32)
+	option.custom_minimum_size = Vector2(170, 36)
+	option.focus_mode = Control.FOCUS_NONE
 	_row(title, option)
 	return option
 
 func _check(title: String) -> CheckButton:
 	var check := CheckButton.new()
 	check.name = title.replace(" ", "").replace(",", "") + "Check"
+	check.focus_mode = Control.FOCUS_NONE
 	_row(title, check)
 	return check
 
 func _layout() -> void:
 	var viewport_size := get_viewport().get_visible_rect().size
-	var width := minf(440, viewport_size.x - 32)
-	var height := minf(viewport_size.y - 32, form.get_combined_minimum_size().y + 128)
+	var width := minf(460, viewport_size.x - 32)
+	var height := minf(viewport_size.y - 32, form.get_combined_minimum_size().y + 132)
 	size = Vector2(width, height)
 	position = (viewport_size - size) / 2
-	scroll.position = Vector2(20, 20)
-	scroll.size = Vector2(width - 40, height - 128)
-	form.custom_minimum_size.x = width - 56
-	status.position = Vector2(20, height - 92)
-	status.size = Vector2(width - 40, 24)
-	footer.position = Vector2(20, height - 60)
-	footer.size = Vector2(width - 40, 40)
+	scroll.position = Vector2(24, 24)
+	scroll.size = Vector2(width - 40, height - 132)
+	form.custom_minimum_size.x = width - 64
+	status.position = Vector2(24, height - 98)
+	status.size = Vector2(width - 48, 22)
+	footer.position = Vector2(24, height - 66)
+	footer.size = Vector2(width - 48, 44)
+	Bazaar.cover(dim, self)
 
 func open_menu(path: String) -> void:
 	settings_path = path
@@ -215,8 +241,12 @@ func open_menu(path: String) -> void:
 	invert.set_pressed_no_signal(settings.invert_y)
 	day_length.select(settings.day_length)
 	status.text = "Graphics card: %s" % RenderingServer.get_video_adapter_name()
+	status.add_theme_color_override("font_color", Bazaar.MUTED)
 	status.tooltip_text = status.text
 	status.clip_text = true
+	scroll.scroll_vertical = 0
+	# Drawn above everything else in its layer (the HUD, name tags, the lobby).
+	move_to_front()
 	show()
 	_layout()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -265,6 +295,7 @@ func _apply() -> void:
 	settings.day_length = day_length.selected
 	if not settings.save_file(settings_path):
 		status.text = "Could not save settings."
+		status.add_theme_color_override("font_color", Bazaar.RED_DEEP)
 		return
 	settings.apply_global()
 	var player = get_tree().current_scene.get_node_or_null("Player")

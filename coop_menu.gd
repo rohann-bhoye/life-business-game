@@ -7,6 +7,7 @@ extends Panel
 # choices are remembered in lobby.cfg. main_menu.gd launches the game.
 signal closed
 const Coop := preload("res://coop.gd")
+const Bazaar := preload("res://ui_bazaar.gd")
 const JOIN_TIMEOUT := 10.0
 var lobby: Control
 var name_edit: LineEdit
@@ -22,13 +23,15 @@ var connecting := 0.0
 
 func _ready() -> void:
 	hide()
-	add_theme_stylebox_override("panel", preload("res://ui_style.gd").glass_box(0.92))
+	# The pause menu's look (ui_bazaar.gd), like every other menu.
+	theme = Bazaar.make_theme()
+	add_theme_stylebox_override("panel", Bazaar.card())
 	form = VBoxContainer.new()
 	form.add_theme_constant_override("separation", 8)
 	add_child(form)
 	var title := _label("CO-OP", 26)
 	title.add_theme_font_override("font", preload("res://kenney_theme.gd").heading_font())
-	_label("Run one shop together with up to 3 friends.", 15).add_theme_color_override("font_color", Color(0.72, 0.8, 0.86))
+	_label("Run one shop together with up to 3 friends.", 15).add_theme_color_override("font_color", Bazaar.MUTED)
 	name_edit = LineEdit.new()
 	name_edit.name = "NameEdit"
 	name_edit.placeholder_text = "Your name"
@@ -49,7 +52,7 @@ func _ready() -> void:
 	code_label = Label.new()
 	code_label.name = "CodeLabel"
 	code_label.add_theme_font_size_override("font_size", 16)
-	code_label.add_theme_color_override("font_color", Color("fde68a"))
+	code_label.add_theme_color_override("font_color", Bazaar.SAFFRON_DEEP)
 	code_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	code_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	code_row.add_child(code_label)
@@ -59,9 +62,9 @@ func _ready() -> void:
 	copy_button.custom_minimum_size = Vector2(80, 34)
 	copy_button.pressed.connect(_copy_code)
 	code_row.add_child(copy_button)
-	_label("Share your code. Friends in other homes use a free virtual LAN like Radmin VPN or ZeroTier; on the same Wi-Fi it just works.", 13).add_theme_color_override("font_color", Color(0.72, 0.8, 0.86))
+	_label("Share your code. Friends in other homes use a free virtual LAN like Radmin VPN or ZeroTier; on the same Wi-Fi it just works.", 13).add_theme_color_override("font_color", Bazaar.MUTED)
 	var line := ColorRect.new()
-	line.color = Color(1, 1, 1, 0.14)
+	line.color = Bazaar.LINE
 	line.custom_minimum_size.y = 1
 	form.add_child(line)
 	address_edit = LineEdit.new()
@@ -77,13 +80,13 @@ func _ready() -> void:
 	form.add_child(join_button)
 	status = _label("", 14)
 	status.name = "Status"
-	status.add_theme_color_override("font_color", Color("86efac"))
+	status.add_theme_color_override("font_color", Bazaar.SAFFRON_DEEP)
 	var back := Button.new()
 	back.text = "Back"
 	back.custom_minimum_size.y = 40
 	back.pressed.connect(close_menu)
 	form.add_child(back)
-	# The pixel button font is wide: clip rather than push the panel wider.
+	# Long button words clip rather than push the panel wider.
 	for button in [host_button, join_button]: button.clip_text = true
 	get_viewport().size_changed.connect(_layout)
 	# Wrapped text settles its height later; fit the panel whenever it does.
@@ -93,7 +96,6 @@ func _label(text: String, size: int) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_font_size_override("font_size", size)
-	label.add_theme_color_override("font_color", Color(0.95, 0.97, 0.98))
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	form.add_child(label)
 	return label
@@ -104,11 +106,9 @@ func _row(title: String, control: Control) -> void:
 	var label := Label.new()
 	label.text = title
 	label.add_theme_font_size_override("font_size", 16)
-	label.add_theme_color_override("font_color", Color(0.95, 0.97, 0.98))
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(label)
 	control.custom_minimum_size = Vector2(190, 34)
-	control.add_theme_font_override("font", label.get_theme_font("font"))
 	control.add_theme_font_size_override("font_size", 15)
 	row.add_child(control)
 

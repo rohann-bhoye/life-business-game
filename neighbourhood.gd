@@ -48,21 +48,8 @@ func _ready() -> void:
 func _close_north() -> void:
 	var wall_z := -57.0
 	_collider("NorthClosedWall", self, Vector3(Edge.LAND_MAX_X - Edge.LAND_MIN_X, 60, 0.4), Vector3(0, 20, wall_z))
-	var road_x := 50.0
-	for side in [-1, 1]:
-		_box("BarrierPost%d" % side, self, Vector3(0.25, 1.3, 0.25), Vector3(road_x + side * 5.2, 0.65, wall_z + 1.5), Color(0.9, 0.9, 0.9), false)
-	for i in range(5):
-		var stripe := Color(0.85, 0.12, 0.1) if i % 2 == 0 else Color(0.95, 0.95, 0.95)
-		_box("BarrierBar%d" % i, self, Vector3(2.08, 0.28, 0.12), Vector3(road_x - 4.16 + i * 2.08, 1.05, wall_z + 1.5), stripe, false)
-	var sign_label := Label3D.new()
-	sign_label.name = "NorthClosedSign"
-	sign_label.text = "ROAD CLOSED\nBridge and village open in the next update"
-	sign_label.font_size = 64
-	sign_label.pixel_size = 0.01
-	sign_label.outline_size = 12
-	sign_label.modulate = Color(1.0, 0.85, 0.3)
-	sign_label.position = Vector3(road_x, 2.4, wall_z + 1.6)
-	add_child(sign_label)
+	# The same barricade as at the welcome gates (road_block.gd); the wall above seals it.
+	preload("res://road_block.gd").build(self, Vector3(50.0, 0.0, wall_z + 1.6), Vector3(0, 0, -1), "North", "Bridge and village\nopen in the next update", 5.0, 0.0, false)
 
 func set_quality(quality: int) -> void:
 	var show_scenery := quality > 0

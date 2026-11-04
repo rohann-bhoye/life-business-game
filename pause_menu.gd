@@ -18,12 +18,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS if Coop.active else Node.PROCESS_MODE_WHEN_PAUSED
 	hide()
 	# Bright bazaar (ui_bazaar.gd): a cream card with a cartoon outline and a saffron top.
-	var card := Bazaar.box(Bazaar.CREAM, 3, 14)
-	card.border_color = Bazaar.SAFFRON
-	card.border_width_top = 8
-	card.shadow_color = Color(0, 0, 0, 0.35)
-	card.shadow_size = 26
-	add_theme_stylebox_override("panel", card)
+	add_theme_stylebox_override("panel", Bazaar.card())
 	# The whole screen dims behind the menu, so the HUD and the name tags step back.
 	dim = ColorRect.new()
 	dim.color = Color(0.05, 0.03, 0.02, 0.5)
@@ -85,7 +80,6 @@ func _ready() -> void:
 	settings_menu = SettingsMenu.new()
 	settings_menu.name = "PauseSettingsMenu"
 	settings_menu.process_mode = process_mode
-	settings_menu.theme = theme
 	ui.add_child(settings_menu)
 	settings_menu.closed.connect(func(): show())
 	get_viewport().size_changed.connect(_layout)
@@ -136,11 +130,22 @@ func open_menu() -> void:
 	if is_instance_valid(coop_code):
 		var codes := Coop.host_codes()
 		coop_code.text = "Co-op code: %s (%s)" % [codes[0][1], codes[0][0]] if not codes.is_empty() else "Co-op code: no network found"
+	move_to_front()
 	show()
 	_layout()
+	hide_overlays(ui)
 	# In co-op the shop keeps running for your friends while your menu is open.
 	if not Coop.active: get_tree().paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+## Hides what would draw over a full-screen menu while the game is paused: the hotbar
+## (its own layer above the HUD, it covered the settings' buttons) and the quest marker.
+## Both show again by themselves once the menu closes and their _process runs.
+static func hide_overlays(game_ui: Node) -> void:
+	var bar := game_ui.get_node_or_null("InventoryBar")
+	if bar != null and bar.layer != null: bar.layer.visible = false
+	var quests := game_ui.get_node_or_null("QuestJournal")
+	if quests != null and quests.waypoint != null: quests.waypoint.visible = false
 
 func close_menu() -> void:
 	hide()

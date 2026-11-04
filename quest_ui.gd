@@ -177,13 +177,17 @@ func _build_banner() -> void:
 
 # --- Waypoint: a gold marker on the place the quest you follow wants you at next ---
 
-## [name, world position] of each place a quest can send you.
+## [name, world position, arrival radius in metres] of each place a quest can send you.
+## Inside the radius (walking or in a car) the marker closes by itself; the shop's covers
+## its forecourt and the road in front, the storage's only its door (it is 10 m from the shop).
 const SPOTS := {
-	"shop": ["Apna Mart", Vector3(-3, 1.8, 3.5)],
-	"storage": ["Apna Storage", Vector3(-3, 1.8, 13.5)],
-	"cave": ["Gufa Darwaza", Vector3(-94, 3.0, -32)],
-	"guild": ["Darwaza Guild", Vector3(-80, 2.0, -18)],
+	"shop": ["Apna Mart", Vector3(-3, 1.8, 3.5), 8.0],
+	"storage": ["Apna Storage", Vector3(-3, 1.8, 13.5), 4.5],
+	"cave": ["Gufa Darwaza", Vector3(-94, 3.0, -32), 8.0],
+	"guild": ["Darwaza Guild", Vector3(-80, 2.0, -18), 6.0],
 }
+## A marker you reached stays closed until you go this far from it again.
+const LEAVE_RADIUS := 30.0
 var waypoint: Control
 var waypoint_spot := ""
 ## The place whose marker you just reached (set again only after you walk away).
@@ -208,6 +212,10 @@ func _waypoint_target(quest: Dictionary) -> String:
 		return "" if player.shop_indoors else "shop"
 	var steps := _steps(quest)
 	return "guild" if steps[2].done and not steps[3].done else "cave"
+
+## A world point on the ground plane (marker heights never count towards arriving).
+static func _ground(point: Vector3) -> Vector2:
+	return Vector2(point.x, point.z)
 
 func _draw_waypoint() -> void:
 	var camera := get_viewport().get_camera_3d()
@@ -612,13 +620,15 @@ func _process(delta: float) -> void:
 		tracker_hint.text = "> " + hint
 		tracker_hint.visible = hint != ""
 	waypoint_spot = _waypoint_target(tracked_quest) if tracker.visible else ""
-	if arrived != "" and ui.player.global_position.distance_to(SPOTS[arrived][1]) > 12.0: arrived = ""
-	if waypoint_spot != "" and ui.player.global_position.distance_to(SPOTS[waypoint_spot][1]) < 5.0:
-		# The marker disappears on arrival, once, with a short message.
-		if arrived != waypoint_spot:
-			arrived = waypoint_spot
-			ui.show_feedback("You arrived at %s." % SPOTS[waypoint_spot][0])
-		waypoint_spot = ""
+	var here := Vector2(ui.player.global_position.x, ui.player.global_position.z)
+	if arrived != "" and here.distance_to(_ground(SPOTS[arrived][1])) > LEAVE_RADIUS: arrived = ""
+	if waypoint_spot != "" and arrived != waypoint_spot and here.distance_to(_ground(SPOTS[waypoint_spot][1])) < SPOTS[waypoint_spot][2]:
+		# The marker closes on arrival with a short message, and stays closed while you
+		# are around the place (walking about in front of the shop, parking the car).
+		arrived = waypoint_spot
+		ui.show_feedback("You arrived at %s." % SPOTS[waypoint_spot][0])
+	if waypoint_spot == arrived: waypoint_spot = ""
+	waypoint.visible = not open_menu
 	waypoint.queue_redraw()
 	banner_time = maxf(0.0, banner_time - delta)
 	banner.visible = not open_menu and not open_window

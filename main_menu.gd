@@ -4,7 +4,7 @@ const Session := preload("res://game_session.gd")
 const LoadingScreen := preload("res://loading_screen.gd")
 const Settings := preload("res://game_settings.gd")
 const SettingsMenu := preload("res://settings_menu.gd")
-const MenuSkin := preload("res://menu_skin.gd")
+const Bazaar := preload("res://ui_bazaar.gd")
 const Coop := preload("res://coop.gd")
 const CoopMenu := preload("res://coop_menu.gd")
 @export var save_path := "user://business_save.json"
@@ -30,20 +30,10 @@ const CREDITS := "Made by Bucketstudy team"
 const VERSION := "Development Demo | v0.11"
 const WHATS_NEW := ["Co-op: run one shop with up to 3 friends", "Indian town: mandir, pani puri cart, cows", "Thick grass, block paths and a home yard", "Graphics presets, 3D resolution, FPS counter", "Longer days: a relaxed 12-minute shop day", "Street lamps glow at night on every setting"]
 
-## Lobby look: Kenney buttons (green / blue / grey / red) on dark glass panels,
-## white labels, dark text on grey buttons.
+## Lobby look: the pause menu's bright bazaar (ui_bazaar.gd) - cream cards with a saffron
+## top, outlined white buttons, Continue in saffron, New Game turquoise, Quit pink.
 static func make_theme() -> Theme:
-	var result := Theme.new()
-	result.default_font_size = 18
-	MenuSkin.apply(result)
-	result.set_color("font_color", "Label", Color(0.95, 0.97, 0.98))
-	for type in ["CheckButton"]:
-		result.set_color("font_color", type, Color(0.95, 0.97, 0.98))
-	result.set_stylebox("panel", "Panel", glass_box())
-	return result
-
-static func glass_box(alpha := 0.82) -> StyleBoxFlat:
-	return preload("res://ui_style.gd").glass_box(alpha)
+	return Bazaar.make_theme()
 
 
 func _ready() -> void:
@@ -63,12 +53,12 @@ func _ready() -> void:
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	# Dark on the left (behind the menu), clear on the right so the street shows.
+	# A warm shade on the left (behind the menu), clear on the right so the street shows.
 	var shade := TextureRect.new()
 	shade.name = "LobbyShade"
 	var gradient := Gradient.new()
-	gradient.set_color(0, Color(0.02, 0.04, 0.08, 0.86))
-	gradient.set_color(1, Color(0.02, 0.04, 0.08, 0.05))
+	gradient.set_color(0, Color(0.12, 0.06, 0.02, 0.62))
+	gradient.set_color(1, Color(0.12, 0.06, 0.02, 0.0))
 	var shade_texture := GradientTexture2D.new()
 	shade_texture.gradient = gradient
 	shade_texture.fill_from = Vector2(0, 0.5)
@@ -91,23 +81,20 @@ func _ready() -> void:
 	var title := _label(content, "LIFE BUSINESS\nGAME", 48)
 	title.name = "GameTitle"
 	title.add_theme_font_override("font", KenneyTheme.heading_font())
-	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	# A soft saffron shadow under the dark ink letters.
+	title.add_theme_color_override("font_shadow_color", Color(Bazaar.SAFFRON, 0.55))
 	title.add_theme_constant_override("shadow_offset_x", 3)
 	title.add_theme_constant_override("shadow_offset_y", 3)
 	var tagline := _label(content, "Run your shop. Build your life.", 17)
 	tagline.name = "Tagline"
-	tagline.add_theme_color_override("font_color", Color("4ade80"))
+	tagline.add_theme_color_override("font_color", Bazaar.SAFFRON_DEEP)
 	_build_slots()
 	save_label = _label(content, "", 15)
 	save_label.name = "SaveCard"
 	save_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var card := glass_box(0.55)
-	card.set_corner_radius_all(10)
-	card.content_margin_left = 12
-	card.content_margin_right = 12
+	var card := Bazaar.box(Bazaar.CARD, 2, 10, Bazaar.LINE)
 	card.content_margin_top = 8
 	card.content_margin_bottom = 8
-	card.shadow_size = 0
 	save_label.add_theme_stylebox_override("normal", card)
 	continue_button = _button(content, "Continue", _continue)
 	continue_button.name = "ContinueButton"
@@ -123,14 +110,23 @@ func _ready() -> void:
 	quit.name = "QuitButton"
 	quit.theme_type_variation = "DangerButton"
 	status_label = _label(content, "", 14)
+	status_label.name = "Status"
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	footer = _label(self, CREDITS, 16)
+	status_label.add_theme_color_override("font_color", Bazaar.SAFFRON_DEEP)
+	# The credits close the card, so they always sit on cream (never over the picture).
+	footer = _label(content, CREDITS.to_upper(), 13)
 	footer.name = "Credits"
+	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	footer.add_theme_font_override("font", KenneyTheme.heading_font())
-	footer.add_theme_color_override("font_color", Color("fde68a"))
+	footer.add_theme_color_override("font_color", Bazaar.MUTED)
 	version_label = _label(self, VERSION, 13)
 	version_label.name = "Version"
 	version_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# Over the street picture: white with a dark shadow.
+	version_label.add_theme_color_override("font_color", Color.WHITE)
+	version_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
+	version_label.add_theme_constant_override("shadow_offset_x", 1)
+	version_label.add_theme_constant_override("shadow_offset_y", 1)
 	how_to_play = preload("res://how_to_play.gd").new()
 	add_child(how_to_play)
 	settings_menu = SettingsMenu.new()
@@ -158,9 +154,6 @@ func _label(parent: Node, text: String, font_size: int) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_shadow_color", Color.BLACK)
-	label.add_theme_constant_override("shadow_offset_x", 1)
-	label.add_theme_constant_override("shadow_offset_y", 1)
 	parent.add_child(label)
 	return label
 
@@ -168,6 +161,7 @@ func _button(parent: Node, text: String, action: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.custom_minimum_size.y = 44
+	button.add_theme_font_size_override("font_size", 18)
 	button.pressed.connect(action)
 	parent.add_child(button)
 	return button
@@ -193,9 +187,9 @@ func _build_confirmation() -> void:
 		var button := _button(confirmation, choice[1], _new_game.bind(choice[2]))
 		button.name = choice[0]
 		button.theme_type_variation = choice[3]
-		button.position = Vector2(20, 132 + index * 52)
+		button.position = Vector2(20, 152 + index * 52)
 	var cancel := _button(confirmation, "Cancel", _cancel_new)
-	cancel.position = Vector2(20, 296)
+	cancel.position = Vector2(20, 316)
 
 ## "What's new" card on the right, like a game launcher's news feed.
 func _build_news() -> Panel:
@@ -206,7 +200,7 @@ func _build_news() -> Panel:
 	var heading := _label(panel, "WHAT'S NEW", 20)
 	heading.name = "Heading"
 	heading.add_theme_font_override("font", KenneyTheme.heading_font())
-	heading.add_theme_color_override("font_color", Color("4ade80"))
+	heading.add_theme_color_override("font_color", Bazaar.SAFFRON_DEEP)
 	heading.position = Vector2(20, 16)
 	var list := _label(panel, "", 15)
 	list.name = "Items"
@@ -218,20 +212,23 @@ func _build_news() -> Panel:
 func _layout() -> void:
 	var viewport_size := get_viewport().get_visible_rect().size
 	var compact := viewport_size.x < 640 or viewport_size.y < 560
+	# Laptop-height windows: a smaller title and buttons so the whole card fits.
+	var tight := not compact and viewport_size.y < 760
 	var title: Label = content.get_node("GameTitle")
-	var font_size := 30 if compact else 44
+	var font_size := 30 if compact else (36 if tight else 44)
 	if title.get_theme_font_size("font_size") != font_size: title.add_theme_font_size_override("font_size", font_size)
 	# Small windows: tighter spacing, shorter buttons, no tagline, so everything fits.
-	content.add_theme_constant_override("separation", 6 if compact else 10)
+	content.add_theme_constant_override("separation", 6 if compact else (7 if tight else 10))
 	content.get_node("Tagline").visible = not compact
 	for child in content.get_children():
-		if child is Button: child.custom_minimum_size.y = 36 if compact else 44
+		if child is Button: child.custom_minimum_size.y = 36 if compact else (40 if tight else 44)
 	content.size = Vector2(minf(360, viewport_size.x - 48), content.get_combined_minimum_size().y)
 	content.position = Vector2(24 if compact else 64, maxf(24, (viewport_size.y - content.get_combined_minimum_size().y) / 2))
-	# Glass panel behind the menu column (skipped on very small screens).
-	lobby_panel.visible = not compact and content.visible
-	lobby_panel.position = content.position - Vector2(28, 24)
-	lobby_panel.size = content.size + Vector2(56, 48)
+	# The cream card behind the menu column (tighter edges on small screens).
+	var edge := Vector2(16, 14) if compact else Vector2(28, 30)
+	lobby_panel.visible = content.visible
+	lobby_panel.position = content.position - edge
+	lobby_panel.size = content.size + edge * 2.0
 	# News card only when there is room beside the menu.
 	news_panel.visible = viewport_size.x >= 900 and viewport_size.y >= 560 and content.visible
 	var items: Label = news_panel.get_node("Items")
@@ -241,16 +238,14 @@ func _layout() -> void:
 	news_panel.size = Vector2(width, minf(viewport_size.y - 96, 72 + items.get_combined_minimum_size().y))
 	news_panel.position = Vector2(viewport_size.x - news_panel.size.x - 48, 48)
 	items.size = Vector2(width - 40, news_panel.size.y - 64)
-	footer.position = Vector2(24 if compact else 64, viewport_size.y - 36)
-	footer.size = Vector2(maxf(0, viewport_size.x - 48), 26)
 	version_label.size = Vector2(260, 22)
 	version_label.position = Vector2(viewport_size.x - 284, viewport_size.y - 32)
 	version_label.visible = viewport_size.x >= 700
-	confirmation.size = Vector2(minf(460, viewport_size.x - 32), 360)
+	confirmation.size = Vector2(minf(460, viewport_size.x - 32), 382)
 	confirmation.position = (viewport_size - confirmation.size) / 2
 	for child in confirmation.get_children():
 		child.size.x = confirmation.size.x - 40
-	confirmation.get_node("Message").size.y = 68
+	confirmation.get_node("Message").size.y = 84
 
 # --- Save slots: slot 1 is the original save file, slots 2 and 3 add "_2"/"_3". ---
 const SLOTS := 3
