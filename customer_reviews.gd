@@ -72,21 +72,34 @@ func record(outcome: String, wait_seconds: float, discounted := false, name := "
 		_write(outcome, wait_seconds, discounted, name, product, day, minute)
 	return true
 
-## The comment for this visit, picked from COMMENTS.
-static func comment(outcome: String, stars: int, wait_seconds: float, discounted: bool, product: String) -> String:
-	var kind := outcome
-	if outcome == "sold":
-		if discounted and stars >= 4: kind = "bargain"
-		elif stars >= 5: kind = "great"
-		elif stars == 4: kind = "good"
-		elif wait_seconds < 100.0: kind = "slow"
-		else: kind = "very_slow"
+## What a visit was like (a COMMENTS key): great, bargain, good, slow, very_slow, stock,
+## price or timeout.
+static func kind_for(outcome: String, stars: int, wait_seconds: float, discounted: bool) -> String:
+	if outcome != "sold": return outcome
+	if discounted and stars >= 4: return "bargain"
+	if stars >= 5: return "great"
+	if stars == 4: return "good"
+	return "slow" if wait_seconds < 100.0 else "very_slow"
+
+## A comment for that kind of visit, picked from COMMENTS.
+static func comment(kind: String, product: String) -> String:
 	var lines: Array = COMMENTS[kind]
 	if product.is_empty(): lines = lines.filter(func(line): return not "{product}" in line)
 	return str(lines.pick_random()).replace("{product}", product)
 
+## What the complaints are about, for the PC's Reviews app: {"stock", "price", "wait"} counts
+## over the kept written reviews.
+func complaints() -> Dictionary:
+	var counts := {"stock": 0, "price": 0, "wait": 0}
+	for entry in written:
+		var kind: String = entry.get("kind", "")
+		if kind in ["stock", "price"]: counts[kind] += 1
+		elif kind in ["slow", "very_slow", "timeout"]: counts.wait += 1
+	return counts
+
 func _write(outcome: String, wait_seconds: float, discounted: bool, name: String, product: String, day: int, minute: int) -> void:
-	written.append({"name": name if not name.is_empty() else "A shopper", "stars": last_stars, "text": comment(outcome, last_stars, wait_seconds, discounted, product), "day": day, "minute": minute})
+	var kind := kind_for(outcome, last_stars, wait_seconds, discounted)
+	written.append({"name": name if not name.is_empty() else "A shopper", "stars": last_stars, "text": comment(kind, product), "kind": kind, "day": day, "minute": minute})
 	if written.size() > KEPT: written = written.slice(written.size() - KEPT)
 	star_counts[last_stars - 1] += 1
 	_update_reputation()
@@ -134,7 +147,7 @@ func restore(data: Dictionary) -> void:
 	last_stars = stars_for(last_score)
 	if data.has("written"):
 		written = []
-		for entry in data.written: written.append({"name": str(entry.name), "stars": int(entry.stars), "text": str(entry.text), "day": int(entry.day), "minute": int(entry.minute)})
+		for entry in data.written: written.append({"name": str(entry.name), "stars": int(entry.stars), "text": str(entry.text), "kind": str(entry.get("kind", "")), "day": int(entry.day), "minute": int(entry.minute)})
 		star_counts = (data.star_counts as Array).map(func(value): return int(value))
 		write_credit = (data.write_credit as Array).map(func(value): return float(value))
 		seed_rating = float(data.seed_rating)
@@ -159,6 +172,7 @@ static func valid(data) -> bool:
 		for entry in data.written:
 			if not entry is Dictionary or not entry.get("name") is String or not entry.get("text") is String: return false
 			if entry.name.length() > 40 or entry.text.length() > 120: return false
+			if entry.has("kind") and (not entry.kind is String or (entry.kind != "" and not COMMENTS.has(entry.kind))): return false
 			for field in ["stars", "day", "minute"]:
 				var number = entry.get(field)
 				if not (number is int or number is float) or not is_finite(float(number)) or number != int(number) or number < 0: return false

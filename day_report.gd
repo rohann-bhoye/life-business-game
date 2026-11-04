@@ -11,6 +11,10 @@ const COST_NAMES := {"stock": "Stock purchases", "staff": "Staff wages and hirin
 
 var start := {}
 var last := {}
+## The finished days, newest last: {day, shoppers, rating10, popularity}.
+var history: Array = []
+const HISTORY_DAYS := 14
+const HISTORY_FIELDS := ["day", "shoppers", "rating10", "popularity"]
 
 static func counters(business) -> Dictionary:
 	var sold := {}
@@ -44,15 +48,20 @@ func close(business) -> Dictionary:
 		var costs := {}
 		for key in COSTS: costs[key] = int(now.costs[key]) - int(start.costs.get(key, 0))
 		last["costs"] = costs
+	# A line of history for the PC's Reviews app chart.
+	history.append({"day": int(last.day), "shoppers": int(last.reviews), "rating10": int(now.get("rating10", 0)), "popularity": int(now.get("popularity", 0))})
+	if history.size() > HISTORY_DAYS: history = history.slice(history.size() - HISTORY_DAYS)
 	start = now
 	return last
 
 func snapshot() -> Dictionary:
-	return {"start": start.duplicate(true), "last": last.duplicate(true)}
+	return {"start": start.duplicate(true), "last": last.duplicate(true), "history": history.duplicate(true)}
 
 func restore(data: Dictionary) -> void:
 	start = _ints(data.get("start", {}))
 	last = _ints(data.get("last", {}))
+	history = []
+	for entry in data.get("history", []): history.append(_ints(entry))
 
 static func _ints(source: Dictionary) -> Dictionary:
 	var result := {}
@@ -65,6 +74,13 @@ static func _ints(source: Dictionary) -> Dictionary:
 
 static func valid(data) -> bool:
 	if not data is Dictionary: return false
+	var days = data.get("history", [])
+	if not days is Array or days.size() > HISTORY_DAYS: return false
+	for entry in days:
+		if not entry is Dictionary: return false
+		for field in HISTORY_FIELDS:
+			var number = entry.get(field)
+			if not (number is int or number is float) or not is_finite(float(number)) or number < 0: return false
 	for part in ["start", "last"]:
 		var item = data.get(part, {})
 		if not item is Dictionary: return false

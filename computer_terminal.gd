@@ -19,6 +19,7 @@ var builders: Panel
 var export_page: Panel
 var licence_page: Panel
 var business_page: Panel
+var reviews_page: Panel
 var staff: Panel
 var desktop: Control
 ## Which desktop app fills the screen: home, store, staff, manager or bank.
@@ -224,14 +225,15 @@ func _build_desktop() -> void:
 		["export", "Export", Color("1e3a8a"), ""],
 		["licences", "Licences", Color("7c3aed"), ""],
 		["business", "Business", Color("c2410c"), ""],
+		["reviews", "Reviews", Color("b45309"), ""],
 	]
 	for index in range(apps.size()):
 		var entry: Array = apps[index]
 		var tile := Button.new()
 		tile.name = "App_" + entry[0]
-		# A 4 x 2 grid of 72 px tiles (116 px drawn at 62%) beside the Today card.
-		var cell_x := 40 + (index % 4) * 130
-		tile.position = Vector2(cell_x + 29, 92 + (index / 4) * 108)
+		# A 5 x 2 grid of 72 px tiles (116 px drawn at 62%) beside the Today card.
+		var cell_x := 40 + (index % 5) * 104
+		tile.position = Vector2(cell_x + 16, 92 + (index / 5) * 108)
 		tile.size = Vector2(116, 116)
 		tile.scale = Vector2.ONE * 0.62
 		tile.focus_mode = Control.FOCUS_NONE
@@ -251,6 +253,7 @@ func _build_desktop() -> void:
 			for item in [["milk", Rect2(-2, 6, 76, 96)], ["bottle", Rect2(44, 4, 76, 96)], ["snack", Rect2(16, 26, 84, 90)]]:
 				_picture(tile, "res://assets/ui/products/%s.png" % item[0], item[1])
 		elif entry[0] == "bank": _text(tile, String.chr(8377), Vector2(0, 14), 116, 56, Color.WHITE).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		elif entry[0] == "reviews": _text(tile, "★", Vector2(0, 8), 116, 64, Color("fde68a")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		elif entry[0] == "business":
 			# A little bar chart.
 			for bar in range(4):
@@ -323,7 +326,7 @@ func _build_desktop() -> void:
 					box.size = Vector2(16, 14)
 					box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 					tile.add_child(box)
-		var label := _text(desktop, entry[1], Vector2(cell_x, tile.position.y + 76), 130, 14, Color.WHITE)
+		var label := _text(desktop, entry[1], Vector2(cell_x, tile.position.y + 76), 104, 14, Color.WHITE)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.35))
 		label.add_theme_constant_override("shadow_offset_y", 1)
@@ -395,7 +398,7 @@ func _build_desktop() -> void:
 	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	desktop.add_child(edge)
 	# Flat pill buttons sized to their text; the open app's button turns teal.
-	var buttons := [["home", "APNA"], ["store", "Wholesale"], ["staff", "Staff"], ["manager", "Shop"], ["bank", "Bank"], ["builders", "Build"], ["export", "Export"], ["licences", "Licences"], ["business", "Business"]]
+	var buttons := [["home", "APNA"], ["store", "Wholesale"], ["staff", "Staff"], ["manager", "Shop"], ["bank", "Bank"], ["builders", "Build"], ["export", "Export"], ["licences", "Licences"], ["business", "Business"], ["reviews", "Reviews"]]
 	var x := 8.0
 	for entry in buttons:
 		var button := _task_button("Task_" + entry[0], entry[1], x, Color(1, 1, 1, 0.07))
@@ -429,13 +432,14 @@ func _task_button(button_name: String, text: String, x: float, colour: Color) ->
 	desktop.add_child(button)
 	var font := button.get_theme_font("font")
 	button.position = Vector2(x, 505)
-	button.size = Vector2(font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 20, 30)
+	button.size = Vector2(font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 14, 30)
 	return button
 
 func _task_style(colour: Color) -> StyleBoxFlat:
 	var style := _round(colour, 8)
-	style.content_margin_left = 10
-	style.content_margin_right = 10
+	# Tight padding so all ten apps, Exit and the clock fit in one row.
+	style.content_margin_left = 7
+	style.content_margin_right = 7
 	return style
 
 # APNA Wholesale (pc_store.gd), APNA Bank (bank_page.gd) and APNA Jobs
@@ -494,6 +498,13 @@ func _build_store(_desktop: Control) -> void:
 	business_page.setup(ui.shop.business, ui.shop._format_money, ui.shop, ui)
 	business_page.hide()
 	business_page.back_requested.connect(show_home)
+	reviews_page = Panel.new()
+	reviews_page.set_script(preload("res://reviews_page.gd"))
+	reviews_page.position = Vector2(24, 12)
+	screen_viewport.add_child(reviews_page)
+	reviews_page.setup(ui.shop.business, ui.shop._format_money)
+	reviews_page.hide()
+	reviews_page.back_requested.connect(show_home)
 	staff = Panel.new()
 	staff.set_script(preload("res://staff_page.gd"))
 	staff.position = Vector2(24, 12)
@@ -524,6 +535,9 @@ func show_app(target: String) -> void:
 	if is_instance_valid(business_page):
 		business_page.visible = target == "business"
 		if business_page.visible: business_page.refresh()
+	if is_instance_valid(reviews_page):
+		reviews_page.visible = target == "reviews"
+		if reviews_page.visible: reviews_page.refresh()
 	if is_instance_valid(licence_page):
 		licence_page.visible = target == "licences"
 		if licence_page.visible: licence_page.refresh()
