@@ -10,33 +10,36 @@ extends CanvasLayer
 signal finished
 
 const KenneyTheme := preload("res://kenney_theme.gd")
+const Voice := preload("res://intro_voice.gd")
 const AIRPORT_SPOT := Vector3(31.5, 1.1, 45.5)
 const AIRPORT_YAW := -PI / 2
-const TOTAL := 60.0
+const TOTAL := 65.0
 const SKIP_FADE := 0.7
 const CABIN := Color(0.035, 0.04, 0.06)
 const BEZEL := Color(0.16, 0.17, 0.2)
 const Rupee := 8377
 
-# Caption lines: [start, end, speaker, colour, text]. Typed out at TYPE_SPEED letters/second.
+# Caption lines: [start, end, speaker, colour, text, voice id]. Typed out at TYPE_SPEED
+# letters/second; the voice line (intro_voice.gd) plays with it when it has been made. Each
+# span is a little longer than its recorded line, so no voice cuts off the next.
 const TYPE_SPEED := 32.0
 const LINES := [
-	[2.6, 7.4, "YOU", Color("e2e8f0"), "Seat 14A. Somewhere over India. Nobody on this plane knows me."],
-	[8.0, 14.0, "PAPA", Color("fbbf24"), "\"Beta, bahut ho gaya. Ghar baithke kuch nahi milta. Jaa, apna kaam dhoondh.\""],
-	[14.6, 20.6, "MUMMY", Color("f9a8d4"), "\"Tiffin rakh diya hai. Aur ye %s... sambhaal ke kharch karna.\""],
-	[21.2, 26.4, "YOU", Color("e2e8f0"), "Why me? Why now? I don't even know what I'm good at."],
-	[34.4, 40.0, "YOU", Color("e2e8f0"), "A town I have never seen. A letter. %s. That is all I have." ],
-	[41.0, 49.0, "PILOT", Color("86efac"), "Ladies and gentlemen, we are now landing at Dholkarpur. Local time is 8 AM, weather sunny. Thank you for flying Apna Air."],
+	[2.2, 9.2, "YOU", Color("e2e8f0"), "Seat 14A. Somewhere over India. Nobody on this plane knows me.", "you_seat"],
+	[9.6, 15.2, "PAPA", Color("fbbf24"), "\"Beta, bahut ho gaya. Ghar baithke kuch nahi milta. Jaa, apna kaam dhoondh.\"", "papa"],
+	[15.6, 20.4, "MUMMY", Color("f9a8d4"), "\"Tiffin rakh diya hai. Aur ye %s... sambhaal ke kharch karna.\"", "mummy_money"],
+	[20.8, 27.2, "YOU", Color("e2e8f0"), "Why me? Why now? I don't even know what I'm good at.", "you_why"],
+	[38.0, 45.6, "YOU", Color("e2e8f0"), "A town I have never seen. A letter. %s. That is all I have.", "you_town_money"],
+	[46.4, 57.4, "PILOT", Color("86efac"), "Ladies and gentlemen, we are now landing at Dholkarpur. Local time is 8 AM, weather sunny. Thank you for flying Apna Air.", "pilot"],
 ]
-const LETTER_START := 27.0
-const LETTER_END := 33.6
+const LETTER_START := 27.6
+const LETTER_END := 37.6
 const LETTER := "Beta,\n\nJab bhi kho jao,\nDholkarpur Gaon chale jaana.\nWahin se sab kuch shuru hota hai.\n\n- Dada-ji"
-const CHIME_AT := 41.0
-const DESCENT_START := 38.0
-const CLOUD_PASS := 46.0
-const ZOOM_START := 49.0
-const TOUCHDOWN := 54.0
-const TITLE_START := 55.5
+const CHIME_AT := 45.8
+const DESCENT_START := 42.0
+const CLOUD_PASS := 51.0
+const ZOOM_START := 54.0
+const TOUCHDOWN := 59.0
+const TITLE_START := 60.5
 
 var clock := 0.0
 var skipping := false
@@ -60,6 +63,9 @@ var chime: AudioStreamPlayer
 var thump: AudioStreamPlayer
 var chime_played := false
 var thump_played := false
+## The characters' voices (intro_voice.gd), one line at a time.
+var voice: AudioStreamPlayer
+var letter_spoken := false
 var teleported := false
 var last_line := -1
 
@@ -203,6 +209,16 @@ func _build_audio() -> void:
 	thump.stream = _thump()
 	thump.volume_db = -2.0
 	add_child(thump)
+	voice = AudioStreamPlayer.new()
+	voice.name = "Voice"
+	add_child(voice)
+
+## Plays the voice line `id`, if it has been made.
+func _say(id: String) -> void:
+	var stream := Voice.stream(id)
+	if stream == null: return
+	voice.stream = stream
+	voice.play()
 
 ## A looping low rumble: a 70 Hz drone with filtered noise on top.
 func _engine_hum() -> AudioStreamWAV:
@@ -279,8 +295,14 @@ func _update_audio() -> void:
 	var volume := -80.0
 	if clock > 0.2: volume = lerpf(-80.0, -17.0, clampf((clock - 0.2) / 3.0, 0.0, 1.0))
 	if clock > TOUCHDOWN - 3.0: volume = lerpf(-17.0, -80.0, clampf((clock - TOUCHDOWN + 3.0) / 4.0, 0.0, 1.0))
+	# The engine hum steps back while someone speaks.
+	if voice.playing: volume -= 6.0
 	if skipping: volume -= 60.0 * clampf(skip_time / SKIP_FADE, 0.0, 1.0)
 	hum.volume_db = volume
+	voice.volume_db = linear_to_db(maxf(0.001, 1.0 - skip_time / SKIP_FADE)) if skipping else 0.0
+	if not letter_spoken and clock >= LETTER_START + 0.6:
+		letter_spoken = true
+		_say("dadaji_letter")
 	if not chime_played and clock >= CHIME_AT:
 		chime_played = true
 		chime.play()
@@ -309,6 +331,7 @@ func _update_captions() -> void:
 		caption_text.visible_characters = 0
 		caption_accent.color = line[3]
 		_fit_caption()
+		_say(line[5])
 	caption_text.visible_characters = int((clock - line[0]) * TYPE_SPEED)
 	caption_card.modulate.a = _fade(clock, line[0], line[1], 0.5)
 
@@ -318,13 +341,15 @@ func _update_title() -> void:
 	title_label.modulate.a = alpha
 	sub_label.modulate.a = clampf(alpha * 2.0 - 0.6, 0.0, 1.0)
 
-## The money you really start with (it depends on the difficulty), as "₹10,000".
-func _money_text() -> String:
-	var amount := 10000
+## The money you really start with (it depends on the difficulty).
+func _money_amount() -> int:
 	var scene := get_tree().current_scene
 	var area = scene.get_node_or_null("Shop/ShopArea") if scene != null else null
-	if area != null: amount = int(area.business.money)
-	var digits := str(amount)
+	return int(area.business.money) if area != null else 10000
+
+## The starting money as "₹10,000".
+func _money_text() -> String:
+	var digits := str(_money_amount())
 	var grouped := ""
 	while digits.length() > 3:
 		grouped = "," + digits.substr(digits.length() - 3) + grouped
@@ -347,6 +372,7 @@ func _finish() -> void:
 	if done: return
 	done = true
 	hum.stop()
+	voice.stop()
 	_place_player()
 	var tree := get_tree()
 	tree.paused = false
