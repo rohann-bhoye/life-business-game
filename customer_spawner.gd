@@ -60,11 +60,13 @@ func _on_spawn_timer_timeout() -> void:
 		_schedule(CLOSED_CHECK)
 		return
 	if physical_shop: _schedule()
-	# Up to 3 shoppers at a time; people already walking away down the street don't
-	# count, but the street never holds more than 8 customers in all. Someone who finds
-	# the shop full walks on (no queue builds up out of sight).
+	# Up to 3 shoppers at a time (more in a shop with wings); people already walking away
+	# down the street don't count, but the street never holds more than 8 customers (more
+	# with wings). Someone who finds the shop full walks on (no queue builds up out of sight).
+	var business = shop_area.business
+	var wing: int = clampi(business.shop_wing, 0, business.WING_SHOPPERS.size() - 1)
 	var shopping := customers.filter(func(customer): return is_instance_valid(customer) and customer.state != customer.State.LEAVING).size()
-	if (shopping >= 3 or customers.size() >= 8 if physical_shop else is_instance_valid(active_customer)):
+	if (shopping >= business.WING_SHOPPERS[wing] or customers.size() >= 8 + wing * 3 if physical_shop else is_instance_valid(active_customer)):
 		return
 
 	var customer = CUSTOMER_SCENE.instantiate()

@@ -76,6 +76,8 @@ var product_labels := {}
 var furnishing
 ## The bought expansions the room is built for (-1 until the first build).
 var room_expansion := -1
+## The side wings the room was last built for (business_backend.gd shop_wing).
+var room_wing := -1
 ## What the back wall decor, skirting and plot were last moved for.
 var followed := []
 var departures := {}
@@ -208,6 +210,7 @@ func build_room(builder: Node3D) -> void:
 	add_child(decor)
 	decor.build(counter)
 	_build_expansion_plot()
+	_build_wing_plot()
 	# Older games started with snack and soap racks too; new games buy them.
 	var free_racks: int = get_parent().get_node("Shop/ShopArea").business.starting_racks
 	for id in ["snack", "soap"]:
@@ -478,34 +481,104 @@ func _resize_room_box(building: Node3D, node_name: String, size: Vector3, offset
 
 func _update_room_size() -> void:
 	var business = get_parent().get_node("Shop/ShopArea").business
-	if room_expansion == business.shop_expansion: return
+	if room_expansion == business.shop_expansion and room_wing == business.shop_wing: return
 	room_expansion = business.shop_expansion
-	# The back wall moves, so the wall occluders are rebuilt once the room has been resized.
+	room_wing = business.shop_wing
+	# The walls move, so the wall occluders are rebuilt once the room has been resized.
 	preload("res://occluders.gd").rebuild.call_deferred(get_parent())
 	var building: Node3D = get_parent().get_node("Shop")
 	var depth: float = 10.0 + room_expansion * Store.EXPANSION_DEPTH
 	var extension := depth - 5.0
 	var center_z := -extension / 2.0
-	_resize_room_box(building, "BackWall", Vector3(6, ROOM_HEIGHT, 0.12), Vector3(0, 0.5, -2.5 - extension))
-	_resize_room_box(building, "SideWall%s" % 3.0, Vector3(0.12, ROOM_HEIGHT, depth), Vector3(3.0, 0.5, center_z))
+	# Side wings (PC: Builders) push the right wall east over the plot beside the shop.
+	var wider: float = Store.WING_WIDTHS[room_wing]
+	var width := 6.0 + wider
+	var middle := wider / 2.0
+	_resize_room_box(building, "BackWall", Vector3(width, ROOM_HEIGHT, 0.12), Vector3(middle, 0.5, -2.5 - extension))
+	_resize_room_box(building, "SideWall%s" % 3.0, Vector3(0.12, ROOM_HEIGHT, depth), Vector3(3.0 + wider, 0.5, center_z))
 	_left_wall_with_door(building, depth, center_z)
 	_resize_room_box(building, "DoorLintel", Vector3(2, 1.4, 0.12), Vector3(0, 1.7, 2.5))
-	_resize_room_box(building, "RoofTrim", Vector3(6.3, 0.18, depth + 0.3), Vector3(0, 2.5, center_z))
-	_resize_room_box(building, "ParapetFront", Vector3(6.3, 0.3, 0.16), Vector3(0, 2.55, 2.66))
-	_resize_room_box(building, "ParapetBack", Vector3(6.3, 0.3, 0.16), Vector3(0, 2.55, 2.43 - depth))
+	_resize_room_box(building, "RoofTrim", Vector3(width + 0.3, 0.18, depth + 0.3), Vector3(middle, 2.5, center_z))
+	_resize_room_box(building, "ParapetFront", Vector3(width + 0.3, 0.3, 0.16), Vector3(middle, 2.55, 2.66))
+	_resize_room_box(building, "ParapetBack", Vector3(width + 0.3, 0.3, 0.16), Vector3(middle, 2.55, 2.43 - depth))
 	for side in [-1, 1]:
-		_resize_room_box(building, "ParapetLeft" if side < 0 else "ParapetRight", Vector3(0.16, 0.3, depth + 0.3), Vector3(side * 3.07, 2.55, center_z))
-	_resize_room_box(building, "Floor", Vector3(5.9, 0.012, depth - 0.1), Vector3(0, -1.394, center_z))
-	building.get_node("ShopInterior/CollisionShape3D").shape.size = Vector3(5.8, ROOM_HEIGHT, depth - 0.2)
-	building.get_node("ShopInterior/CollisionShape3D").position = Vector3(0, 0.5, center_z)
-	building.get_node("ShopArea/CollisionShape3D").shape.size = Vector3(7, ROOM_HEIGHT, depth + 1)
-	building.get_node("ShopArea/CollisionShape3D").position = Vector3(0, 0.5, center_z)
+		_resize_room_box(building, "ParapetLeft" if side < 0 else "ParapetRight", Vector3(0.16, 0.3, depth + 0.3), Vector3(-3.07 if side < 0 else 3.07 + wider, 2.55, center_z))
+	_resize_room_box(building, "Floor", Vector3(width - 0.1, 0.012, depth - 0.1), Vector3(middle, -1.394, center_z))
+	building.get_node("ShopInterior/CollisionShape3D").shape.size = Vector3(width - 0.2, ROOM_HEIGHT, depth - 0.2)
+	building.get_node("ShopInterior/CollisionShape3D").position = Vector3(middle, 0.5, center_z)
+	building.get_node("ShopArea/CollisionShape3D").shape.size = Vector3(width + 1, ROOM_HEIGHT, depth + 1)
+	building.get_node("ShopArea/CollisionShape3D").position = Vector3(middle, 0.5, center_z)
 	get_node("ShopLight").position.y = 3.3
 	get_node("ShopLight").omni_range = depth + 1
-	# Bought expansions (PC: Space) move the back wall; the room keeps its width.
+	_build_wing(building, wider, depth)
+	# Bought expansions (PC: Space) move the back wall; wings move the right wall.
 	if is_instance_valid(player):
 		var point: Vector3 = building.to_local(player.global_position)
-		player.shop_indoors = absf(point.x) < 2.9 and point.z > -2.5 - extension and point.z < 2.4 and point.y < 2.4
+		player.shop_indoors = point.x > -2.9 and point.x < 2.9 + wider and point.z > -2.5 - extension and point.z < 2.4 and point.y < 2.4
+
+## The side wings' own parts, rebuilt whenever the room changes: the street front (window
+## walls like the shop's, brick, with pink-framed glass and a full-height collider), steel
+## beams under the ceiling and ceiling lamps. Nothing is built before the first wing.
+func _build_wing(building: Node3D, wider: float, depth: float) -> void:
+	var old := building.get_node_or_null("WingParts")
+	if old != null:
+		building.remove_child(old)
+		old.queue_free()
+	var lamps := get_node_or_null("WingLamps")
+	if lamps != null:
+		remove_child(lamps)
+		lamps.queue_free()
+	if wider <= 0.0: return
+	var parts := Node3D.new()
+	parts.name = "WingParts"
+	building.add_child(parts)
+	var Bricks := preload("res://brick_works.gd")
+	var brick: Material = building.get_node(("FrontWall%s" % 2.0).validate_node_name()).material_override
+	var pieces := roundi(wider / 2.1)
+	for index in range(pieces):
+		var x := 3.0 + 2.1 * (index + 0.5)
+		var front := MeshInstance3D.new()
+		front.name = "WingFront%d" % index
+		front.mesh = _window_wall(ROOM_HEIGHT)
+		front.scale.x = 1.05
+		front.position = Vector3(x, 0.5, 2.5)
+		front.material_override = brick
+		parts.add_child(front)
+		var body := StaticBody3D.new()
+		body.name = "WingFrontBody%d" % index
+		body.position = front.position
+		var shape := CollisionShape3D.new()
+		shape.shape = BoxShape3D.new()
+		shape.shape.size = Vector3(2.1, ROOM_HEIGHT, 0.12)
+		body.add_child(shape)
+		parts.add_child(body)
+		Bricks.framed_window(parts, "WingWindow%d" % index, Vector3(x, -0.85, 2.5), 0.0, 1.6, 1.7, Bricks.FRAME, 1, Color.TRANSPARENT)
+	Bricks.i_beams(parts, "WingBeams", 3.06, 2.94 + wider, [1.9, -0.4, -4.2, -6.5, -9.0], 2.41)
+	# A lamp every 6 m down the middle of each 4.2 m bay.
+	lamps = Node3D.new()
+	lamps.name = "WingLamps"
+	add_child(lamps)
+	var back := 2.4 - depth
+	for bay in range(pieces / 2):
+		var x := 2.1 + bay * 4.2
+		var z := 0.0
+		while z > back + 1.5:
+			var fixture := _box(lamps, "WingLamp", Vector3(1.7, 0.07, 0.24), Vector3(x, 3.82, z - 1.5), Color(0.94, 0.98, 1))
+			var glow := _material(Color(0.94, 0.98, 1)).duplicate() as StandardMaterial3D
+			glow.emission_enabled = true
+			glow.emission = Color(0.9, 0.96, 1)
+			glow.emission_energy_multiplier = 0.6
+			fixture.material_override = glow
+			fixture.rotation.y = PI / 2
+			var lamp := OmniLight3D.new()
+			lamp.name = "Lamp"
+			lamp.position = Vector3(0, -0.15, 0)
+			lamp.light_color = Color(0.96, 0.97, 1)
+			lamp.light_energy = 0.75
+			lamp.omni_range = 5.5
+			lamp.shadow_enabled = false
+			fixture.add_child(lamp)
+			z -= 6.0
 
 ## The left wall (any depth) with the doorway into the packing room: the mesh gets a
 ## hole and the collider is split into the parts behind, in front of and above it.
@@ -552,14 +625,19 @@ func back_z() -> float:
 func follow_back_wall() -> void:
 	var building: Node3D = get_parent().get_node("Shop")
 	var decor := get_node_or_null("ShopDecor")
-	var key := [room_expansion, decor != null, building.has_node("InteriorCategory")]
+	var key := [room_expansion, room_wing, decor != null, building.has_node("InteriorCategory")]
 	if key == followed: return
 	followed = key
 	var back := back_z()
-	if decor != null: decor.set_back(back)
+	var wider: float = Store.WING_WIDTHS[maxi(0, room_wing)]
+	if decor != null:
+		decor.set_back(back)
+		# The right-wall decor goes with the right wall when a side wing is built.
+		decor.set_right(Store.floor_rect(room_expansion, maxi(0, room_wing)).end.x)
 	for skirting in building.find_children("WallSkirting*", "MeshInstance3D", false, false):
 		# The left skirting stops at the packing room doorway (the rest is DoorSkirting).
 		var front: float = SIDE_DOOR.x if skirting.position.x < 0.0 else 2.44
+		if skirting.position.x > 0.0: skirting.position.x = 2.92 + wider
 		skirting.mesh.size.z = front - back - 0.2
 		skirting.position.z = (front + back) / 2.0
 	var sign := building.get_node_or_null("InteriorCategory") as Node3D
@@ -588,6 +666,7 @@ func follow_back_wall() -> void:
 			fixture.add_child(lamp)
 		fixture.visible = index < room_expansion
 	_place_expansion_plot()
+	_place_wing_plot()
 
 ## The cement plot behind the shop that expansions build on, with a rope and a
 ## sign while some of it is still for sale. It is laid at the start so no grass
@@ -610,6 +689,56 @@ func _build_expansion_plot() -> void:
 	text.font_size = 28
 	text.modulate = Color(0.12, 0.2, 0.18)
 	_box(plot, "SignLeg", Vector3(0.06, 0.8, 0.06), Vector3(-3, 0.45, far + 0.3), Color(0.3, 0.3, 0.3))
+
+## The plot east of the shop where the side wings go (world x 0..8.46 beside the shop, the
+## pani puri cart just past it): bare earth with a rope round the part not yet built on and a
+## board to the street. Its hidden mask keeps grass off the whole plot for good, like the
+## back plot (environment_details.gd reads hidden meshes too).
+const WING_PLOT_EAST := 8.46
+const WING_PLOT_FRONT := 2.3
+const WING_PLOT_BACK := -12.0
+
+func _build_wing_plot() -> void:
+	var plot := Node3D.new()
+	plot.name = "WingPlot"
+	add_child(plot)
+	var depth := WING_PLOT_FRONT - WING_PLOT_BACK
+	var mask := _box(plot, "GrassMask", Vector3(WING_PLOT_EAST, 0.01, depth), Vector3(WING_PLOT_EAST / 2.0, 0.1, (WING_PLOT_FRONT + WING_PLOT_BACK) / 2.0), Color(0.5, 0.41, 0.31))
+	mask.hide()
+	_box(plot, "Earth", Vector3(1, 0.03, depth), Vector3(0, 0.106, (WING_PLOT_FRONT + WING_PLOT_BACK) / 2.0), Color(0.5, 0.41, 0.31))
+	for index in range(4): _box(plot, "Post%d" % index, Vector3(0.06, 0.9, 0.06), Vector3.ZERO, Color(0.95, 0.5, 0.1))
+	for index in range(3): _box(plot, "Rope%d" % index, Vector3(0.02, 0.02, 0.02), Vector3.ZERO, Color(0.95, 0.5, 0.1))
+	var board := _box(plot, "SignBoard", Vector3(1.9, 0.62, 0.05), Vector3.ZERO, Color(0.97, 0.96, 0.9))
+	var text := _sign(board, "SignText", "", Vector3(0, 0, 0.03))
+	text.font_size = 46
+	text.modulate = Color(0.12, 0.2, 0.18)
+	_box(plot, "SignLeg", Vector3(0.06, 0.8, 0.06), Vector3.ZERO, Color(0.3, 0.3, 0.3))
+
+## Ropes off the part of the wing plot not built on yet (none once both wings stand).
+func _place_wing_plot() -> void:
+	var plot := get_node_or_null("WingPlot")
+	if plot == null: return
+	var wing := maxi(0, room_wing)
+	var left: float = Store.floor_rect(room_expansion, wing).end.x + 0.25
+	var open := wing < Store.MAX_WING
+	var earth: MeshInstance3D = plot.get_node("Earth")
+	earth.mesh.size.x = maxf(0.1, WING_PLOT_EAST - left)
+	earth.position.x = (left + WING_PLOT_EAST) / 2.0
+	var corners := [Vector3(left, 0.55, WING_PLOT_FRONT), Vector3(WING_PLOT_EAST, 0.55, WING_PLOT_FRONT), Vector3(WING_PLOT_EAST, 0.55, WING_PLOT_BACK), Vector3(left, 0.55, WING_PLOT_BACK)]
+	for index in range(4): plot.get_node("Post%d" % index).position = corners[index]
+	for index in range(3):
+		var rope: MeshInstance3D = plot.get_node("Rope%d" % index)
+		var from: Vector3 = corners[index] + Vector3(0, 0.3, 0)
+		var to: Vector3 = corners[index + 1] + Vector3(0, 0.3, 0)
+		rope.mesh.size = Vector3(maxf(0.02, absf(to.x - from.x)), 0.03, maxf(0.02, absf(to.z - from.z)))
+		rope.position = (from + to) / 2.0
+	var middle := (left + WING_PLOT_EAST) / 2.0
+	plot.get_node("SignBoard").position = Vector3(middle, 1.15, WING_PLOT_FRONT - 0.4)
+	plot.get_node("SignLeg").position = Vector3(middle, 0.45, WING_PLOT_FRONT - 0.4)
+	var business = get_parent().get_node("Shop/ShopArea").business
+	if open: plot.get_node("SignBoard/SignText").text = "SPACE FOR A BIGGER SHOP\n%s: shop PC > Builders" % business.WING_NAMES[wing]
+	for child in plot.get_children():
+		if child.name != "GrassMask": child.visible = open
 
 func _place_expansion_plot() -> void:
 	var plot := get_node_or_null("ExpansionPlot")

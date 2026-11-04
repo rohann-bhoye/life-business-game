@@ -3,7 +3,7 @@ extends RefCounted
 const Catalog = preload("res://product_catalog.gd")
 const COST := 1000
 ## Racks a save may hold; how many fit today is rack_limit() (more after expansions).
-const MAX_RACKS := 12
+const MAX_RACKS := 20
 const BASE_RACKS := 8
 const RACKS_PER_EXPANSION := 2
 const SHELVES := 3
@@ -13,6 +13,14 @@ const SHELF_CAPACITY := 10
 const FLOOR := Rect2(-5.97, -7.42, 5.91, 9.84)
 const EXPANSION_DEPTH := 2.25
 const MAX_EXPANSION := 2
+## Side wings over the plot east of the shop (business_backend.gd shop_wing): how much wider
+## the floor gets (m) and the racks each adds. They need both back expansions first, so the
+## floor stays one rectangle.
+const WING_WIDTHS := [0.0, 4.2, 8.4]
+const MAX_WING := 2
+const RACKS_PER_WING := 4
+## Grid cells east of x 0 the shopper paths cover (the widest wing, 0.25 m cells).
+const GRID_EAST := 34
 const ENTRY := Vector3(-3, 0.1, 1.65)
 ## The stock worker's back aisle and the doorway: nothing is ever built there.
 const RESERVED := [Rect2(-5.04, -7.42, 0.88, 9.84), Rect2(-3.9, 1.2, 1.8, 1.25)]
@@ -27,13 +35,16 @@ var records: Array = fresh()
 var fixtures: Dictionary = FIXTURE_HOME.duplicate(true)
 ## Bought shop expansions (business_backend.gd shop_expansion keeps this in step).
 var expansion := 0
+## Built side wings (business_backend.gd shop_wing keeps this in step).
+var wing := 0
 
-static func floor_rect(expansion_level: int) -> Rect2:
+static func floor_rect(expansion_level: int, wing_level := 0) -> Rect2:
 	var extra := clampi(expansion_level, 0, MAX_EXPANSION) * EXPANSION_DEPTH
-	return Rect2(FLOOR.position.x, FLOOR.position.y - extra, FLOOR.size.x, FLOOR.size.y + extra)
+	var wider: float = WING_WIDTHS[clampi(wing_level, 0, MAX_WING)]
+	return Rect2(FLOOR.position.x, FLOOR.position.y - extra, FLOOR.size.x + wider, FLOOR.size.y + extra)
 
-static func rack_limit(expansion_level: int) -> int:
-	return BASE_RACKS + clampi(expansion_level, 0, MAX_EXPANSION) * RACKS_PER_EXPANSION
+static func rack_limit(expansion_level: int, wing_level := 0) -> int:
+	return BASE_RACKS + clampi(expansion_level, 0, MAX_EXPANSION) * RACKS_PER_EXPANSION + clampi(wing_level, 0, MAX_WING) * RACKS_PER_WING
 var grid: AStarGrid2D
 var grid_key := ""
 var last_added_slot := -1
@@ -163,9 +174,9 @@ static func blocked_areas(fx: Dictionary, strict := false) -> Array:
 	if strict: areas.append(fixture_rect(fx.counter, CASHIER_ZONE))
 	return areas
 
-static func geometry_error(layout: Array, fx: Dictionary = {}, strict_id := -1, expansion_level := 0) -> String:
+static func geometry_error(layout: Array, fx: Dictionary = {}, strict_id := -1, expansion_level := 0, wing_level := 0) -> String:
 	if fx.is_empty(): fx = FIXTURE_HOME
-	var floor_area := floor_rect(expansion_level)
+	var floor_area := floor_rect(expansion_level, wing_level)
 	for record in layout:
 		var area := footprint(record)
 		if not floor_area.encloses(area): return "Keep the rack inside the shop."
@@ -178,13 +189,13 @@ static func geometry_error(layout: Array, fx: Dictionary = {}, strict_id := -1, 
 	return ""
 
 func _navigation(layout: Array, fx: Dictionary) -> AStarGrid2D:
-	var key := str(fx) + str(expansion)
+	var key := str(fx) + str(expansion) + "w" + str(wing)
 	for item in layout: key += str([item.id, item.x, item.z, item.turn])
 	if grid != null and key == grid_key: return grid
 	grid_key = key
 	grid = AStarGrid2D.new()
-	# 0.25 m cells over the largest shop (two expansions) and the doorway.
-	grid.region = Rect2i(-23, -50, 23, 59)
+	# 0.25 m cells over the largest shop (two expansions, two wings) and the doorway.
+	grid.region = Rect2i(-23, -50, 23 + GRID_EAST, 59)
 	grid.cell_size = Vector2.ONE * 0.25
 	grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
 	grid.default_compute_heuristic = AStarGrid2D.HEURISTIC_OCTILE
@@ -193,9 +204,9 @@ func _navigation(layout: Array, fx: Dictionary) -> AStarGrid2D:
 	var obstacles: Array = []
 	for fixture_name in FIXTURE_SIZE: obstacles.append(fixture_body(fixture_name, fx[fixture_name]))
 	for item in layout: obstacles.append(footprint(item))
-	var floor_area := floor_rect(expansion)
+	var floor_area := floor_rect(expansion, wing)
 	for y in range(-50, 9):
-		for x in range(-23, 0):
+		for x in range(-23, GRID_EAST):
 			var position := Vector2(x, y) * 0.25
 			var blocked := not floor_area.grow(-0.28).has_point(position)
 			for area in obstacles:
@@ -224,7 +235,7 @@ func placement_error(candidate: Dictionary) -> String:
 			layout[index] = candidate
 			found = true
 	if not found: layout.append(candidate)
-	var error := geometry_error(layout, fixtures, int(candidate.id), expansion)
+	var error := geometry_error(layout, fixtures, int(candidate.id), expansion, wing)
 	if not error.is_empty(): return error
 	for item in layout:
 		if route(ENTRY, approach(item), layout).is_empty(): return "Leave a reachable aisle in front of every rack."
@@ -247,7 +258,7 @@ func fixture_error(fixture_name: String, candidate: Dictionary) -> String:
 	fx[fixture_name] = candidate
 	var bodies := {}
 	for key in FIXTURE_SIZE: bodies[key] = fixture_body(key, fx[key])
-	var floor_area := floor_rect(expansion)
+	var floor_area := floor_rect(expansion, wing)
 	for key in bodies:
 		if not floor_area.encloses(bodies[key]): return "Keep it inside the shop."
 		for reserved in RESERVED:
@@ -329,9 +340,9 @@ func remove_stock(product: String, amount: int, id := -1) -> bool:
 
 ## `base`: the free starting racks (3 in older games, 1 in games started from the
 ## menu now); they stay in the shop and keep their first products.
-static func valid(layout, stock: int, inventory: Dictionary, fx = FIXTURE_HOME, expansion_level := 0, base := 3) -> bool:
+static func valid(layout, stock: int, inventory: Dictionary, fx = FIXTURE_HOME, expansion_level := 0, base := 3, wing_level := 0) -> bool:
 	if not fixtures_valid(fx): return false
-	if not layout is Array or layout.size() < base or layout.size() > rack_limit(expansion_level): return false
+	if not layout is Array or layout.size() < base or layout.size() > rack_limit(expansion_level, wing_level): return false
 	# New games' one free rack is the cold-drink fridge.
 	var base_displays: Array = ["shelf", "fridge"] if base == 1 else ["shelf"]
 	var totals := {}
@@ -370,7 +381,7 @@ static func valid(layout, stock: int, inventory: Dictionary, fx = FIXTURE_HOME, 
 				if slot.product != "": totals[slot.product] += int(count)
 			if total != int(item.amount): return false
 		else: totals[item.product] += int(item.amount)
-	if not geometry_error(layout, fx, -1, expansion_level).is_empty(): return false
+	if not geometry_error(layout, fx, -1, expansion_level, wing_level).is_empty(): return false
 	# One restock rack per product at most; the starting racks' products always have one.
 	for product in destinations:
 		if destinations[product] > 1 or Catalog.IDS.find(product) < base and destinations[product] != 1: return false

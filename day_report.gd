@@ -23,7 +23,7 @@ static func counters(business) -> Dictionary:
 		sold[id] = int(business.inventory.get(id, {}).get("sold", 0))
 		extras += sold[id]
 	sold["bottle"] = maxi(0, int(business.items_sold) - extras)
-	var costs := {"stock": business.restocking_expenses, "staff": business.hiring_expenses + business.wage_expenses + business.overtime_expenses, "bills": business.operating_expenses + business.rent_paid, "marketing": business.marketing_expenses, "upgrades": business.upgrade_expenses + business.furnishing_expenses + business.expansion_expenses + business.shop_cost, "farm": business.farm.expenses(), "loan": business.loan_interest_paid}
+	var costs := {"stock": business.restocking_expenses, "staff": business.hiring_expenses + business.wage_expenses + business.overtime_expenses, "bills": business.operating_expenses + business.rent_paid, "marketing": business.marketing_expenses, "upgrades": business.upgrade_expenses + business.furnishing_expenses + business.expansion_expenses + business.wing_expenses + business.shop_cost, "farm": business.farm.expenses(), "loan": business.loan_interest_paid}
 	return {"day": int(business.day), "items_sold": int(business.items_sold), "revenue": int(business.sales_revenue), "expenses": int(business.total_expenses()), "missed": int(business.missed_sales), "reputation": int(business.customer_reviews.reputation), "reviews": int(business.customer_reviews.review_count), "popularity": roundi(business.popularity), "walkouts": int(business.price_walkouts), "rating10": roundi(business.customer_reviews.rating() * 10.0), "written": business.customer_reviews.written_count(), "sold": sold, "costs": costs}
 
 func begin(business) -> void:

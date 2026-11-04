@@ -757,13 +757,59 @@ func coop_return_boxes(peers: Array = []) -> void:
 	_activate_next_box()
 	_commit()
 
-## How many racks fit in the shop now (8, then 2 more per expansion).
+## How many racks fit in the shop now (8, then 2 more per expansion and 4 per wing).
 func rack_limit() -> int:
-	return RackStore.rack_limit(shop_expansion)
+	return RackStore.rack_limit(shop_expansion, shop_wing)
 
-## Floor area in m2 for the Space tab: 60 m2, then about 13 m2 more per expansion.
+## Floor area in m2 for the Space tab: 60 m2, about 13 m2 more per expansion, and the wings.
 func shop_floor_area() -> int:
-	return roundi(6.0 * (10.0 + shop_expansion * RackStore.EXPANSION_DEPTH))
+	return roundi((6.0 + RackStore.WING_WIDTHS[shop_wing]) * (10.0 + shop_expansion * RackStore.EXPANSION_DEPTH))
+
+# --- Side wings (Builders on the shop PC): the shop opens east over the plot beside it once
+# both back expansions are built. Each wing needs a good rating and the town's word, and
+# brings more racks, more shoppers at a time and more shoppers a day. ---
+const WING_NAMES := ["Side Wing", "Super Hall"]
+const WING_COSTS := [25000, 50000]
+## [star rating, popularity tier] each wing needs.
+const WING_NEEDS := [[3.5, 1], [4.0, 2]]
+## Per wing level (none, Side Wing, Super Hall): shoppers a day, and how many shop at once.
+const WING_CUSTOMERS := [1.0, 1.15, 1.3]
+const WING_SHOPPERS := [3, 5, 7]
+var shop_wing := 0
+var wing_expenses := 0
+
+func next_wing_cost() -> int:
+	return WING_COSTS[shop_wing] if shop_wing < WING_COSTS.size() else 0
+
+## Why the next wing can't be built yet ("" when it can).
+func wing_block_reason() -> String:
+	if shop_wing >= WING_COSTS.size(): return "Fully built"
+	if shop_expansion < RackStore.MAX_EXPANSION: return "Build the Grand Hall first"
+	var need: Array = WING_NEEDS[shop_wing]
+	if customer_reviews.rating() < float(need[0]): return "Needs a ★ %.1f rating" % float(need[0])
+	if popularity_tier() < int(need[1]): return "Needs the town to call you %s" % POPULARITY_TIERS[int(need[1])][1]
+	if money < next_wing_cost(): return "Needs %s%d" % [String.chr(8377), next_wing_cost()]
+	return ""
+
+func can_build_wing() -> bool:
+	return wing_block_reason().is_empty()
+
+## Builders: builds the next wing; the room widens at once (shop_operations.gd).
+func build_wing() -> bool:
+	if not can_build_wing(): return false
+	var cost := next_wing_cost()
+	money -= cost
+	wing_expenses += cost
+	shop_wing += 1
+	racks.wing = shop_wing
+	if not save_progress():
+		money += cost
+		wing_expenses -= cost
+		shop_wing -= 1
+		racks.wing = shop_wing
+		return false
+	changed.emit()
+	return true
 
 func next_expansion_cost() -> int:
 	return EXPANSION_COSTS[shop_expansion] if shop_expansion < EXPANSION_COSTS.size() else 0
@@ -889,6 +935,7 @@ func customers_per_day(marketing := false) -> float:
 	var range_now: Array = DAY_CUSTOMERS[clampi(shop_level - 1, 0, DAY_CUSTOMERS.size() - 1)]
 	var count: float = lerpf(range_now[0], range_now[1], popularity / 100.0)
 	count *= MARKETING_CUSTOMERS if marketing else 1.0
+	count *= WING_CUSTOMERS[clampi(shop_wing, 0, WING_CUSTOMERS.size() - 1)]
 	count /= reputation_traffic_factor() * (RAIN_TRAFFIC_FACTOR if is_raining() else 1.0) * rival_traffic_factor()
 	return count * day_mood()
 
@@ -1375,7 +1422,7 @@ func finish_marketing() -> void:
 	_commit()
 
 func total_expenses() -> int:
-	return restocking_expenses + marketing_expenses + hiring_expenses + operating_expenses + wage_expenses + upgrade_expenses + overtime_expenses + furnishing_expenses + expansion_expenses + shop_cost + bag_expenses + licence_expenses + farm.expenses() + loan_interest_paid + rent_paid
+	return restocking_expenses + marketing_expenses + hiring_expenses + operating_expenses + wage_expenses + upgrade_expenses + overtime_expenses + furnishing_expenses + expansion_expenses + wing_expenses + shop_cost + bag_expenses + licence_expenses + farm.expenses() + loan_interest_paid + rent_paid
 
 func place_rack(product: String, position: Vector2, turn: int, id := -1, from_delivery := false) -> bool:
 	if product not in Catalog.IDS or not position.is_finite() or turn < 0 or turn > 3: return false
@@ -1760,6 +1807,8 @@ func snapshot() -> Dictionary:
 	data["udhaar_given"] = udhaar_given
 	data["udhaar_collected"] = udhaar_collected
 	data["expansion_expenses"] = expansion_expenses
+	data["shop_wing"] = shop_wing
+	data["wing_expenses"] = wing_expenses
 	data["shop_owned"] = shop_owned
 	data["shop_cost"] = shop_cost
 	data["carry_bags"] = carry_bags
@@ -1862,6 +1911,8 @@ func restore(data: Dictionary) -> void:
 	udhaar_given = int(data.get("udhaar_given", 0))
 	udhaar_collected = int(data.get("udhaar_collected", 0))
 	expansion_expenses = int(data.get("expansion_expenses", 0))
+	shop_wing = int(data.get("shop_wing", 0))
+	wing_expenses = int(data.get("wing_expenses", 0))
 	shop_owned = bool(data.get("shop_owned", true))
 	shop_cost = int(data.get("shop_cost", 0))
 	carry_bags = int(data.get("carry_bags", STARTER_BAGS))
@@ -1881,6 +1932,7 @@ func restore(data: Dictionary) -> void:
 				if item is Dictionary and (int(item.get("purchased", 0)) > 0 or int(item.get("stock", 0)) > 0): licences[entry.id] = 0
 	bag_expenses = int(data.get("bag_expenses", 0))
 	racks.expansion = shop_expansion
+	racks.wing = shop_wing
 
 func save_progress() -> bool:
 	if save_path.is_empty():
@@ -2071,6 +2123,13 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	var expected_expansion := 0
 	for index in range(int(expansion)): expected_expansion += EXPANSION_COSTS[index]
 	if not EmployeeRelations.whole(data.get("expansion_expenses", 0), MAX_SAVED_VALUE) or int(data.get("expansion_expenses", 0)) != expected_expansion: return false
+	# Wings: only after both back expansions, each paid in full.
+	var wing = data.get("shop_wing", 0)
+	if not EmployeeRelations.whole(wing, WING_COSTS.size()): return false
+	if int(wing) > 0 and int(expansion) < RackStore.MAX_EXPANSION: return false
+	var expected_wings := 0
+	for index in range(int(wing)): expected_wings += WING_COSTS[index]
+	if not EmployeeRelations.whole(data.get("wing_expenses", 0), MAX_SAVED_VALUE) or int(data.get("wing_expenses", 0)) != expected_wings: return false
 	# The shop sale: an unbought shop has cost nothing, a bought one cost exactly its price.
 	var sale_owned = data.get("shop_owned", true)
 	var sale_cost = data.get("shop_cost", 0)
@@ -2094,9 +2153,9 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	if int(bags) > STARTER_BAGS + int(bag_cost) / BAG_PACK_COST * BAG_PACK_SIZE: return false
 	if not EmployeeRelations.whole(furnishing, MAX_SAVED_VALUE): return false
 	var layout = data.get("rack_layout", RackStore.fresh(int(data.stock), data.inventory))
-	if not RackStore.valid(layout, int(data.stock), data.inventory, data.get("shop_fixtures", RackStore.FIXTURE_HOME), int(expansion), int(base)): return false
+	if not RackStore.valid(layout, int(data.stock), data.inventory, data.get("shop_fixtures", RackStore.FIXTURE_HOME), int(expansion), int(base), int(data.get("shop_wing", 0))): return false
 	var delivery_data = data.get("logistics", {})
-	if not Logistics.valid(delivery_data, RackStore.rack_limit(int(expansion)) - layout.size()): return false
+	if not Logistics.valid(delivery_data, RackStore.rack_limit(int(expansion), int(data.get("shop_wing", 0))) - layout.size()): return false
 	var pending_racks: int = delivery_data.get("rack_incoming", []).size() + delivery_data.get("rack_delivered", []).size()
 	if furnishing != (layout.size() - int(base) + pending_racks) * RackStore.COST: return false
 	if not data.get("warehouse_worker_hired", false) is bool: return false
@@ -2271,7 +2330,7 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	if extra_sold > sold or extra_stock > data.stock: return false
 	if revenue % 10 != 0 or revenue < sold * 50 or revenue > sold * 200:
 		return false
-	var expenses := int(data["restocking_expenses"]) + int(data["marketing_expenses"]) + int(data["hiring_expenses"]) + int(data["operating_expenses"]) + int(data["wage_expenses"]) + int(data["upgrade_expenses"]) + int(data.overtime_expenses) + int(furnishing) + expected_expansion + int(sale_cost) + int(bag_cost) + int(licence_cost) + farm_state.expenses() + int(data.get("loan_interest_paid", 0)) + int(data.get("rent_paid", 0))
+	var expenses := int(data["restocking_expenses"]) + int(data["marketing_expenses"]) + int(data["hiring_expenses"]) + int(data["operating_expenses"]) + int(data["wage_expenses"]) + int(data["upgrade_expenses"]) + int(data.overtime_expenses) + int(furnishing) + expected_expansion + expected_wings + int(sale_cost) + int(bag_cost) + int(licence_cost) + farm_state.expenses() + int(data.get("loan_interest_paid", 0)) + int(data.get("rent_paid", 0))
 	# Loans: money received minus principal paid back.
 	if not _valid_loan(data): return false
 	if not _valid_rent(data, int(saved_day)): return false

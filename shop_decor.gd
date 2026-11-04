@@ -34,6 +34,8 @@ var fans: Array[Node3D] = []
 ## Shelves, paint and the welcome board on the back wall: they move back together
 ## when the shop is expanded (set_back).
 var back_wall: Node3D
+## The right wall's decor: it moves east with the wall when a side wing is built.
+var right_wall: Node3D
 var diya_light: OmniLight3D
 var flicker := 0.0
 
@@ -73,11 +75,24 @@ func build(counter: Node3D) -> void:
 	for child in get_children():
 		if child is Node3D and child != back_wall and child.position.z < BACK_Z + 0.3:
 			child.reparent(back_wall)
+	# Everything on the right wall (its shelves and stock, boards, the mandir, its paint band)
+	# joins right_wall, which moves east when a side wing is built (set_right).
+	right_wall = Node3D.new()
+	right_wall.name = "RightWallDecor"
+	add_child(right_wall)
+	for child in get_children():
+		if not child is Node3D or child == back_wall or child == right_wall: continue
+		var centre: float = (child.global_transform * child.get_aabb()).get_center().x if child is VisualInstance3D else child.global_position.x
+		if centre > ROOM_MAX_X - 0.6: child.reparent(right_wall)
+
+## Moves the right-wall decor to a wall whose inside face is at world x `right_x`.
+func set_right(right_x: float) -> void:
+	right_wall.position.x = right_x - ROOM_MAX_X
 
 ## Moves the back-wall decor to a wall at `back_z` and stretches the side paint bands.
 func set_back(back_z: float) -> void:
 	back_wall.position.z = back_z - BACK_Z
-	for child in get_children():
+	for child in get_children() + right_wall.get_children():
 		if child is MeshInstance3D and (child.name.begins_with("WallPaint") or child.name.begins_with("WallStripe")):
 			if child.name.ends_with("LeftFront"): continue
 			var front: float = SIDE_DOOR.x if child.name.ends_with("Left") else FRONT_Z

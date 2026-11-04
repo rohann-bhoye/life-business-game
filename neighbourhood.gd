@@ -10,7 +10,7 @@ func _ready() -> void:
 	get_parent().get_node("Shop/ShopArea").business.changed.connect(_update_shop_upgrade)
 	_update_shop_upgrade()
 	_build_streets()
-	_build_garden()
+	# The old garden east of the shop made way for the side wings' plot (shop_operations.gd).
 	for point in [Vector3(-11, 0.1, -8), Vector3(-18, 0.1, 12), Vector3(11, 0.1, -11), Vector3(27, 0.1, -3), Vector3(17.8, 0.1, 13.4), Vector3(-17, 0.1, 0), Vector3(-21, 0.1, -14), Vector3(25.5, 0.1, -9.5), Vector3(25, 0.1, 3)]:
 		_tree(point)
 	# Not at -8: that is the packing room door (export_world.gd).
