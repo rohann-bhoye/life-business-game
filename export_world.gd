@@ -219,14 +219,8 @@ func _dress_packing_room(room: Node3D) -> void:
 	room.get_node("PackTubeLight").material_override = glow
 	var second: MeshInstance3D = builder._box("PackTubeLight2", room, Vector3(0.24, 0.07, 1.7), Vector3(-7.83, 3.82, -2.8), Color(0.94, 0.98, 1))
 	second.material_override = glow
-	var lamp2 := OmniLight3D.new()
-	lamp2.name = "PackLight2"
-	lamp2.position = Vector3(-7.83, 3.3, -2.6)
-	lamp2.light_color = Color(1, 0.97, 0.9)
-	lamp2.light_energy = 0.55
-	lamp2.omni_range = 5.0
-	lamp2.shadow_enabled = false
-	room.add_child(lamp2)
+	# (No second room light: the two glowing tube fixtures and PackLight are enough, and every
+	# extra light costs the Compatibility renderer a little on every pixel it touches.)
 	# Yellow safety lines marking the walking lane from the street door to the back.
 	var yellow := Color(0.96, 0.77, 0.2)
 	for x in [-8.72, -7.38]:
@@ -254,14 +248,6 @@ func _dress_packing_room(room: Node3D) -> void:
 	builder._box("FrontPlinthRight", room, Vector3(1.4, 0.34, 0.1), Vector3(-6.72, 0.27, 2.58), grey)
 	for x in [-9.45, -6.3]:
 		_prop(room, "ExportLamp", "export_lamp", Vector3(x, 2.62, 2.57))
-		var light := OmniLight3D.new()
-		light.name = "FrontLamp"
-		light.position = Vector3(x, 2.5, 2.9)
-		light.light_color = Color(1, 0.84, 0.55)
-		light.light_energy = 0.5
-		light.omni_range = 3.2
-		light.shadow_enabled = false
-		room.add_child(light)
 	Bricks.poster(room, "ExportFrontPoster", Vector3(-9.22, 1.45, 2.58), 0.0, Vector2(0.7, 0.95), Color(0.12, 0.36, 0.62), "SHIP\nWORLD\nWIDE!")
 	builder._box("NumberPlate", room, Vector3(0.3, 0.14, 0.03), Vector3(-6.4, 1.5, 2.575), Color(0.95, 0.95, 0.9))
 	_text(room, "NumberPlateText", "No. 2", Vector3(-6.4, 1.5, 2.595), 28, Color(0.1, 0.1, 0.12))
