@@ -92,7 +92,24 @@ func set_quality(quality: int) -> void:
 	low_quality = quality == 0
 	_refresh()
 
+
+## Cinematic grade: filmic tone curve, a touch more contrast and colour, and a soft glow
+## around bright lights and signs. Low (Fast) skips the extra passes for low-end GPUs.
+func _grade() -> void:
+	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	environment.tonemap_white = 5.0
+	environment.tonemap_exposure = 1.12
+	environment.glow_enabled = not low_quality
+	environment.glow_intensity = 0.55
+	environment.glow_strength = 0.9
+	environment.glow_bloom = 0.04
+	environment.glow_hdr_threshold = 0.95
+	environment.adjustment_enabled = not low_quality
+	environment.adjustment_contrast = 1.07
+	environment.adjustment_saturation = 1.12
+
 func _refresh() -> void:
+	_grade()
 	last_minute = floori(business.minutes_of_day)
 	sun.visible = underground.is_empty()
 	moon.visible = underground.is_empty()

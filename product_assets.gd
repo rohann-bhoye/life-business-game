@@ -1,13 +1,14 @@
 extends RefCounted
 
 const PATHS := {
-	"bottle": "res://assets/products/kenney/soda-bottle.glb",
-	"snack": "res://assets/products/kenney/bag.glb",
-	"oil": "res://assets/products/kenney/bottle-oil.glb",
-	"milk": "res://assets/products/kenney/carton.glb",
-	"bread": "res://assets/products/kenney/loaf.glb",
-	"chocolate": "res://assets/products/kenney/chocolate-wrapper.glb",
-	"honey": "res://assets/products/kenney/honey.glb"
+	"bottle": "res://assets/products/custom/bottle.glb",
+	"snack": "res://assets/products/custom/snack.glb",
+	"oil": "res://assets/products/custom/oil.glb",
+	"milk": "res://assets/products/custom/milk.glb",
+	"bread": "res://assets/products/custom/bread.glb",
+	"chocolate": "res://assets/products/custom/chocolate.glb",
+	"honey": "res://assets/products/custom/honey.glb",
+	"soap": "res://assets/products/custom/soap.glb"
 }
 static var models: Dictionary = {}
 static var bounds: Dictionary = {}
@@ -35,14 +36,16 @@ static func attach(parent: Node3D, product: String, size: Vector3) -> void:
 	var visual := Node3D.new()
 	visual.name = "ProductAsset"
 	visual.scale = Vector3.ONE * factor
-	visual.position = -Vector3(box.get_center().x, box.position.y, box.get_center().z) * factor
+	# Our models print their label toward +Z; shelves, counters and baskets face +X.
+	visual.rotation.y = PI / 2
+	visual.position = -Vector3(box.get_center().z, box.position.y, -box.get_center().x) * factor
 	visual.add_child(models[product].instantiate())
 	parent.add_child(visual)
 	label_product(parent, product, box.size.x * factor * 0.5 + 0.002)
 
 static func label_product(parent: Node3D, product: String, face_x := 0.084) -> void:
 	# Kenney grocery models already look like their product; only the original three get packaging labels.
-	if product not in ["bottle", "snack", "soap"]: return
+	return  # custom product models print their own labels
 	var label := Label3D.new()
 	label.name = "PackageLabel"
 	label.text = {"bottle": "REUSE", "snack": "MASALA\nCRUNCH", "soap": "SOAP"}[product]

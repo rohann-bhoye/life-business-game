@@ -83,7 +83,7 @@ func _exterior(shop: Node3D) -> void:
 	Bricks.shutter(shop, "GoodsShutter", Vector3(-6.72, -1.4, -1.0), -PI / 2, 2.2, 2.4)
 	Bricks.poster(shop, "SidePoster", Vector3(-6.74, 0.2, 1.3), -PI / 2, Vector2(0.9, 1.1), Color(0.12, 0.36, 0.62), "BETTER\nCHOICES\nEVERYDAY!")
 	_cctv(shop, Vector3(-6.74, 2.1, 2.3))
-	shop.get_node("RoofTrim").material_override = builder._material(Color(0.24, 0.26, 0.29))
+	shop.get_node("RoofTrim").material_override = builder._material(Color(0.8, 0.8, 0.77))
 	Bricks.i_beams(shop, "CeilingBeams", -2.94, 2.94, [1.9, -0.4, -4.2, -6.5], 2.41)
 	_label(shop, "WindowHours", "OPEN  08:00 - 20:00", Vector3(2, -0.68, 2.57), 22, 0.003)
 	_label(shop, "WindowPayments", "CASH / CARD / UPI", Vector3(-2, -0.68, 2.57), 22, 0.003)

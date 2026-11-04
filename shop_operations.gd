@@ -319,11 +319,36 @@ func _refresh_bag_stand() -> void:
 	bag_stand_label.text = "CARRY BAGS: %d" % bags if bags > 0 else "NO CARRY BAGS\nBuy on the shop PC"
 
 ## One of our Blender props (assets/props/<path>.glb), its origin at `offset`.
+const CONTACT_SHADOW := preload("res://assets/materials/contact_shadow.gdshader")
+const CONTACT_SHADOWED := ["shop/rack", "shop/fridge", "shop/counter"]
+
+## A soft floor shadow around a big fixture (racks, fridge, counter), sized from its model.
+func _contact_shadow(prop: Node3D) -> void:
+	var box: AABB = preload("res://product_assets.gd")._bounds(prop, Transform3D.IDENTITY)
+	if not box.has_volume(): return
+	box.position -= prop.position  # the bounds are in the parent's frame; the shadow is a child
+	var margin := 0.45
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(box.size.x + margin * 2.0, box.size.z + margin * 2.0)
+	var material := ShaderMaterial.new()
+	material.shader = CONTACT_SHADOW
+	material.set_shader_parameter("half_size", Vector2(box.size.x, box.size.z) / 2.0)
+	material.set_shader_parameter("margin", margin)
+	material.set_shader_parameter("strength", 0.7)
+	var shadow := MeshInstance3D.new()
+	shadow.name = "ContactShadow"
+	shadow.mesh = plane
+	shadow.material_override = material
+	shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	shadow.position = Vector3(box.get_center().x, box.position.y + 0.04, box.get_center().z)
+	prop.add_child(shadow)
+
 func _prop(parent: Node3D, node_name: String, path: String, offset := Vector3.ZERO) -> Node3D:
 	var prop: Node3D = (load("res://assets/props/%s.glb" % path) as PackedScene).instantiate()
 	prop.name = node_name
 	prop.position = offset
 	parent.add_child(prop)
+	if path in CONTACT_SHADOWED: _contact_shadow(prop)
 	return prop
 
 ## Our green APNA MART carry bag (tools/blender/build_carry_bag.py): printed front
@@ -720,7 +745,7 @@ func make_bottle(parent: Node3D, node_name: String, offset: Vector3) -> Node3D:
 	return bottle
 
 const PRODUCE_SIZES := {"tomato": Vector3(0.19, 0.18, 0.19), "carrot": Vector3(0.2, 0.2, 0.2), "cabbage": Vector3(0.2, 0.19, 0.2), "corn": Vector3(0.2, 0.22, 0.2), "apple": Vector3(0.17, 0.17, 0.17)}
-const GROCERY_SIZES := {"oil": Vector3(0.14, 0.3, 0.11), "milk": Vector3(0.14, 0.24, 0.11), "bread": Vector3(0.16, 0.13, 0.17), "chocolate": Vector3(0.16, 0.06, 0.15), "honey": Vector3(0.13, 0.16, 0.13)}
+const GROCERY_SIZES := {"snack": Vector3(0.16, 0.26, 0.11), "soap": Vector3(0.16, 0.12, 0.11), "oil": Vector3(0.14, 0.3, 0.11), "milk": Vector3(0.14, 0.24, 0.11), "bread": Vector3(0.2, 0.14, 0.17), "chocolate": Vector3(0.13, 0.15, 0.1), "honey": Vector3(0.13, 0.16, 0.13)}
 static var asset_boxes: Dictionary = {}
 # Real size of a fitted product model, so caps/seals sit exactly on top of it.
 func _asset_box(id: String, size: Vector3) -> AABB:

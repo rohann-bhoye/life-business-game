@@ -1,7 +1,7 @@
 extends RefCounted
 
 const Bounds := preload("res://product_assets.gd")
-const ROOT := "res://assets/produce/kenney/"
+const ROOT := "res://assets/produce/custom/"
 static var scenes := {}
 static var boxes := {}
 
