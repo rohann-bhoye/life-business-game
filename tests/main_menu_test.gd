@@ -94,7 +94,7 @@ func _run() -> void:
 	await _through_loading("New shop")
 	var shop = current_scene.get_node("Shop/ShopArea")
 	var player = current_scene.get_node("Player")
-	assert(shop.money == 10000 and shop.business.starting_money == 10000 and shop.stock == 10 and shop.business.save_path == save_path, "New Game starts with beginner money")
+	assert(shop.money == preload("res://business_backend.gd").DIFFICULTY_MONEY[1] and shop.business.starting_money == preload("res://business_backend.gd").DIFFICULTY_MONEY[1] and shop.stock == 10 and shop.business.save_path == save_path, "New Game starts with beginner money")
 	assert(player.mouse_sensitivity == 0.006 and player.invert_y and player.camera.fov == 68)
 	assert(not current_scene.get_node("DirectionalLight3D").shadow_enabled, "Default Low preset must disable sun shadows")
 	assert(current_scene.get_meta("session_settings_path") == settings_path)

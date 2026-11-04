@@ -179,14 +179,16 @@ func _build_confirmation() -> void:
 	message.position = Vector2(20, 60)
 	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	message.clip_text = true
-	# Normal keeps the old ConfirmButton name.
-	var rupee := String.chr(8377)
-	var choices := [["EasyButton", "Aasaan - %s15,000" % rupee, 0, "PrimaryButton"], ["ConfirmButton", "Normal - %s10,000" % rupee, 1, "InfoButton"], ["HardButton", "Mushkil - %s6,000" % rupee, 2, "DangerButton"]]
+	# Normal keeps the old ConfirmButton name. The amounts come from the game's own rules
+	# (starting money and Apna Mart's price per level), so the buttons always tell the truth.
+	var choices := [["EasyButton", 0, "PrimaryButton"], ["ConfirmButton", 1, "InfoButton"], ["HardButton", 2, "DangerButton"]]
 	for index in range(choices.size()):
 		var choice: Array = choices[index]
-		var button := _button(confirmation, choice[1], _new_game.bind(choice[2]))
+		var level: int = choice[1]
+		var words := "%s  -  %s%s   (Apna Mart %s%s)" % [Session.Backend.DIFFICULTY_NAMES[level], String.chr(8377), _money(Session.Backend.DIFFICULTY_MONEY[level]), String.chr(8377), _money(Session.Backend.SHOP_PRICES[level])]
+		var button := _button(confirmation, words, _new_game.bind(level))
 		button.name = choice[0]
-		button.theme_type_variation = choice[3]
+		button.theme_type_variation = choice[2]
 		button.position = Vector2(20, 152 + index * 52)
 	var cancel := _button(confirmation, "Cancel", _cancel_new)
 	cancel.position = Vector2(20, 316)
