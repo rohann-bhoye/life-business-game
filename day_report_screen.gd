@@ -147,7 +147,11 @@ func open(business_ref, money_format := Callable(), team: Array = []) -> bool:
 	if int(report.expenses) == 0: _row(costs, "No spending today", "")
 	_row(costs, "Total", _money(int(report.expenses)), RED if int(report.expenses) > 0 else INK)
 	var change: int = int(report.reputation_change)
-	status_label.text = "Money now: %s   |   Reputation: %d/100 (%s%d)   |   New reviews: %d" % [_money(int(business.money)), report.reputation, "+" if change >= 0 else "", change, report.reviews]
+	status_label.text = "Money now: %s   |   Reputation: %d/100 (%s%d)   |   Shoppers: %d" % [_money(int(business.money)), report.reputation, "+" if change >= 0 else "", change, report.reviews]
+	# How the town's talk moved today (business_backend popularity; old reports have none).
+	if report.has("popularity"):
+		var talk: int = int(report.get("popularity_change", 0))
+		status_label.text += "\nTown popularity: %s (%d/100, %s%d today)" % [business.popularity_name(), int(report.popularity), "+" if talk >= 0 else "", talk]
 	if business.loan_left() > 0: status_label.text += "\nBank loan left: %s (%s per day)" % [_money(business.loan_left()), _money(business.loan_daily_payment())]
 	var next_day: int = business.day
 	tomorrow.text = "Tomorrow: Day %d  |  Forecast: %s" % [next_day, "Rain (more customers stay home)" if business.weather_for_day(next_day) == "rain" else "Sunny"]

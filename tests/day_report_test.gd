@@ -14,15 +14,15 @@ func _path() -> String:
 	return path
 
 func _run() -> void:
-	# Reputation: 50 is neutral, 100 brings customers 25% sooner, 0 makes them 25% slower.
+	# Reputation: 50 is neutral, 100 brings a third more shoppers a day, 0 a fifth fewer.
 	var state = Backend.new()
 	state.save_path = _path()
-	var base: float = state.customer_spawn_interval()
+	var base: float = state.customers_per_day()
 	assert(is_equal_approx(state.reputation_traffic_factor(), 1.0))
 	state.customer_reviews.reputation = 100
-	assert(is_equal_approx(state.customer_spawn_interval(), base * 0.75))
+	assert(is_equal_approx(state.customers_per_day(), base / 0.75))
 	state.customer_reviews.reputation = 0
-	assert(is_equal_approx(state.customer_spawn_interval(), base * 1.25))
+	assert(is_equal_approx(state.customers_per_day(), base / 1.25))
 	state.customer_reviews.reputation = 50
 
 	# One day of trade, closed by sleeping.

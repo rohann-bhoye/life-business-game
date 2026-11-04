@@ -214,6 +214,8 @@ func _ready() -> void:
 	order_panel.theme = theme
 	add_child(order_panel)
 	shop.business.khata_news.connect(func(message: String, good: bool): show_feedback(message, not good))
+	# The town's talk about the shop moves up or down a step (business_backend popularity).
+	shop.business.popularity_tier_changed.connect(_on_popularity_tier)
 	how_to_play = HowToPlay.new()
 	add_child(how_to_play)
 	how_to_play.closed.connect(func():
@@ -770,8 +772,8 @@ func _update_hud() -> void:
 	_update_demo_goals()
 	_update_first_day_guide()
 	var reviews = shop.business.customer_reviews
-	shop_menu.get_node("ReputationLabel").text = "Reputation: %d/100\n%s" % [reviews.reputation, "No reviews yet" if reviews.review_count == 0 else "Last satisfaction: %d/100" % reviews.last_score]
-	shop_menu.get_node("ReputationLabel").tooltip_text = "%d customer reviews | Customer visits %+d%%" % [reviews.review_count, roundi((1.0 / shop.business.reputation_traffic_factor() - 1.0) * 100.0)]
+	shop_menu.get_node("ReputationLabel").text = "Reputation: %d/100  |  Town: %s\n%s" % [reviews.reputation, shop.business.popularity_name(), "No reviews yet" if reviews.review_count == 0 else "Last satisfaction: %d/100" % reviews.last_score]
+	shop_menu.get_node("ReputationLabel").tooltip_text = "%d customer reviews | Town popularity %d/100 (%s) | About %d shoppers a day" % [reviews.review_count, roundi(shop.business.popularity), shop.business.popularity_name(), roundi(shop.business.customers_per_day(shop.marketing_active))]
 	hud_money.text = "Money: %s%s" % [String.chr(8377), shop._format_money(shop.money)]
 	shop.profit_label.modulate = Color(0.48, 0.88, 0.67) if shop.business.net_profit() >= 0 else Color(1, 0.61, 0.57)
 	shop.unpaid_bills_label.modulate = Color(1, 0.74, 0.43) if shop.business.unpaid_bills() > 0 else Color.WHITE
@@ -854,7 +856,7 @@ func _present_demo_completion() -> void:
 		shop.business.mark_demo_seen()
 
 func _update_upgrade_controls() -> void:
-	shop_level_label.text = "Level %d | Visit wait: %ss" % [shop.business.shop_level, str(shop.business.customer_spawn_interval(shop.marketing_active))]
+	shop_level_label.text = "Level %d | About %d shoppers a day" % [shop.business.shop_level, roundi(shop.business.customers_per_day(shop.marketing_active))]
 	var cost: int = shop.business.next_upgrade_cost()
 	upgrade_button.disabled = not shop.business.can_upgrade_shop()
 	upgrade_button.text = "Maximum level" if cost == 0 else "Upgrade to level %d - %s%s" % [shop.business.shop_level + 1, String.chr(8377), shop._format_money(cost)]
@@ -896,6 +898,16 @@ func _refresh_farm() -> void:
 	var button: Button = shop_menu.get_node("FarmUpgradeButton")
 	button.text = "Maximum farm size" if farm.level == 3 else "Expand to %d beds - %s%s" % [farm.PLOTS[farm.level], String.chr(8377), shop._format_money(farm.UPGRADE_COSTS[farm.level - 1])]
 	button.disabled = farm.level == 3 or shop.business.shop_level <= farm.level or shop.business.money < farm.UPGRADE_COSTS[mini(farm.level - 1, 1)]
+
+## The town talks about the shop more (or less): say so, with what it means.
+func _on_popularity_tier(tier: int) -> void:
+	var lines := [
+		"People are forgetting Apna Mart. Keep it open, stocked and fairly priced.",
+		"Dholkarpur now knows Apna Mart. More shoppers will come.",
+		"Apna Mart is Popular in Dholkarpur! Busier days ahead.",
+		"Apna Mart is Famous in Dholkarpur! The whole town shops here.",
+	]
+	show_feedback(lines[clampi(tier, 0, lines.size() - 1)], tier == 0)
 
 func show_feedback(message: String, failed := false) -> void:
 	feedback_label.text = message

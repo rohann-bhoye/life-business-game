@@ -53,10 +53,10 @@ func _run() -> void:
 	var weather = Backend.new()
 	weather.save_path = ""
 	weather.day = rainy - 1 if Backend.weather_for_day(rainy - 1) == "sunny" else 1
-	var sunny_interval: float = weather.customer_spawn_interval()
+	var sunny_crowd: float = weather.customers_per_day() / weather.day_mood()
 	weather.day = rainy
 	assert(weather.is_raining())
-	assert(weather.customer_spawn_interval() > sunny_interval, "Rain brings fewer customers")
+	assert(weather.customers_per_day() / weather.day_mood() < sunny_crowd, "Rain brings fewer customers")
 	weather.day = 1
 	weather.save_path = _path()
 	assert(weather.buy_seeds(1) and weather.plant_crop(0))

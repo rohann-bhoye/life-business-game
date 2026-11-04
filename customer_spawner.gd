@@ -1,8 +1,14 @@
 extends Node3D
 
+# Sends shoppers to Apna Mart. How often comes from the business (customer_gap_minutes:
+# the town's popularity, rating, prices, Sharma, rain, marketing and the hour, with a morning
+# and an evening rush), counted in game minutes so every Day length setting gets the same
+# number of shoppers. Each gap gets some chance, so people never arrive like clockwork.
 const CUSTOMER_SCENE := preload("res://customer.tscn")
-const NORMAL_SPAWN_INTERVAL := 10.0
-const MARKETING_SPAWN_INTERVAL := 8.5
+## Spread of each gap around the average (0.55x .. 1.45x).
+const GAP_SPREAD := Vector2(0.55, 1.45)
+## While the shop is shut it looks again this often (real seconds).
+const CLOSED_CHECK := 3.0
 
 var active_customer: Node3D
 var customers: Array[Node3D] = []
@@ -18,20 +24,28 @@ func _ready() -> void:
 	customers.append(active_customer)
 	active_customer.tree_exited.connect(_on_customer_departed.bind(active_customer))
 	physical_shop = get_node("../ShopOperations").enabled
-	$SpawnTimer.one_shot = not physical_shop
+	$SpawnTimer.one_shot = true
 	$SpawnTimer.stop()
 	$SpawnTimer.timeout.connect(_on_spawn_timer_timeout)
 	shop_area.business.changed.connect(_refresh_spawn_interval)
-	_refresh_spawn_interval()
-	if physical_shop: $SpawnTimer.start()
+	if physical_shop: _schedule()
 
+## Real seconds between shoppers at this hour, on average.
+func average_gap_seconds(marketing := false) -> float:
+	var clock := get_node_or_null("../DayClock")
+	var speed: float = clock.minutes_per_second if clock != null and "minutes_per_second" in clock else 1.0
+	return shop_area.business.customer_gap_minutes(marketing) / maxf(0.1, speed)
+
+## Waits for the next shopper: the average gap with some chance, or `seconds` when given.
+func _schedule(seconds := -1.0) -> void:
+	if seconds < 0.0: seconds = average_gap_seconds(shop_area.marketing_active) * randf_range(GAP_SPREAD.x, GAP_SPREAD.y)
+	$SpawnTimer.start(maxf(1.0, seconds))
+
+## A campaign (or the end of one) changes the pace from the next shopper on; a long wait
+## already running is cut short so the change shows at once.
 func set_marketing_active(active: bool) -> void:
-	var interval: float = shop_area.business.customer_spawn_interval(active)
-	if is_equal_approx($SpawnTimer.wait_time, interval):
-		return
-	$SpawnTimer.wait_time = interval
-	if physical_shop or not is_instance_valid(active_customer):
-		$SpawnTimer.start()
+	if not physical_shop: return
+	if $SpawnTimer.is_stopped() or $SpawnTimer.time_left > average_gap_seconds(active) * GAP_SPREAD.y: _schedule()
 
 func _refresh_spawn_interval() -> void:
 	set_marketing_active(shop_area.marketing_active)
@@ -39,16 +53,16 @@ func _refresh_spawn_interval() -> void:
 func _on_customer_departed(customer: Node3D) -> void:
 	customers.erase(customer)
 	active_customer = customers[0] if not customers.is_empty() else null
-	if is_inside_tree() and not physical_shop:
-		$SpawnTimer.start()
+	if is_inside_tree() and not physical_shop: _schedule()
 
 func _on_spawn_timer_timeout() -> void:
-	if not physical_shop: $SpawnTimer.stop()
 	if not shop_area.business.shop_is_open():
-		$SpawnTimer.start()
+		_schedule(CLOSED_CHECK)
 		return
+	if physical_shop: _schedule()
 	# Up to 3 shoppers at a time; people already walking away down the street don't
-	# count, but the street never holds more than 8 customers in all.
+	# count, but the street never holds more than 8 customers in all. Someone who finds
+	# the shop full walks on (no queue builds up out of sight).
 	var shopping := customers.filter(func(customer): return is_instance_valid(customer) and customer.state != customer.State.LEAVING).size()
 	if (shopping >= 3 or customers.size() >= 8 if physical_shop else is_instance_valid(active_customer)):
 		return

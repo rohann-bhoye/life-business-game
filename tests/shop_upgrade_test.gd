@@ -33,14 +33,17 @@ func _stop_simulation() -> void:
 func _run() -> void:
 	var state = Backend.new()
 	assert(state.shop_level == 1 and state.next_upgrade_cost() == 2500)
-	assert(state.customer_spawn_interval() == 10.0 and state.customer_spawn_interval(true) == 8.5)
+	# Each level brings more shoppers a day; marketing adds 18% on top.
+	var level_one: float = state.customers_per_day()
+	assert(is_equal_approx(state.customers_per_day(true), level_one * 1.18))
 	assert(state.upgrade_shop())
 	assert(state.shop_level == 2 and state.money == 47500 and state.stock == 10)
 	assert(state.upgrade_expenses == 2500 and state.total_expenses() == 2500 and state.net_profit() == -2500)
-	assert(state.customer_spawn_interval() == 8.0 and is_equal_approx(state.customer_spawn_interval(true), 6.8))
+	var level_two: float = state.customers_per_day()
+	assert(level_two > level_one and is_equal_approx(state.customers_per_day(true), level_two * 1.18))
 	assert(state.upgrade_shop())
 	assert(state.shop_level == 3 and state.money == 42500 and state.upgrade_expenses == 7500)
-	assert(state.customer_spawn_interval() == 6.0 and is_equal_approx(state.customer_spawn_interval(true), 5.1))
+	assert(state.customers_per_day() > level_two)
 	var max_state: Dictionary = state.snapshot()
 	assert(state.next_upgrade_cost() == 0 and not state.can_upgrade_shop())
 	assert(not state.upgrade_shop() and state.snapshot() == max_state)
@@ -181,7 +184,9 @@ func _run() -> void:
 	shop.business.save_path = ""
 	assert(shop.business.shop_level == 3 and shop.money == saved_money)
 	assert(shop.business.upgrade_expenses == 7500 and ui.upgrade_button.disabled)
-	assert(is_equal_approx(spawner.get_node("SpawnTimer").wait_time, 6.0 * shop.business.reputation_traffic_factor()))
+	# The next shopper comes within the usual spread of the average gap (customer_spawner.gd).
+	if not spawner.get_node("SpawnTimer").is_stopped():
+		assert(spawner.get_node("SpawnTimer").time_left <= maxf(spawner.CLOSED_CHECK, spawner.average_gap_seconds() * spawner.GAP_SPREAD.y) + 0.1)
 	assert(current_scene.get_node("Shop/ShopSign").text == "SHOP III")
 	assert(not shop.business.shop_is_open())
 	for path in paths:

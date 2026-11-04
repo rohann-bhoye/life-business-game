@@ -20,7 +20,7 @@ static func counters(business) -> Dictionary:
 		extras += sold[id]
 	sold["bottle"] = maxi(0, int(business.items_sold) - extras)
 	var costs := {"stock": business.restocking_expenses, "staff": business.hiring_expenses + business.wage_expenses + business.overtime_expenses, "bills": business.operating_expenses + business.rent_paid, "marketing": business.marketing_expenses, "upgrades": business.upgrade_expenses + business.furnishing_expenses + business.expansion_expenses + business.shop_cost, "farm": business.farm.expenses(), "loan": business.loan_interest_paid}
-	return {"day": int(business.day), "items_sold": int(business.items_sold), "revenue": int(business.sales_revenue), "expenses": int(business.total_expenses()), "missed": int(business.missed_sales), "reputation": int(business.customer_reviews.reputation), "reviews": int(business.customer_reviews.review_count), "sold": sold, "costs": costs}
+	return {"day": int(business.day), "items_sold": int(business.items_sold), "revenue": int(business.sales_revenue), "expenses": int(business.total_expenses()), "missed": int(business.missed_sales), "reputation": int(business.customer_reviews.reputation), "reviews": int(business.customer_reviews.review_count), "popularity": roundi(business.popularity), "sold": sold, "costs": costs}
 
 func begin(business) -> void:
 	start = counters(business)
@@ -38,7 +38,7 @@ func close(business) -> Dictionary:
 			best_count = count
 	var revenue: int = now.revenue - int(start.revenue)
 	var expenses: int = now.expenses - int(start.expenses)
-	last = {"day": int(start.day), "items_sold": now.items_sold - int(start.items_sold), "revenue": revenue, "expenses": expenses, "profit": revenue - expenses, "missed": now.missed - int(start.missed), "reputation": now.reputation, "reputation_change": now.reputation - int(start.reputation), "reviews": now.reviews - int(start.reviews), "best": best, "best_count": best_count}
+	last = {"day": int(start.day), "items_sold": now.items_sold - int(start.items_sold), "revenue": revenue, "expenses": expenses, "profit": revenue - expenses, "missed": now.missed - int(start.missed), "reputation": now.reputation, "reputation_change": now.reputation - int(start.reputation), "reviews": now.reviews - int(start.reviews), "popularity": now.popularity, "popularity_change": now.popularity - int(start.get("popularity", now.popularity)), "best": best, "best_count": best_count}
 	# Saves from before the breakdown have no start costs; they show only the total.
 	if start.has("costs"):
 		var costs := {}

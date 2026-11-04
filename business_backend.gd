@@ -829,8 +829,78 @@ func upgrade_shop() -> bool:
 	_commit()
 	return true	
 
-func customer_spawn_interval(marketing := false) -> float:
-	return CUSTOMER_INTERVALS[shop_level - 1] * (0.85 if marketing else 1.0) * reputation_traffic_factor() * (RAIN_TRAFFIC_FACTOR if is_raining() else 1.0) * rival_traffic_factor()
+# --- Town popularity: how well Dholkarpur knows Apna Mart (0..100). A new shop is unknown,
+# so only a few people come on the first days. Every happy customer tells friends (it grows,
+# more slowly near the top); an unhappy one warns them (it falls); and the town forgets a
+# little each night, more when the shop stayed shut. Together with the rating, prices,
+# Sharma's store, rain and the hour it sets how many shoppers come. ---
+const POPULARITY_START := 5.0
+## Saves from before popularity existed were already busy shops.
+const POPULARITY_OLD_SAVES := 50.0
+const POPULARITY_TIERS := [[0.0, "Unknown"], [20.0, "Known"], [45.0, "Popular"], [75.0, "Famous"]]
+## Shoppers in a whole shop day (8 AM to 8 PM) at popularity 0 and 100, per shop level.
+const DAY_CUSTOMERS := [[14.0, 60.0], [18.0, 76.0], [22.0, 95.0]]
+## How busy each shop hour is, 8 AM to 7 PM: a morning rush, a quiet afternoon and the
+## evening rush after work (averages 1.05; customer_gap_minutes() evens it out).
+const HOUR_RUSH := [1.3, 1.4, 1.1, 0.95, 0.7, 0.6, 0.65, 0.85, 1.0, 1.3, 1.45, 1.3]
+const MARKETING_CUSTOMERS := 1.18
+## A campaign gets the shop talked about: popularity jumps a little when it starts.
+const MARKETING_POPULARITY := 3.0
+const POPULARITY_NIGHT_FADE := 0.97
+const POPULARITY_SHUT_DAY := 4.0
+signal popularity_tier_changed(tier: int)
+var popularity := POPULARITY_START
+
+## 0 Unknown, 1 Known, 2 Popular, 3 Famous.
+func popularity_tier() -> int:
+	var tier := 0
+	for index in range(POPULARITY_TIERS.size()):
+		if popularity >= POPULARITY_TIERS[index][0]: tier = index
+	return tier
+
+func popularity_name() -> String:
+	return POPULARITY_TIERS[popularity_tier()][1]
+
+## Moves popularity by `amount` (kept within 0..100) and tells the HUD when the tier changes.
+func change_popularity(amount: float) -> void:
+	var before := popularity_tier()
+	popularity = clampf(popularity + amount, 0.0, 100.0)
+	if popularity_tier() != before: popularity_tier_changed.emit(popularity_tier())
+
+## What one visit does to the town's talk: happy shoppers spread the word (less as the shop
+## is already known), unhappy ones put people off.
+func _popularity_from_review(score: int) -> void:
+	var spread := 1.0 - popularity / 120.0
+	if score >= 70: change_popularity(0.5 * spread)
+	elif score >= 50: change_popularity(0.15 * spread)
+	else: change_popularity(-0.9)
+
+## Some days are busier than others (a wedding in town, payday): 0.88..1.12, the same for
+## a day every time, like the weather.
+func day_mood(day_number := -1) -> float:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash((day if day_number < 0 else day_number) * 92821 + 31)
+	return rng.randf_range(0.88, 1.12)
+
+## Shoppers expected in a whole shop day as things stand now.
+func customers_per_day(marketing := false) -> float:
+	var range_now: Array = DAY_CUSTOMERS[clampi(shop_level - 1, 0, DAY_CUSTOMERS.size() - 1)]
+	var count: float = lerpf(range_now[0], range_now[1], popularity / 100.0)
+	count *= MARKETING_CUSTOMERS if marketing else 1.0
+	count /= reputation_traffic_factor() * (RAIN_TRAFFIC_FACTOR if is_raining() else 1.0) * rival_traffic_factor()
+	return count * day_mood()
+
+## How busy the shop hour at `minute` is (1.0 = an average hour), eased between hours.
+static func hour_rush(minute: float) -> float:
+	var hour := clampf((minute - SHOP_OPEN_MINUTE) / 60.0 - 0.5, 0.0, HOUR_RUSH.size() - 1.0)
+	var low := floori(hour)
+	var high := mini(low + 1, HOUR_RUSH.size() - 1)
+	return lerpf(HOUR_RUSH[low], HOUR_RUSH[high], hour - low) / 1.05
+
+## Game minutes between two shoppers at this hour, on average (the spawner adds chance).
+func customer_gap_minutes(marketing := false) -> float:
+	var day_minutes := float(SHOP_CLOSE_MINUTE - SHOP_OPEN_MINUTE)
+	return day_minutes / maxf(1.0, customers_per_day(marketing)) / hour_rush(minutes_of_day)
 
 ## Good reputation brings customers more often: 100 -> 25% shorter waits,
 ## 0 -> 25% longer, 50 (the starting value) -> unchanged.
@@ -1032,6 +1102,10 @@ func _bill_new_day() -> void:
 	_rain_waters_farm()
 	_collect_udhaar()
 	exports.refresh(day, export_prices())
+	# The town forgets a little each night, and more when the shop served nobody all day.
+	var faded := popularity * (1.0 - pow(POPULARITY_NIGHT_FADE, elapsed_days))
+	if shop_owned and int(day_report.last.get("reviews", 1)) == 0: faded += POPULARITY_SHUT_DAY
+	change_popularity(-faded)
 
 func advance_clock(minutes: float) -> void:
 	if not is_finite(minutes) or minutes <= 0.0:
@@ -1215,6 +1289,7 @@ func start_marketing() -> bool:
 	money -= MARKETING_COST
 	marketing_expenses += MARKETING_COST
 	marketing_seconds_left = MARKETING_DURATION
+	change_popularity(MARKETING_POPULARITY)
 	_commit()
 	return true
 
@@ -1589,6 +1664,7 @@ func net_profit() -> int:
 
 func record_customer_review(outcome: String, wait_seconds: float, discounted := false) -> bool:
 	if not customer_reviews.record(outcome, wait_seconds, discounted): return false
+	_popularity_from_review(customer_reviews.last_score)
 	_commit()
 	return true
 
@@ -1610,6 +1686,7 @@ func snapshot() -> Dictionary:
 	for field in ["loan_received", "loan_principal_repaid", "loan_interest_paid", "loan_missed_payments"]: data[field] = get(field)
 	data["starting_money"] = starting_money
 	data["home_rented"] = home_rented
+	data["popularity"] = popularity
 	data["rent_paid"] = rent_paid
 	data["rent_due"] = rent_due
 	data["incoming_boxes"] = incoming_boxes.duplicate(true)
@@ -1684,6 +1761,7 @@ func restore(data: Dictionary) -> void:
 	for field in ["loan_received", "loan_principal_repaid", "loan_interest_paid", "loan_missed_payments"]: set(field, int(data.get(field, 0)))
 	starting_money = int(data.get("starting_money", INITIAL_MONEY))
 	home_rented = data.get("home_rented", false) == true
+	popularity = float(data.get("popularity", POPULARITY_OLD_SAVES))
 	rent_paid = int(data.get("rent_paid", 0))
 	rent_due = int(data.get("rent_due", 0))
 	for id in inventory:
@@ -2140,6 +2218,8 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	# Loans: money received minus principal paid back.
 	if not _valid_loan(data): return false
 	if not _valid_rent(data, int(saved_day)): return false
+	var talk = data.get("popularity", POPULARITY_OLD_SAVES)
+	if not (talk is int or talk is float) or not is_finite(float(talk)) or talk < 0.0 or talk > 100.0: return false
 	expenses -= int(data.get("loan_received", 0)) - int(data.get("loan_principal_repaid", 0))
 	var start_money := int(data.get("starting_money", INITIAL_MONEY))
 	if start_money not in [INITIAL_MONEY] + DIFFICULTY_MONEY + OLD_DIFFICULTY_MONEY: return false

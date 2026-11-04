@@ -119,8 +119,7 @@ func _sync_runtime_state() -> void:
 		customer_spawner.set_marketing_active(true)
 	elif not marketing_active:
 		marketing_timer.stop()
-		if customer_spawner.get_node("SpawnTimer").wait_time != business.customer_spawn_interval():
-			customer_spawner.set_marketing_active(false)
+		customer_spawner.set_marketing_active(false)
 	_update_shop_labels()
 
 func _on_marketing_button_pressed() -> void:
