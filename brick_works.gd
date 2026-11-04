@@ -18,6 +18,8 @@ static var glass: StandardMaterial3D
 static func brick_material() -> StandardMaterial3D:
 	if bricks != null: return bricks
 	var image := Image.create(128, 64, false, Image.FORMAT_RGB8)
+	# Height map for the relief: bricks stand proud, the mortar joints are recessed.
+	var height := Image.create(128, 64, false, Image.FORMAT_RGB8)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2037
 	var mortar := Color(0.78, 0.74, 0.68)
@@ -30,9 +32,15 @@ static func brick_material() -> StandardMaterial3D:
 					if x < 0 or x >= 128: continue
 					var edge := y % 16 < 2 or (x + offset) % 32 < 2
 					image.set_pixel(x, y, mortar if edge else shade.darkened(rng.randf_range(0.0, 0.05)))
+					var level := 0.18 + rng.randf() * 0.1 if edge else 0.72 + rng.randf() * 0.2
+					height.set_pixel(x, y, Color(level, level, level))
 	image.generate_mipmaps()
+	height.bump_map_to_normal_map(4.0)
+	height.generate_mipmaps()
 	bricks = StandardMaterial3D.new()
 	bricks.albedo_texture = ImageTexture.create_from_image(image)
+	bricks.normal_enabled = true
+	bricks.normal_texture = ImageTexture.create_from_image(height)
 	bricks.uv1_triplanar = true
 	bricks.uv1_world_triplanar = true
 	bricks.uv1_scale = Vector3(1.0, 2.0, 1.0)

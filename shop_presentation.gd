@@ -22,6 +22,10 @@ func surface(tile: Vector2, scale: float) -> ShaderMaterial:
 		material.set_shader_parameter("meters_per_tile", scale)
 		if tile == Vector2(0, 0.5): material.set_shader_parameter("detail_strength", 0.3)
 		if tile == Vector2(0, 0.5): material.set_shader_parameter("road_surface", true)
+		# Glazed shop-floor tiles catch a little sheen from the tube lights.
+		if tile == Vector2(0.5, 0):
+			material.set_shader_parameter("surface_roughness", 0.5)
+			material.set_shader_parameter("surface_specular", 0.45)
 		surfaces[key] = material
 	return surfaces[key]
 

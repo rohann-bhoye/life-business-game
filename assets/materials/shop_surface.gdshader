@@ -8,6 +8,8 @@ uniform vec4 tint : source_color = vec4(1.0);
 uniform vec4 base_color : source_color = vec4(0.12, 0.13, 0.14, 1.0);
 uniform float detail_strength = 1.0;
 uniform bool road_surface = false;
+uniform float surface_roughness : hint_range(0.0, 1.0) = 0.88;
+uniform float surface_specular : hint_range(0.0, 1.0) = 0.15;
 varying vec3 world_position;
 varying vec3 world_normal;
 
@@ -28,6 +30,6 @@ void fragment() {
 		sampled *= mix(0.82 + grain * 0.13, 0.9, wear * 0.18);
 	}
 	ALBEDO = mix(base_color.rgb, sampled, detail_strength) * tint.rgb;
-	ROUGHNESS = 0.88;
-	SPECULAR = 0.15;
+	ROUGHNESS = surface_roughness;
+	SPECULAR = surface_specular;
 }
