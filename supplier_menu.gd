@@ -352,7 +352,13 @@ func _refresh() -> void:
 	var quantity := int(box_quantity.value)
 	get_node("ProductLabel").text = "Shelf: %d | Warehouse: %d | Box of 10" % [business.product_stock(product), business.logistics.stored_units(product)]
 	var sharma: int = business.rival_price_today(product)
-	get_node("RivalPriceLabel").text = ("Sharma: %s%d%s" % [String.chr(8377), sharma, " (SALE)" if business.rival_sale().get("id", "") == product else ""]) if business.rival_open() else "Sharma opens day %d" % business.RIVAL_OPEN_DAY
+	var rival_text := ("Sharma %s%d%s" % [String.chr(8377), sharma, " (SALE)" if business.rival_sale().get("id", "") == product else ""]) if business.rival_open() else "Sharma opens day %d" % business.RIVAL_OPEN_DAY
+	# How shoppers feel about your price (business_backend.gd price rules), as a coloured tag.
+	var feel: int = business.price_feel(product)
+	var rival_label: Label = get_node("RivalPriceLabel")
+	rival_label.text = "MRP %s%d  |  %s  |  %s" % [String.chr(8377), business.fair_price(product), business.PRICE_FEELS[feel], rival_text]
+	rival_label.add_theme_color_override("font_color", [Color("15803d"), Color("15803d"), Color("b45309"), Color("b91c1c"), Color("b91c1c")][feel])
+	rival_label.tooltip_text = ["Under the MRP: shoppers love it (happier reviews), but you earn less.", "Near the MRP: everyone who wants it buys it.", "Over the MRP: some shoppers walk out.", "Far over the MRP: most shoppers walk out and leave bad reviews.", "Half as much again as the MRP: nobody buys it."][feel]
 	get_node("MatchSharmaButton").disabled = not business.rival_open() or business.product_price(product) <= sharma or sharma % 10 != 0
 	var order_total: int = business.order_cost(product, quantity)
 	var bulk: bool = quantity >= business.BULK_BOXES

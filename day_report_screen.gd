@@ -141,6 +141,7 @@ func open(business_ref, money_format := Callable(), team: Array = []) -> bool:
 	_row(income, "Items sold", str(report.items_sold))
 	_row(income, "Best seller", "%s (%d)" % [Catalog.NAMES[report.best], report.best_count] if report.best != "" else "none")
 	_row(income, "Missed sales", str(report.missed), RED if int(report.missed) > 0 else INK)
+	if int(report.get("walkouts", 0)) > 0: _row(income, "Walked out (price)", str(report.walkouts), RED)
 	var breakdown: Dictionary = report.get("costs", {})
 	for key in DayReport.COSTS:
 		if int(breakdown.get(key, 0)) != 0: _row(costs, DayReport.COST_NAMES[key], _money(int(breakdown[key])))
@@ -175,6 +176,8 @@ func open(business_ref, money_format := Callable(), team: Array = []) -> bool:
 	return true
 
 func _tip(report: Dictionary) -> String:
+	var walkouts := int(report.get("walkouts", 0))
+	if walkouts > 0 and walkouts >= int(report.missed): return "Tip: %d shoppers walked out over prices. Keep prices near the MRP (green on the shop PC)." % walkouts
 	if int(report.items_sold) == 0 and int(report.missed) > 0: return "Tip: %d customers left without buying. Order stock on the shop PC and fill the shelves." % report.missed
 	if int(report.missed) > 0: return "Tip: %d sales were missed. Keep shelves full and tills staffed." % report.missed
 	if int(report.profit) < 0: return "Tip: spending was higher than sales today. Sell more or cut costs."

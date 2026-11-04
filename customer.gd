@@ -61,6 +61,9 @@ var route_index := 0
 var service_wait_seconds := 0.0
 var review_outcome := ""
 var review_recorded := false
+## Price rules (business_backend.gd): switched once to a fairer product; bought a bargain.
+var price_switched := false
+var cheap_buy := false
 var queue_wait_seconds := 0.0
 var patience_label: Label3D
 var speech_label: Label3D
@@ -220,7 +223,11 @@ func _physics_process(delta: float) -> void:
 					review_outcome = "stock"
 					shop_area.business.record_stock_shortage()
 					leave_shop()
+				elif randf() > shop_area.business.buy_chance(product_id):
+					# The shelf tag is too dear for them (business_backend.gd price rules).
+					_price_refused()
 				else:
+					_price_remark()
 					has_product = true
 					basket_count = mini(shopping_quantity, available)
 					held_bottle = operations.make_product(self, "HeldBottle", Vector3(0.32, 0.9, -0.2), product_id)
@@ -230,6 +237,10 @@ func _physics_process(delta: float) -> void:
 			if _walk_route(delta):
 				var line: Dictionary = extra_lines[line_index]
 				var available: int = operations.furnishing.available(line.rack, line.product) if is_instance_valid(operations.furnishing) else operations.available_stock(line.product)
+				# Too dear an extra stays on the shelf; the rest of the basket goes on.
+				if available > 0 and randf() > shop_area.business.buy_chance(line.product):
+					say("Ye bhi mehenga hai... rehne do.", 2.5)
+					available = 0
 				if available > 0:
 					line.count = mini(line.count, available)
 					line.taken = true
@@ -297,6 +308,46 @@ func _physics_process(delta: float) -> void:
 		State.LEAVING:
 			if (_walk_route(delta) if physical_shop() else _walk_to(exit_point.global_position, delta)):
 				queue_free()
+
+## At the shelf the price is too dear: once, they look for something fairly priced that they
+## can afford instead; otherwise they say so and walk out (a "price" review).
+func _price_refused() -> void:
+	var business = shop_area.business
+	if not price_switched and is_instance_valid(operations.furnishing):
+		price_switched = true
+		var others: Array = operations.Catalog.IDS.filter(func(id): return id != product_id and operations.available_stock(id) > 0 and business.product_price(id) <= spending_budget and business.price_feel(id) <= 1)
+		if not others.is_empty():
+			var other: String = others.pick_random()
+			var rack: int = operations.furnishing.choose_rack(other)
+			var record: Dictionary = business.racks.find(rack)
+			if not record.is_empty():
+				var points: Array[Vector3] = business.racks.route(global_position, business.RackStore.approach(record))
+				if not points.is_empty():
+					say("Ye mehenga hai... kuch aur le leta hoon.", 2.5)
+					product_id = other
+					rack_id = rack
+					_set_route(points)
+					state = State.ARRIVING
+					return
+	var sharma: int = business.rival_price_today(product_id)
+	if business.rival_open() and business.product_price(product_id) > sharma:
+		say("Sharma ji ke yahan %s%d mein milta hai!" % [String.chr(8377), sharma], 3.0)
+	else:
+		say(["Bahut mehenga hai!", "Itna mehenga? Rehne do.", "MRP se zyada? Nahi chahiye."].pick_random(), 3.0)
+	review_outcome = "price"
+	business.record_price_walkout()
+	leave_shop()
+
+## What they say about a price they did pay: pleased by a bargain, grumbling at a dear one.
+func _price_remark() -> void:
+	match shop_area.business.price_feel(product_id):
+		0:
+			cheap_buy = true
+			if randf() < 0.5: say(["Arre wah, sasta hai!", "Accha daam hai!"].pick_random(), 2.5)
+		2:
+			if randf() < 0.4: say(["Thoda mehenga hai...", "Daam badh gaya kya?"].pick_random(), 2.5)
+		3:
+			say("Mehenga hai, par chalo.", 2.5)
 
 ## Half of customers also want one or two other products they can afford.
 func _plan_extra_products(choices: Array) -> void:
@@ -416,7 +467,8 @@ func leave_shop() -> void:
 		review_recorded = true
 		# Friendly service (a chat) makes the wait feel 10 s shorter.
 		var felt_wait := maxf(0.0, service_wait_seconds - (10.0 if chat_done.has("help") else 0.0))
-		shop_area.business.record_customer_review("sold" if deal_sold else review_outcome, felt_wait, agreed_unit_price < quoted_price)
+		# A bargain on the shelf tag pleases them like a discount does.
+		shop_area.business.record_customer_review("sold" if deal_sold else review_outcome, felt_wait, agreed_unit_price < quoted_price or cheap_buy)
 	state = State.LEAVING
 	if not physical_shop():
 		return

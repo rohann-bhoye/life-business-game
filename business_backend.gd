@@ -1019,6 +1019,55 @@ func rival_traffic_factor() -> float:
 	if not rival_open(): return 1.0
 	return clampf(1.0 + (price_index() - 1.0) + (RIVAL_REPUTATION - customer_reviews.reputation) / 200.0, 0.85, 1.4)
 
+# --- Prices: every product has a fair price, its MRP (Catalog.PRICES; a cold drink ₹100,
+# Sharma's standard price too). Shoppers read the shelf tag: up to 10% over the MRP they buy
+# as normal, dearer and fewer do, half as much again and nobody does; under the MRP pleases
+# them. Aasaan shoppers forgive a little more, Mushkil ones less, and once Sharma is open,
+# being much dearer than him loses a quarter more. ---
+const PRICE_CHEAP := 0.90
+const PRICE_FAIR := 1.10
+const PRICE_HIGH := 1.30
+const PRICE_TOO_HIGH := 1.50
+## How dear prices feel per difficulty (Aasaan, Normal, Mushkil), added to the ratio.
+const PRICE_FEEL_SHIFT := [-0.05, 0.0, 0.05]
+const SHARMA_WALKOUT := 0.75
+const PRICE_FEELS := ["Cheap", "Fair", "A bit high", "Too high", "Nobody buys"]
+## Shoppers who left without buying because of a price (all time; the day report counts a day).
+var price_walkouts := 0
+
+static func fair_price(id: String) -> int:
+	return rival_price(id)
+
+## Your price over the fair price, as this difficulty's shoppers feel it (1.0 = the MRP).
+func price_ratio(id: String) -> float:
+	return float(product_price(id)) / maxf(1.0, fair_price(id)) + PRICE_FEEL_SHIFT[clampi(difficulty, 0, 2)]
+
+## 0 cheap, 1 fair, 2 a bit high, 3 too high, 4 nobody buys (PRICE_FEELS).
+func price_feel(id: String) -> int:
+	var ratio := price_ratio(id)
+	if ratio <= PRICE_CHEAP: return 0
+	if ratio <= PRICE_FAIR: return 1
+	if ratio <= PRICE_HIGH: return 2
+	if ratio <= PRICE_TOO_HIGH: return 3
+	return 4
+
+## The chance a shopper who wants `id` still takes it at your price.
+func buy_chance(id: String) -> float:
+	var ratio := price_ratio(id)
+	var chance := 1.0
+	if ratio > PRICE_TOO_HIGH: chance = 0.0
+	elif ratio > PRICE_HIGH: chance = lerpf(0.55, 0.10, (ratio - PRICE_HIGH) / (PRICE_TOO_HIGH - PRICE_HIGH))
+	elif ratio > PRICE_FAIR: chance = lerpf(1.0, 0.55, (ratio - PRICE_FAIR) / (PRICE_HIGH - PRICE_FAIR))
+	if rival_open() and product_price(id) > rival_price_today(id) * 1.1: chance *= SHARMA_WALKOUT
+	return chance
+
+## A shopper read a price tag and walked out without buying.
+func record_price_walkout() -> void:
+	if not shop_is_open(): return
+	price_walkouts += 1
+	last_visit = "Price too high"
+	_commit()
+
 # --- APNA Bank business loan: Rs20,000 repaid over 10 days with 10% interest. ---
 const LOAN_AMOUNT := 20000
 const LOAN_DAYS := 10
@@ -1687,6 +1736,7 @@ func snapshot() -> Dictionary:
 	data["starting_money"] = starting_money
 	data["home_rented"] = home_rented
 	data["popularity"] = popularity
+	data["price_walkouts"] = price_walkouts
 	data["rent_paid"] = rent_paid
 	data["rent_due"] = rent_due
 	data["incoming_boxes"] = incoming_boxes.duplicate(true)
@@ -1762,6 +1812,7 @@ func restore(data: Dictionary) -> void:
 	starting_money = int(data.get("starting_money", INITIAL_MONEY))
 	home_rented = data.get("home_rented", false) == true
 	popularity = float(data.get("popularity", POPULARITY_OLD_SAVES))
+	price_walkouts = int(data.get("price_walkouts", 0))
 	rent_paid = int(data.get("rent_paid", 0))
 	rent_due = int(data.get("rent_due", 0))
 	for id in inventory:
@@ -2220,6 +2271,7 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	if not _valid_rent(data, int(saved_day)): return false
 	var talk = data.get("popularity", POPULARITY_OLD_SAVES)
 	if not (talk is int or talk is float) or not is_finite(float(talk)) or talk < 0.0 or talk > 100.0: return false
+	if not EmployeeRelations.whole(data.get("price_walkouts", 0), MAX_SAVED_VALUE): return false
 	expenses -= int(data.get("loan_received", 0)) - int(data.get("loan_principal_repaid", 0))
 	var start_money := int(data.get("starting_money", INITIAL_MONEY))
 	if start_money not in [INITIAL_MONEY] + DIFFICULTY_MONEY + OLD_DIFFICULTY_MONEY: return false

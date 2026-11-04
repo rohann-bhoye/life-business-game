@@ -45,6 +45,12 @@ func refresh() -> void:
 	var sale: Dictionary = business.rival_sale()
 	if not sale.is_empty() and business.product_stock(sale.id) > 0 and business.product_price(sale.id) > int(sale.price):
 		next["rival_sale"] = _entry("Sharma's sale: %s %s%d" % [business.Catalog.NAMES[sale.id], String.chr(8377), sale.price], "You charge %s%d. Match it on the shop PC: Shop > Orders > Match, or customers go to Sharma." % [String.chr(8377), business.product_price(sale.id)], "", true)
+	# A product on the shelves priced so high that most shoppers walk out (price rules).
+	var dearest := ""
+	for id in business.Catalog.IDS:
+		if business.product_stock(id) > 0 and business.price_feel(id) >= 3 and (dearest == "" or business.price_ratio(id) > business.price_ratio(dearest)): dearest = id
+	if dearest != "":
+		next["too_dear"] = _entry("%s is too expensive" % business.Catalog.NAMES[dearest], "You charge %s%d, the MRP is %s%d. Most shoppers walk out. Lower it on the shop PC: Shop > Orders." % [String.chr(8377), business.product_price(dearest), String.chr(8377), business.fair_price(dearest)], "", true)
 	if business.rival_open() and business.price_index() > 1.05:
 		next["rival"] = _entry("Customers prefer %s" % business.RIVAL_NAME, "Your prices are %d%% higher. Lower prices or raise your reputation." % roundi((business.price_index() - 1.0) * 100.0), "", true)
 	if business.loan_left() > 0 and business.loan_missed_payments > 0:
