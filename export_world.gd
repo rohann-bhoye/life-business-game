@@ -202,6 +202,70 @@ func _build_packing_room() -> void:
 	orders_board.pixel_size = 0.0026
 	orders_board.width = 460
 	orders_board.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_dress_packing_room(room)
+
+## Extra finishing for the packing room: pale ceiling, a second tube light, floor safety
+## lines, working props (loaded pallet, hand trolley, floor scale, wall shelf, fire
+## extinguisher), contact shadows, and a better street front (plinth, caged lamps, poster).
+func _dress_packing_room(room: Node3D) -> void:
+	var ops := get_parent().get_node_or_null("ShopOperations")
+	room.get_node("PackRoof").material_override = builder._material(Color(0.8, 0.8, 0.77))
+	# Second tube light, brighter glow for the bloom.
+	var glow := StandardMaterial3D.new()
+	glow.albedo_color = Color(0.94, 0.98, 1)
+	glow.emission_enabled = true
+	glow.emission = Color(0.9, 0.96, 1)
+	glow.emission_energy_multiplier = 1.3
+	room.get_node("PackTubeLight").material_override = glow
+	var second: MeshInstance3D = builder._box("PackTubeLight2", room, Vector3(0.24, 0.07, 1.7), Vector3(-7.83, 3.82, -2.8), Color(0.94, 0.98, 1))
+	second.material_override = glow
+	var lamp2 := OmniLight3D.new()
+	lamp2.name = "PackLight2"
+	lamp2.position = Vector3(-7.83, 3.3, -2.6)
+	lamp2.light_color = Color(1, 0.97, 0.9)
+	lamp2.light_energy = 0.55
+	lamp2.omni_range = 5.0
+	lamp2.shadow_enabled = false
+	room.add_child(lamp2)
+	# Yellow safety lines marking the walking lane from the street door to the back.
+	var yellow := Color(0.96, 0.77, 0.2)
+	for x in [-8.72, -7.38]:
+		builder._box("LaneLine", room, Vector3(0.07, 0.006, 5.4), Vector3(x, 0.115, -0.9), yellow)
+	builder._box("DoorLine", room, Vector3(1.4, 0.006, 0.07), Vector3(-8.05, 0.115, 1.95), yellow)
+	# Props.
+	var pallet := _prop(room, "PalletStack", "pallet_stack", Vector3(-7.2, 0.1, -3.35))
+	pallet.rotation.y = 0.18
+	builder._collider("PalletStackBody", room, Vector3(0.85, 0.96, 0.7), Vector3(-7.2, 0.58, -3.35))
+	var trolley := _prop(room, "HandTrolley", "hand_trolley", Vector3(-6.6, 0.1, -2.3))
+	trolley.rotation.y = -PI / 2
+	builder._collider("HandTrolleyBody", room, Vector3(0.5, 1.1, 0.5), Vector3(-6.62, 0.65, -2.3))
+	var scale_prop := _prop(room, "FloorScale", "floor_scale", Vector3(-8.2, 0.1, -2.4))
+	builder._collider("FloorScaleBody", room, Vector3(0.6, 0.12, 0.6), Vector3(-8.2, 0.17, -2.4))
+	_prop(room, "WallShelf", "wall_shelf", Vector3(-8.85, 1.35, -3.78))
+	var extinguisher := _prop(room, "Extinguisher", "extinguisher", Vector3(-6.11, 0.75, 0.2))
+	extinguisher.rotation.y = -PI / 2
+	room.get_node("WorldPoster").position.x = -7.0
+	if ops != null:
+		for prop in [room.get_node("PackingTable"), room.get_node("SupplyShelf"), pallet, trolley, scale_prop]:
+			ops._contact_shadow(prop)
+	# Street front: grey plinth, caged lamps with a warm glow, a poster, a number plate.
+	var grey := Color(0.5, 0.5, 0.52)
+	builder._box("FrontPlinthLeft", room, Vector3(1.18, 0.34, 0.1), Vector3(-9.14, 0.27, 2.58), grey)
+	builder._box("FrontPlinthRight", room, Vector3(1.4, 0.34, 0.1), Vector3(-6.72, 0.27, 2.58), grey)
+	for x in [-9.45, -6.3]:
+		_prop(room, "ExportLamp", "export_lamp", Vector3(x, 2.62, 2.57))
+		var light := OmniLight3D.new()
+		light.name = "FrontLamp"
+		light.position = Vector3(x, 2.5, 2.9)
+		light.light_color = Color(1, 0.84, 0.55)
+		light.light_energy = 0.5
+		light.omni_range = 3.2
+		light.shadow_enabled = false
+		room.add_child(light)
+	Bricks.poster(room, "ExportFrontPoster", Vector3(-9.22, 1.45, 2.58), 0.0, Vector2(0.7, 0.95), Color(0.12, 0.36, 0.62), "SHIP\nWORLD\nWIDE!")
+	builder._box("NumberPlate", room, Vector3(0.3, 0.14, 0.03), Vector3(-6.4, 1.5, 2.575), Color(0.95, 0.95, 0.9))
+	_text(room, "NumberPlateText", "No. 2", Vector3(-6.4, 1.5, 2.595), 28, Color(0.1, 0.1, 0.12))
+
 
 # ---------------------------------------------------------------- airport
 func _build_airport() -> void:

@@ -324,9 +324,8 @@ const CONTACT_SHADOWED := ["shop/rack", "shop/fridge", "shop/counter"]
 
 ## A soft floor shadow around a big fixture (racks, fridge, counter), sized from its model.
 func _contact_shadow(prop: Node3D) -> void:
-	var box: AABB = preload("res://product_assets.gd")._bounds(prop, Transform3D.IDENTITY)
+	var box: AABB = preload("res://product_assets.gd")._bounds(prop, prop.transform.affine_inverse())  # the prop's own frame
 	if not box.has_volume(): return
-	box.position -= prop.position  # the bounds are in the parent's frame; the shadow is a child
 	var margin := 0.45
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(box.size.x + margin * 2.0, box.size.z + margin * 2.0)
