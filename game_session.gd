@@ -27,7 +27,10 @@ static func new_game(path: String, difficulty := 1, story := false) -> String:
 	# Licences: Kirana Basics to start; more on the shop PC (Licences).
 	state.start_with_licences()
 	# The story start: Apna Mart is for sale and you buy it at the shop door (shop_sale.gd).
-	if story: state.start_unowned_shop()
+	if story:
+		state.start_unowned_shop()
+		# Story homes are rented (200 a day) until the player buys the family home.
+		state.start_renting()
 	return "" if state.save_progress() else "Could not create a new save."
 
 static func launch_game(tree: SceneTree, path: String, settings_path: String) -> Error:

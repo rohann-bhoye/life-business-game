@@ -239,8 +239,8 @@ func _update_shop_labels():
 		hire_worker_button.disabled = false
 	worker_label.text = "Worker: Hired" if business.worker_hired else "Worker: Not hired"
 	save_status_label.text = business.save_status
-	home_ownership_label.text = "Home: Owned" if business.house_owned else "Home: Not owned"
-	var daily_cost: int = business.DAILY_SHOP_COST + business.DAILY_WORKER_WAGE * business.staff_count()
+	home_ownership_label.text = "Home: Owned" if business.house_owned else ("Home: Rented - %s%d a day" % [String.chr(8377), business.RENT_PER_DAY] if business.home_rented else "Home: Not owned")
+	var daily_cost: int = business.DAILY_SHOP_COST + business.DAILY_WORKER_WAGE * business.staff_count() + (business.RENT_PER_DAY if business.home_rented else 0)
 	daily_cost_label.text = "Daily bills: %s%s" % [String.chr(8377), _format_money(daily_cost)]
 	unpaid_bills_label.text = "Unpaid bills: %s%s" % [String.chr(8377), _format_money(business.unpaid_bills())]
 	pay_bills_button.disabled = not business.can_pay_bills()

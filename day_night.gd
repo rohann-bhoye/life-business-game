@@ -172,6 +172,6 @@ func _refresh() -> void:
 	for material in lamp_materials:
 		material.emission_enabled = streetlights_on
 		material.emission_energy_multiplier = 3.0 if streetlights_on else 0.0
-	interior_light.visible = streetlights_on and business.house_owned
+	interior_light.visible = streetlights_on and (business.house_owned or business.home_rented)
 	star_material.albedo_color = Color(1, 1, 1, (1.0 - daylight) * (0.25 if business.is_raining() else 0.9))
 	stars.visible = daylight < 0.9

@@ -30,7 +30,8 @@ const HomeDecor := preload("res://home_decor.gd")
 func _start_at_home() -> void:
 	# Only real sessions started from the main menu (New Game / Continue).
 	if not get_tree().current_scene.has_meta("session_save_path"): return
-	shop_area.business.grant_home()
+	# Story games rent the home until it is bought; every other game owns it from the start.
+	if not shop_area.business.home_rented: shop_area.business.grant_home()
 	spawn_player()
 
 func spawn_player() -> void:
@@ -72,11 +73,15 @@ func _on_close_house_pressed() -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _update_house_state() -> void:
-	var owned: bool = shop_area.business.house_owned
+	var business = shop_area.business
+	var owned: bool = business.house_owned
+	var rented: bool = business.home_rented
 	house_money_label.text = "Money: %s%s" % [String.chr(8377), shop_area._format_money(shop_area.money)]
-	ownership_label.text = "Ownership: Yours" if owned else "Ownership: For sale"
-	buy_house_button.disabled = owned or shop_area.money < shop_area.business.HOUSE_COST
-	buy_house_button.tooltip_text = "Home already owned" if owned else ("Not enough money. Requires %s15,000." % String.chr(8377) if buy_house_button.disabled else "Buy home")
-	house_sign.text = "MY HOME" if owned else "HOME - %s15,000" % String.chr(8377)
-	front_door.visible = not owned
-	front_door.get_node("CollisionShape3D").set_deferred("disabled", owned)
+	ownership_label.text = "Ownership: Yours" if owned else ("Renting: %s%d a day - buy it for %s%s" % [String.chr(8377), business.RENT_PER_DAY, String.chr(8377), shop_area._format_money(business.HOUSE_COST)] if rented else "Ownership: For sale")
+	buy_house_button.disabled = owned or shop_area.money < business.HOUSE_COST
+	buy_house_button.tooltip_text = "Home already owned" if owned else ("Not enough money. Requires %s15,000." % String.chr(8377) if buy_house_button.disabled else "Buy home (rent stops)")
+	house_sign.text = "MY HOME" if owned else ("RENTED - BUY %s15,000" % String.chr(8377) if rented else "HOME - %s15,000" % String.chr(8377))
+	# A rented home is lived in from day one, so only a home neither owned nor rented is locked.
+	var open_door: bool = owned or rented
+	front_door.visible = not open_door
+	front_door.get_node("CollisionShape3D").set_deferred("disabled", open_door)

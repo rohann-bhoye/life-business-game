@@ -924,10 +924,10 @@ func _process(delta: float) -> void:
 	_update_first_day_guide()
 	if player._menu_is_open():
 		return
-	if player.indoors and sleep_area.overlaps_body(player) and shop.business.house_owned:
+	if player.indoors and sleep_area.overlaps_body(player) and (shop.business.house_owned or shop.business.home_rented):
 		interaction_label.text = "Sleep until morning" if shop.business.sleep_time_allowed() else "Sleep after 20:00"
 	elif house.player_inside:
-		interaction_label.text = "My home" if shop.business.house_owned else "Home for sale"
+		interaction_label.text = "My home" if shop.business.house_owned else ("Rented home - E to buy it" if shop.business.home_rented else "Home for sale")
 	elif shop.player_inside:
 		# Only something worth knowing under the crosshair, not the name of the room.
 		interaction_label.text = "Customer wants a discount" if shop.get_bargaining_customer() != null else ("" if shop.business.shop_is_open() else "Shop closed - opens at 08:00")

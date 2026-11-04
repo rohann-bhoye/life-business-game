@@ -83,7 +83,7 @@ func _run() -> void:
 
 	# Exercise actual timed checkout during the shift, rather than direct backend sales.
 	var player = current_scene.get_node("Player")
-	player.position = Vector3(4, 1.1, -4)
+	player.position = current_scene.get_node("House").to_global(Vector3(0, 1.0, 0))
 	var visitor = current_scene.get_node("Customer")
 	visitor.state = visitor.State.SCANNING
 	visitor.has_product = true
@@ -134,7 +134,7 @@ func _run() -> void:
 
 	# Early E is consumed with HUD feedback; it never opens a menu or changes time.
 	player.indoors = true
-	player.global_position = Vector3(3.0, 1.1, -4.7)
+	player.global_position = current_scene.get_node("House").to_global(Vector3(-1, 1.0, -0.7))
 	await physics_frame
 	await physics_frame
 	await physics_frame

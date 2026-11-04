@@ -424,6 +424,8 @@ const MARKETING_COST := 200
 const MARKETING_DURATION := 60.0
 const HIRING_COST := 1000
 const HOUSE_COST := 15000
+## Story games start in a rented home: this much a day until the family home is bought.
+const RENT_PER_DAY := 200
 const DAILY_SHOP_COST := 100
 const DAILY_WORKER_WAGE := 200
 const SHOP_OPEN_MINUTE := 480
@@ -450,6 +452,10 @@ var marketing_expenses := 0
 var hiring_expenses := 0
 var property_expenses := 0
 var house_owned := false
+## Renting the family home (story start); rent_due is unpaid rent, rent_paid is the total paid.
+var home_rented := false
+var rent_paid := 0
+var rent_due := 0
 var selling_price := 100
 var missed_sales := 0
 var last_visit := "No customers yet"
@@ -844,10 +850,10 @@ func staff_count() -> int:
 	return int(staff.active(self, "cashier")) + int(staff.active(self, "stock")) + int(staff.active(self, "warehouse"))
 
 func unpaid_bills() -> int:
-	return operating_due + wages_due
+	return operating_due + wages_due + rent_due
 
 func can_pay_bills() -> bool:
-	return (operating_due > 0 and money >= DAILY_SHOP_COST) or (wages_due > 0 and money >= DAILY_WORKER_WAGE)
+	return (operating_due > 0 and money >= DAILY_SHOP_COST) or (wages_due > 0 and money >= DAILY_WORKER_WAGE) or (rent_due > 0 and money >= RENT_PER_DAY)
 
 func pay_bills() -> bool:
 	if not can_pay_bills():
@@ -865,6 +871,10 @@ func _settle_bills() -> void:
 	money -= wage_payment
 	wages_due -= wage_payment
 	wage_expenses += wage_payment
+	var rent_payment := mini(rent_due, (money / RENT_PER_DAY) * RENT_PER_DAY)
+	money -= rent_payment
+	rent_due -= rent_payment
+	rent_paid += rent_payment
 
 func _can_bill(target_day: int) -> bool:
 	var wages := ((target_day - worker_hired_day) if worker_hired else 0) + ((target_day - stock_worker_hired_day) if stock_worker_hired else 0)
@@ -989,6 +999,20 @@ func _pay_loan_installments(days: int) -> void:
 		if money >= loan_daily_payment(): _repay_principal(mini(LOAN_AMOUNT / LOAN_DAYS, loan_left()))
 		else: loan_missed_payments += 1
 
+## Rent (story start): whole multiples of RENT_PER_DAY, never more than a day's rent for every
+## day since the shop's billing began, and never while the home is owned and rented at once.
+static func _valid_rent(data: Dictionary, saved_day: int) -> bool:
+	if data.has("home_rented") and not data["home_rented"] is bool: return false
+	for field in ["rent_paid", "rent_due"]:
+		if not EmployeeRelations.whole(data.get(field, 0), MAX_SAVED_VALUE): return false
+		if int(data.get(field, 0)) % RENT_PER_DAY != 0: return false
+	var total := int(data.get("rent_paid", 0)) + int(data.get("rent_due", 0))
+	if data.get("home_rented", false) == true and data.get("house_owned", false) == true: return false
+	if total > maxi(0, saved_day - int(data.get("billing_start_day", saved_day))) * RENT_PER_DAY: return false
+	# Free homes (given at the start or older saves) never paid rent.
+	if total > 0 and data.get("house_owned", false) == true and int(data.get("property_expenses", 0)) == 0: return false
+	return true
+
 static func _valid_loan(data: Dictionary) -> bool:
 	for field in ["loan_received", "loan_principal_repaid", "loan_interest_paid", "loan_missed_payments"]:
 		if not EmployeeRelations.whole(data.get(field, 0), MAX_SAVED_VALUE): return false
@@ -1001,6 +1025,7 @@ func _bill_new_day() -> void:
 	var elapsed_days := day - last_billed_day
 	operating_due += elapsed_days * DAILY_SHOP_COST
 	wages_due += elapsed_days * DAILY_WORKER_WAGE * staff_count()
+	if home_rented: rent_due += elapsed_days * RENT_PER_DAY
 	last_billed_day = day
 	_settle_bills()
 	_pay_loan_installments(elapsed_days)
@@ -1033,7 +1058,7 @@ func sleep_time_allowed() -> bool:
 
 func sleep_until_morning() -> bool:
 	var next_day := day + int(minutes_of_day >= SHOP_CLOSE_MINUTE)
-	if not house_owned or not sleep_time_allowed() or next_day > MAX_SAVED_VALUE or not _can_bill(next_day):
+	if not (house_owned or home_rented) or not sleep_time_allowed() or next_day > MAX_SAVED_VALUE or not _can_bill(next_day):
 		return false
 	if next_day != day:
 		day = next_day
@@ -1199,7 +1224,14 @@ func buy_house() -> bool:
 	money -= HOUSE_COST
 	property_expenses += HOUSE_COST
 	house_owned = true
+	home_rented = false
 	_commit()
+	return true
+
+## Story start: the family home is rented (RENT_PER_DAY) until the player buys it.
+func start_renting() -> bool:
+	if house_owned or home_rented: return false
+	home_rented = true
 	return true
 
 ## The player's family home is owned from the start of every game, at no cost.
@@ -1217,7 +1249,7 @@ func finish_marketing() -> void:
 	_commit()
 
 func total_expenses() -> int:
-	return restocking_expenses + marketing_expenses + hiring_expenses + operating_expenses + wage_expenses + upgrade_expenses + overtime_expenses + furnishing_expenses + expansion_expenses + shop_cost + bag_expenses + licence_expenses + farm.expenses() + loan_interest_paid
+	return restocking_expenses + marketing_expenses + hiring_expenses + operating_expenses + wage_expenses + upgrade_expenses + overtime_expenses + furnishing_expenses + expansion_expenses + shop_cost + bag_expenses + licence_expenses + farm.expenses() + loan_interest_paid + rent_paid
 
 func place_rack(product: String, position: Vector2, turn: int, id := -1, from_delivery := false) -> bool:
 	if product not in Catalog.IDS or not position.is_finite() or turn < 0 or turn > 3: return false
@@ -1577,6 +1609,9 @@ func snapshot() -> Dictionary:
 	data["supplier_discounts"] = supplier_discounts
 	for field in ["loan_received", "loan_principal_repaid", "loan_interest_paid", "loan_missed_payments"]: data[field] = get(field)
 	data["starting_money"] = starting_money
+	data["home_rented"] = home_rented
+	data["rent_paid"] = rent_paid
+	data["rent_due"] = rent_due
 	data["incoming_boxes"] = incoming_boxes.duplicate(true)
 	data["queued_boxes"] = queued_boxes.duplicate(true)
 	# Co-op: boxes in other players' hands (only while someone carries one).
@@ -1648,6 +1683,9 @@ func restore(data: Dictionary) -> void:
 	supplier_discounts = int(data.get("supplier_discounts", 0))
 	for field in ["loan_received", "loan_principal_repaid", "loan_interest_paid", "loan_missed_payments"]: set(field, int(data.get(field, 0)))
 	starting_money = int(data.get("starting_money", INITIAL_MONEY))
+	home_rented = data.get("home_rented", false) == true
+	rent_paid = int(data.get("rent_paid", 0))
+	rent_due = int(data.get("rent_due", 0))
 	for id in inventory:
 		for field in inventory[id]: inventory[id][field] = int(inventory[id][field])
 	pending_product = data.pending_product
@@ -2098,9 +2136,10 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	if extra_sold > sold or extra_stock > data.stock: return false
 	if revenue % 10 != 0 or revenue < sold * 50 or revenue > sold * 200:
 		return false
-	var expenses := int(data["restocking_expenses"]) + int(data["marketing_expenses"]) + int(data["hiring_expenses"]) + int(data["operating_expenses"]) + int(data["wage_expenses"]) + int(data["upgrade_expenses"]) + int(data.overtime_expenses) + int(furnishing) + expected_expansion + int(sale_cost) + int(bag_cost) + int(licence_cost) + farm_state.expenses() + int(data.get("loan_interest_paid", 0))
+	var expenses := int(data["restocking_expenses"]) + int(data["marketing_expenses"]) + int(data["hiring_expenses"]) + int(data["operating_expenses"]) + int(data["wage_expenses"]) + int(data["upgrade_expenses"]) + int(data.overtime_expenses) + int(furnishing) + expected_expansion + int(sale_cost) + int(bag_cost) + int(licence_cost) + farm_state.expenses() + int(data.get("loan_interest_paid", 0)) + int(data.get("rent_paid", 0))
 	# Loans: money received minus principal paid back.
 	if not _valid_loan(data): return false
+	if not _valid_rent(data, int(saved_day)): return false
 	expenses -= int(data.get("loan_received", 0)) - int(data.get("loan_principal_repaid", 0))
 	var start_money := int(data.get("starting_money", INITIAL_MONEY))
 	if start_money not in [INITIAL_MONEY] + DIFFICULTY_MONEY + OLD_DIFFICULTY_MONEY: return false

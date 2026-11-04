@@ -18,6 +18,7 @@ var level_label: Label
 var pay_button: Button
 var marketing_button: Button
 var upgrade_button: Button
+var home_button: Button
 
 func setup(business_ref, money_formatter: Callable, shop_ref, ui_ref) -> void:
 	business = business_ref
@@ -52,11 +53,17 @@ func setup(business_ref, money_formatter: Callable, shop_ref, ui_ref) -> void:
 	numbers_label.clip_text = false
 	var bills := _card(Vector2(20, 280), Vector2(420, 170), "BILLS")
 	bills_label = _label("", Vector2(16, 44), 388, 16, KenneyTheme.TEXT, bills)
-	bills_label.size.y = 50
+	bills_label.size.y = 42
 	bills_label.clip_text = false
-	pay_button = _button("PayBillsButton", Vector2(16, 108), Vector2(388, 44), bills)
+	pay_button = _button("PayBillsButton", Vector2(16, 90), Vector2(388, 38), bills)
 	pay_button.theme_type_variation = "PrimaryButton"
 	pay_button.pressed.connect(func(): shop._on_pay_bills_pressed())
+	# Story games rent the home; this buys it (the rent stops).
+	home_button = _button("BuyHomeButton", Vector2(16, 132), Vector2(388, 30), bills)
+	home_button.theme_type_variation = "InfoButton"
+	home_button.pressed.connect(func():
+		if business.buy_house(): shop._feedback("Home bought. Rent stops. -%s15,000" % String.chr(8377))
+		else: shop._feedback("Not enough money to buy the home.", true))
 	# Marketing shows five lines (reputation takes two), so its button sits lower.
 	var marketing := _card(Vector2(460, 76), Vector2(432, 234), "MARKETING")
 	marketing_label = _label("", Vector2(16, 42), 400, 15, KenneyTheme.TEXT, marketing)
@@ -119,6 +126,9 @@ func refresh() -> void:
 	bills_label.text = "%s\n%s" % [shop.daily_cost_label.text, shop.unpaid_bills_label.text]
 	pay_button.text = "Pay bills - %s" % _money(business.unpaid_bills()) if business.unpaid_bills() > 0 else "No unpaid bills"
 	pay_button.disabled = not business.can_pay_bills()
+	home_button.visible = business.home_rented and not business.house_owned
+	home_button.text = "Buy your home - %s (rent stops)" % _money(business.HOUSE_COST)
+	home_button.disabled = business.money < business.HOUSE_COST
 	marketing_label.text = "%s\n%s\n%s\n%s" % [shop.marketing_label.text, shop.missed_sales_label.text, shop.last_visit_label.text, ui.shop_menu.get_node("ReputationLabel").text]
 	marketing_button.text = "Marketing active" if shop.marketing_active else "Start marketing - %s" % _money(shop.MARKETING_COST)
 	marketing_button.disabled = shop.marketing_active or business.money < shop.MARKETING_COST

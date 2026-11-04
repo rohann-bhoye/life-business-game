@@ -301,7 +301,7 @@ func _run_checks() -> void:
 	var original_player_transform: Transform3D = house_player.global_transform
 	await physics_frame
 	await physics_frame
-	var door_query := PhysicsRayQueryParameters3D.create(Vector3(4, 1, -1), Vector3(4, 1, -3))
+	var door_query := PhysicsRayQueryParameters3D.create(current_scene.get_node("House").to_global(Vector3(0, 0.9, 3)), current_scene.get_node("House").to_global(Vector3(0, 0.9, 1)))
 	door_query.exclude = [house_player.get_rid()]
 	var locked_hit: Dictionary = current_scene.get_world_3d().direct_space_state.intersect_ray(door_query)
 	assert(not locked_hit.is_empty() and locked_hit["collider"] == house.front_door)
@@ -310,10 +310,11 @@ func _run_checks() -> void:
 	interaction.pressed = true
 	house._unhandled_input(interaction)
 	assert(not house.house_menu.visible)
-	house_player.global_position = Vector3(4, 1.1, -1)
+	house_player.global_position = current_scene.get_node("House").to_global(Vector3(0, 1.0, 3))
+	house_player.rotation.y = current_scene.get_node("House").global_rotation.y
 	house_player.velocity = Vector3.ZERO
 	await _walk_forward(0.3)
-	assert(house_player.global_position.z > -2.0 and house.player_inside)
+	assert(current_scene.get_node("House").to_local(house_player.global_position).z > 2.0 and house.player_inside)
 	house._unhandled_input(interaction)
 	assert(house.house_menu.visible and not shop.shop_menu.visible)
 	var money_before_house: int = shop.money
@@ -332,15 +333,15 @@ func _run_checks() -> void:
 	assert(house.front_door.get_node("CollisionShape3D").disabled)
 	assert(current_scene.get_world_3d().direct_space_state.intersect_ray(door_query).is_empty())
 	await _walk_forward(0.65)
-	assert(house_player.global_position.z < -2.8)
+	assert(current_scene.get_node("House").to_local(house_player.global_position).z < 1.2)
 	assert(house_player.indoors and is_zero_approx(house_player.spring_arm.spring_length))
 	await process_frame
 	await process_frame
 	assert(not house_player.player_mesh.visible)
 	assert(not house_player.player_mesh.get_node("Body").is_visible_in_tree())
 	assert(not house_player.player_mesh.get_node("Head").is_visible_in_tree())
-	house_player.global_position = Vector3(4, 1.1, -5.1)
-	house_player.rotation.y = PI
+	house_player.global_position = current_scene.get_node("House").to_global(Vector3(0, 1.0, -1.1))
+	house_player.rotation.y = PI + current_scene.get_node("House").global_rotation.y
 	house_player.velocity = Vector3.ZERO
 	await physics_frame
 	await physics_frame
@@ -351,8 +352,8 @@ func _run_checks() -> void:
 	var camera_ray := PhysicsRayQueryParameters3D.create(house_player.camera_pivot.global_position, camera.global_position)
 	camera_ray.exclude = [house_player.get_rid()]
 	assert(current_scene.get_world_3d().direct_space_state.intersect_ray(camera_ray).is_empty())
-	house_player.global_position = Vector3(3.0, 1.1, -4.7)
-	house_player.rotation.y = 0.0
+	house_player.global_position = current_scene.get_node("House").to_global(Vector3(-1, 1.0, -0.7))
+	house_player.rotation.y = current_scene.get_node("House").global_rotation.y
 	house_player.camera_pivot.rotation.x = deg_to_rad(-55)
 	await physics_frame
 	await physics_frame
@@ -380,8 +381,8 @@ func _run_checks() -> void:
 	assert(shop.business.save_status == "Save: Saved")
 	assert(camera.global_position.y < 3.1)
 	assert(camera.global_position.distance_to(house_player.camera_pivot.global_position) < 0.01)
-	house_player.global_position = Vector3(4, 1.1, -9.0)
-	house_player.rotation.y = 0.0
+	house_player.global_position = current_scene.get_node("House").to_global(Vector3(0, 1.0, -5.0))
+	house_player.rotation.y = current_scene.get_node("House").global_rotation.y
 	house_player.camera_pivot.rotation.x = deg_to_rad(-12)
 	await create_timer(0.3).timeout
 	await physics_frame
@@ -461,12 +462,12 @@ func _run_checks() -> void:
 	var release_event := InputEventKey.new()
 	release_event.keycode = KEY_W
 	Input.parse_input_event(release_event)
-	assert(is_equal_approx(player.global_position.z, old_position.z))
+	assert(player.global_position.distance_to(old_position) < 0.001)
 	shop.close_button.pressed.emit()
 	if supports_mouse_capture:
 		assert(Input.mouse_mode == Input.MOUSE_MODE_CAPTURED)
 	await _walk_forward(0.1)
-	assert(player.global_position.z < old_position.z)
+	assert(player.global_position.distance_to(old_position) > 0.02)
 	# The headless display cannot capture the OS cursor.
 	if supports_mouse_capture:
 		player._unhandled_input(motion)

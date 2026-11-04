@@ -79,7 +79,7 @@ func _run() -> void:
 	assert(business.grant_home() and business.sell_basket(2, 1000))
 	business.advance_clock(1260.0 - business.minutes_of_day)
 	player.indoors = true
-	player.global_position = Vector3(3.0, 1.1, -4.7)
+	player.global_position = current_scene.get_node("House").to_global(Vector3(-1, 1.0, -0.7))
 	for frame in range(3): await physics_frame
 	var bed = current_scene.get_node("House/Bed/SleepArea")
 	assert(bed.try_sleep())
