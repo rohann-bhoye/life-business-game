@@ -468,7 +468,7 @@ func leave_shop() -> void:
 		# Friendly service (a chat) makes the wait feel 10 s shorter.
 		var felt_wait := maxf(0.0, service_wait_seconds - (10.0 if chat_done.has("help") else 0.0))
 		# A bargain on the shelf tag pleases them like a discount does.
-		shop_area.business.record_customer_review("sold" if deal_sold else review_outcome, felt_wait, agreed_unit_price < quoted_price or cheap_buy)
+		shop_area.business.record_customer_review("sold" if deal_sold else review_outcome, felt_wait, agreed_unit_price < quoted_price or cheap_buy, customer_name.get_slice(" - ", 0), product_id)
 	state = State.LEAVING
 	if not physical_shop():
 		return

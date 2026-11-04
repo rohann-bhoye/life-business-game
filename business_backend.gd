@@ -849,6 +849,8 @@ const MARKETING_POPULARITY := 3.0
 const POPULARITY_NIGHT_FADE := 0.97
 const POPULARITY_SHUT_DAY := 4.0
 signal popularity_tier_changed(tier: int)
+## A shopper wrote a review (customer_reviews.gd entry: name, stars, text, day, minute).
+signal review_written(review: Dictionary)
 var popularity := POPULARITY_START
 
 ## 0 Unknown, 1 Known, 2 Popular, 3 Famous.
@@ -1711,10 +1713,14 @@ func assign_shelf_slot(id: int, slot: int, product: String) -> bool:
 func net_profit() -> int:
 	return sales_revenue - total_expenses()
 
-func record_customer_review(outcome: String, wait_seconds: float, discounted := false) -> bool:
-	if not customer_reviews.record(outcome, wait_seconds, discounted): return false
+## A visit ended: its stars and maybe a written review (customer_reviews.gd) by `shopper`
+## about `product` (a catalog id), and the word it spreads in town.
+func record_customer_review(outcome: String, wait_seconds: float, discounted := false, shopper := "", product := "") -> bool:
+	var written_before: int = customer_reviews.written_count()
+	if not customer_reviews.record(outcome, wait_seconds, discounted, shopper.left(40), str(Catalog.NAMES.get(product, "")), day, floori(minutes_of_day)): return false
 	_popularity_from_review(customer_reviews.last_score)
 	_commit()
+	if customer_reviews.written_count() > written_before: review_written.emit(customer_reviews.written.back())
 	return true
 
 func total_spending() -> int:

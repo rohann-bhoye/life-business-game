@@ -148,7 +148,12 @@ func open(business_ref, money_format := Callable(), team: Array = []) -> bool:
 	if int(report.expenses) == 0: _row(costs, "No spending today", "")
 	_row(costs, "Total", _money(int(report.expenses)), RED if int(report.expenses) > 0 else INK)
 	var change: int = int(report.reputation_change)
-	status_label.text = "Money now: %s   |   Reputation: %d/100 (%s%d)   |   Shoppers: %d" % [_money(int(business.money)), report.reputation, "+" if change >= 0 else "", change, report.reviews]
+	# The star rating (customer_reviews.gd); reports from before stars show reputation.
+	var standing := "Reputation: %d/100 (%s%d)" % [report.reputation, "+" if change >= 0 else "", change]
+	if report.has("rating10"):
+		var moved: int = int(report.get("rating_change10", 0))
+		standing = "Rating: %s (%s%.1f)   |   New reviews: %d" % [business.customer_reviews.rating_text().get_slice(" (", 0) if int(report.rating10) > 0 else "none yet", "+" if moved >= 0 else "", moved / 10.0, int(report.get("written", 0))]
+	status_label.text = "Money now: %s   |   %s   |   Shoppers: %d" % [_money(int(business.money)), standing, report.reviews]
 	# How the town's talk moved today (business_backend popularity; old reports have none).
 	if report.has("popularity"):
 		var talk: int = int(report.get("popularity_change", 0))

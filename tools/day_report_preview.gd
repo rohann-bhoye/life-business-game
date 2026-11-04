@@ -24,6 +24,10 @@ func _run() -> void:
 	for quantity in [3, 2]: assert(business.sell_basket(quantity, 1000, -1, "snack"))
 	assert(business.sell_basket(2, 1000))
 	assert(business.record_customer_review("sold", 5.0) and business.record_customer_review("price", 5.0))
+	# A day of shoppers so stars and written reviews show (customer_reviews.gd).
+	for visit in range(12): business.record_customer_review("sold", [0.0, 8.0, 30.0][visit % 3], false, ["Ramesh", "Sunita", "Arjun"][visit % 3], "snack")
+	business.record_customer_review("stock", 0.0, false, "Meena", "oil")
+	business.record_customer_review("stock", 0.0, false, "Kiran", "milk")
 	business.advance_clock(1260.0 - business.minutes_of_day)
 	var player = current_scene.get_node("Player")
 	player.indoors = true

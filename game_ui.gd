@@ -142,7 +142,8 @@ func _ready() -> void:
 	shop_menu.get_node("BuyProduceTableButton").pressed.connect(func():
 		var success: bool = shop.business.order_racks("tomato", 1)
 		show_feedback("Produce table ordered. Collect its package at the warehouse." if success else "Cannot order: check money, display limit or save status.", not success))
-	_label("ReputationLabel", shop_menu)
+	# Two lines (rating, newest review): long reviews end in "..." rather than spill out.
+	_label("ReputationLabel", shop_menu).text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	for node_name in TAB_CONTROLS[4]:
 		if node_name == "DemoContinueButton":
 			var button := Button.new()
@@ -216,6 +217,10 @@ func _ready() -> void:
 	shop.business.khata_news.connect(func(message: String, good: bool): show_feedback(message, not good))
 	# The town's talk about the shop moves up or down a step (business_backend popularity).
 	shop.business.popularity_tier_changed.connect(_on_popularity_tier)
+	# Bad reviews are worth knowing at once; glowing ones are nice to see.
+	shop.business.review_written.connect(func(review: Dictionary):
+		if int(review.stars) <= 2 or int(review.stars) == 5:
+			show_feedback("New review %s %s: \"%s\"" % [shop.business.customer_reviews.star_text(int(review.stars)), review.name, review.text], int(review.stars) <= 2))
 	how_to_play = HowToPlay.new()
 	add_child(how_to_play)
 	how_to_play.closed.connect(func():
@@ -772,8 +777,10 @@ func _update_hud() -> void:
 	_update_demo_goals()
 	_update_first_day_guide()
 	var reviews = shop.business.customer_reviews
-	shop_menu.get_node("ReputationLabel").text = "Reputation: %d/100  |  Town: %s\n%s" % [reviews.reputation, shop.business.popularity_name(), "No reviews yet" if reviews.review_count == 0 else "Last satisfaction: %d/100" % reviews.last_score]
-	shop_menu.get_node("ReputationLabel").tooltip_text = "%d customer reviews | Town popularity %d/100 (%s) | About %d shoppers a day" % [reviews.review_count, roundi(shop.business.popularity), shop.business.popularity_name(), roundi(shop.business.customers_per_day(shop.marketing_active))]
+	# The star rating (customer_reviews.gd) and the newest written review under it.
+	var newest: String = "No written reviews yet" if reviews.written.is_empty() else "%s %s: \"%s\"" % [reviews.star_text(reviews.written.back().stars), reviews.written.back().name, reviews.written.back().text]
+	shop_menu.get_node("ReputationLabel").text = "Rating: %s  |  Town: %s\n%s" % [reviews.rating_text(), shop.business.popularity_name(), newest]
+	shop_menu.get_node("ReputationLabel").tooltip_text = "Reputation %d/100 | %d shoppers served | Town popularity %d/100 (%s) | About %d shoppers a day" % [reviews.reputation, reviews.review_count, roundi(shop.business.popularity), shop.business.popularity_name(), roundi(shop.business.customers_per_day(shop.marketing_active))]
 	hud_money.text = "Money: %s%s" % [String.chr(8377), shop._format_money(shop.money)]
 	shop.profit_label.modulate = Color(0.48, 0.88, 0.67) if shop.business.net_profit() >= 0 else Color(1, 0.61, 0.57)
 	shop.unpaid_bills_label.modulate = Color(1, 0.74, 0.43) if shop.business.unpaid_bills() > 0 else Color.WHITE
