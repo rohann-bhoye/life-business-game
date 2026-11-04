@@ -5,22 +5,30 @@ extends Panel
 # (typed out), and up to four numbered replies (click, or press 1-4; Esc leaves).
 # staff_dialog.gd and customer_chat.gd fill it in.
 
+const Bazaar := preload("res://ui_bazaar.gd")
 const MAX_CHOICES := 4
+## People further than this are not turned to (a talk opened from the PC or a notice).
+const FACE_REACH := 8.0
 var choices: Array[Button] = []
 var portrait: Panel
 var initial: Label
 var mood: ProgressBar
 var typing := 0.0
+## The person you talk to: while the box is open the view turns smoothly to their face.
+var speaker_node: Node3D
+var face_height := 1.5
+## Their recorded lines play here (speak()); a new line or leaving stops the last one.
+var voice: AudioStreamPlayer
 @onready var ui = get_parent()
 @onready var business = get_tree().current_scene.get_node("Shop/ShopArea").business
 
 func _ready() -> void:
 	hide()
-	var frame := StyleBoxFlat.new()
-	frame.bg_color = Color(0.04, 0.06, 0.07, 0.94)
-	frame.border_color = Color(0.95, 0.7, 0.2)
-	frame.border_width_top = 3
-	frame.set_corner_radius_all(10)
+	# The pause menu's look (ui_bazaar.gd): a cream card with a saffron top, outlined reply
+	# buttons in the plain font, dark ink text.
+	theme = Bazaar.make_theme()
+	var frame := Bazaar.card()
+	frame.shadow_size = 14
 	add_theme_stylebox_override("panel", frame)
 	portrait = Panel.new()
 	portrait.name = "Portrait"
@@ -41,11 +49,15 @@ func _ready() -> void:
 	var tag: Label = ui._label("HappinessLabel", self)
 	tag.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	tag.add_theme_font_size_override("font_size", 13)
-	tag.add_theme_color_override("font_color", Color(0.75, 0.82, 0.84))
+	tag.add_theme_color_override("font_color", Bazaar.MUTED)
 	var message: Label = ui._label("MessageLabel", self)
 	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	message.add_theme_font_size_override("font_size", 16)
-	message.add_theme_color_override("font_color", Color(1, 0.96, 0.86))
+	# Dark ink on cream: no HUD shadow.
+	for label in [speaker, tag, message]:
+		label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0))
+	speaker.add_theme_color_override("font_color", Bazaar.INK)
+	message.add_theme_color_override("font_color", Bazaar.INK)
 	mood = ProgressBar.new()
 	mood.name = "HappinessBar"
 	mood.show_percentage = false
@@ -64,8 +76,45 @@ func _ready() -> void:
 	close.text = "Leave  Esc"
 	add_child(close)
 	close.pressed.connect(close_menu)
+	voice = AudioStreamPlayer.new()
+	voice.name = "Voice"
+	add_child(voice)
 	get_viewport().size_changed.connect(_layout)
 	_layout()
+
+## Turns the view to `person`'s face while this talk is open (call it before present()).
+## Their face is found from their model's top, as characters differ in height.
+func look_at_person(person: Node3D) -> void:
+	speaker_node = person
+	face_height = _face_height(person) if is_instance_valid(person) else 1.5
+
+static func _face_height(person: Node3D) -> float:
+	var top := -INF
+	for part in person.find_children("*", "GeometryInstance3D", true, false):
+		if part is Label3D or part is Sprite3D or not part.is_visible_in_tree(): continue
+		top = maxf(top, (part.global_transform * part.get_aabb()).end.y)
+	if top == -INF: return 1.5
+	# The middle of a big cartoon head sits about a quarter of a metre under its top.
+	return clampf(top - person.global_position.y - 0.25, 0.8, 2.2)
+
+## Plays a recorded line (null: silence); it replaces the line before.
+func speak(stream: AudioStream) -> void:
+	voice.stop()
+	if stream == null: return
+	voice.stream = stream
+	voice.play()
+
+## Turns the player (yaw) and the camera (pitch) a little each frame towards `face`.
+func _turn_to(face: Vector3, delta: float) -> void:
+	var player = ui.player
+	if not is_instance_valid(player): return
+	var way: Vector3 = face - player.camera.global_position
+	var flat := Vector2(way.x, way.z).length()
+	if flat < 0.3 or flat > FACE_REACH: return
+	var weight := 1.0 - exp(-delta * 5.0)
+	player.rotation.y = lerp_angle(player.rotation.y, atan2(-way.x, -way.z), weight)
+	var limit := deg_to_rad(player.LOOK_LIMIT)
+	player.camera_pivot.rotation.x = lerpf(player.camera_pivot.rotation.x, clampf(atan2(way.y, flat), -limit, limit), weight)
 
 func _layout() -> void:
 	var view := get_viewport().get_visible_rect().size
@@ -130,6 +179,9 @@ func say(line: String, replies: Array, disabled: Array = []) -> void:
 
 func _process(delta: float) -> void:
 	if not visible: return
+	if is_instance_valid(speaker_node) and speaker_node.is_inside_tree():
+		# Aimed a little under the face, so the face sits above the talk box, not behind it.
+		_turn_to(speaker_node.global_position + Vector3(0, face_height - 0.3, 0), delta)
 	var message: Label = get_node("MessageLabel")
 	if message.visible_ratio < 1.0:
 		typing += delta
@@ -152,4 +204,6 @@ func _reply(_index: int) -> void:
 
 func close_menu() -> void:
 	hide()
+	speaker_node = null
+	voice.stop()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED

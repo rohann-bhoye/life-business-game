@@ -29,7 +29,13 @@ func _run() -> void:
 	await _shot("1_door")
 	var ops = current_scene.get_node("Shop/ShopOperations") if current_scene.has_node("Shop/ShopOperations") else null
 	print("hint=", ops.interaction_hint() if ops != null else "no ops")
-	current_scene.get_node("Ui/ShopSaleDialog").open_for(current_scene.get_node("ShopSale"))
+	# Look away first: the talk turns the view to Seth Ramlal's face by itself.
+	player.rotation.y = 1.4
+	player.camera_pivot.rotation.x = -0.45
+	var dialog = current_scene.get_node("Ui/ShopSaleDialog")
+	dialog.open_for(current_scene.get_node("ShopSale"))
+	for index in range(90): await process_frame
+	print("voice playing=", dialog.voice.playing, " (", dialog.voice.stream.resource_path if dialog.voice.stream != null else "none", ")  face height=", dialog.face_height)
 	await _shot("2_talk")
 	print("can_buy=", business.can_buy_shop(), " save=", business.save_path)
 	var ok := false

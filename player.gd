@@ -94,7 +94,7 @@ func _menu_is_open() -> bool:
 	if is_instance_valid(world_map) and world_map.is_open(): return true
 	for book in get_tree().get_nodes_in_group("dungeon_panel"):
 		if book.visible: return true
-	for talk in ["Ui/StaffDialog", "Ui/CustomerChat", "Ui/FriendChat", "Ui/HowToPlay"]:
+	for talk in ["Ui/StaffDialog", "Ui/CustomerChat", "Ui/FriendChat", "Ui/ShopSaleDialog", "Ui/HowToPlay"]:
 		var dialog := get_tree().current_scene.get_node_or_null(talk)
 		if is_instance_valid(dialog) and dialog.visible: return true
 	return shop_menu.visible or house_menu.visible or (is_instance_valid(bargain_menu) and bargain_menu.visible) or (is_instance_valid(supplier_menu) and supplier_menu.visible) or (is_instance_valid(checkout_menu) and checkout_menu.visible)

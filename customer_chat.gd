@@ -25,6 +25,7 @@ func open_for(shopper: Node3D) -> void:
 	var greeting: String = ["Bhaiya, kuch discount milega?", "Namaste bhaiya!", "Jaldi karna, der ho rahi hai!"][clampi(customer.personality, 0, 2)]
 	if not customer.shopper_type.is_empty(): greeting = customer.SHOPPER_TYPES[customer.shopper_type].say.pick_random()
 	if customer.state == customer.State.QUEUING: greeting = "Line kitni lambi hai..." if customer.queue_is_impatient() else "Bas mera number aane wala hai."
+	look_at_person(customer)
 	present(customer.customer_name.get_slice(" - ", 0), "%s  |  Basket: %s" % [kind, _basket()], COLOURS[clampi(customer.personality, 0, 2)], greeting, [], [])
 	_offer()
 

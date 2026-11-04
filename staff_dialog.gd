@@ -27,6 +27,9 @@ func open_for(employee_role: String) -> void:
 		if action in ["kind", "rude"]: off = record.last_talk_day == business.day or not staff.active(business, role)
 		disabled.append(off)
 	var line: String = record.message if not record.message.is_empty() else "Namaste! How is your day going?"
+	# The view turns to them when they stand near (not from the PC across the shop).
+	var worker_node: String = {"cashier": "Worker", "stock": "StockWorker"}.get(role, "")
+	look_at_person(get_tree().current_scene.get_node_or_null(worker_node) if worker_node != "" else null)
 	present(staff.name_for(role), "%s  |  Happiness %d / 100" % [ROLE_TITLES.get(role, "Staff"), record.happiness], ROLE_COLOURS.get(role, Color(0.3, 0.4, 0.45)), line, texts, disabled)
 	mood.value = record.happiness
 	mood.show()

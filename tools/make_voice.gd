@@ -1,14 +1,17 @@
 extends SceneTree
 
-# Makes the intro's spoken lines (intro_voice.gd) with Gemini text-to-speech and saves
-# them to assets/audio/intro/<id>.wav: leading/trailing silence trimmed, peaks evened out.
+# Makes spoken lines with Gemini text-to-speech: the intro's (intro_voice.gd, into
+# assets/audio/intro/) or another set such as Seth Ramlal's (ramlal_voice.gd, set=ramlal).
+# Leading/trailing silence is trimmed and peaks evened out.
 # The key comes from the GEMINI_API_KEY environment variable only (never stored in the
 # project). From PowerShell, with the key saved for your Windows user (setx):
 #   $env:GEMINI_API_KEY = [Environment]::GetEnvironmentVariable("GEMINI_API_KEY","User")
 #   & $godot --headless --path . --script res://tools/make_voice.gd
-# Options after "--": only=<id prefix> (remake some lines), force (remake existing files).
-# GEMINI_TTS_MODEL picks the model; otherwise the newest Flash TTS model is used.
-const Voice := preload("res://intro_voice.gd")
+# Options after "--": set=<name> (<name>_voice.gd, default intro), only=<id prefix> (remake
+# some lines), force (remake existing files).
+# GEMINI_TTS_MODEL picks the model; otherwise the newest Flash TTS model is used. Free keys
+# get 10 requests a day per model.
+var Voice: Script = preload("res://intro_voice.gd")
 const API := "https://generativelanguage.googleapis.com/v1beta/"
 const FALLBACK_MODEL := "gemini-2.5-flash-preview-tts"
 const PEAK := 0.89  # about -1 dB
@@ -34,6 +37,7 @@ func _run() -> void:
 	var only := ""
 	for arg in args:
 		if arg.begins_with("only="): only = arg.trim_prefix("only=")
+		if arg.begins_with("set="): Voice = load("res://%s_voice.gd" % arg.trim_prefix("set="))
 	var force := "force" in args
 	var model := OS.get_environment("GEMINI_TTS_MODEL")
 	if model.is_empty(): model = await _pick_model()
