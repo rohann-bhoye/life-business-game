@@ -16,6 +16,13 @@ board and a local suggestion form. See Farming section below for controls and li
 
 ## Highest graphics and realistic Surya Nagri (2026-11-05)
 
+- Settings menu (settings_menu.gd) is in tabs: Sound, Controls, Gameplay, Graphics, Display.
+  Graphics: "Pick automatically" switch, three picture cards Low / Medium / High (pictures
+  assets/ui/settings/graphics_*.jpg from tools/graphics_thumbnails.gd, "BEST FOR THIS PC"
+  badge), a "Cinematic lighting (High only)" switch = Highest, and an "Advanced options" fold
+  with the single options (changing one makes it Custom). The hidden `graphics` OptionButton
+  (Auto, Low, Medium, High, Highest, Custom) still holds the choice, so _apply is unchanged.
+  PRESET_NAMES are Low / Medium / High. tools/menus_preview.gd shoots the Graphics tab.
 - Settings > Graphics > Quality is one dropdown: Auto, Low, Normal, High, Highest, Custom.
   Highest = High + Cinematic (game_settings.gd `cinematic`): the Forward+ renderer, chosen
   at start-up from user://renderer.cfg (project.godot application/config/

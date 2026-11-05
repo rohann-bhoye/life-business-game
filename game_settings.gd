@@ -30,7 +30,7 @@ const RENDERER_FILE := "user://renderer.cfg"
 const CUSTOM := 3
 ## Game minutes per real second: the 8 AM to 8 PM shop day lasts 6, 9 or 12 minutes.
 const DAY_SPEEDS := [2.0, 4.0 / 3.0, 1.0]
-const PRESET_NAMES := ["Low", "Normal", "High"]
+const PRESET_NAMES := ["Low", "Medium", "High"]
 ## render_scale: 3D resolution (UI stays sharp); shadows: 0 off, 1 short, 2 far;
 ## grass: 0 off, 1 light, 2 medium, 3 full; antialias: 0 off, 1 MSAA 2x, 2 MSAA 4x;
 ## effects: walking people, clouds, fog, the pond and real street-lamp lights.

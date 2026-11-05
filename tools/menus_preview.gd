@@ -28,6 +28,18 @@ func _run() -> void:
 	await _shot("lobby")
 	menu._open_settings()
 	await _shot("settings")
+	menu.settings_menu._show_tab("GRAPHICS")
+	await _shot("settings_graphics")
+	menu.settings_menu._show_advanced(true)
+	await _shot("settings_graphics_advanced")
+	root.size = Vector2i(640, 480)
+	for frame in range(4): await process_frame
+	menu.settings_menu._layout()
+	await _shot("settings_graphics_small")
+	root.size = Vector2i(1152, 648)
+	for frame in range(4): await process_frame
+	menu.settings_menu._show_advanced(false)
+	menu.settings_menu._show_tab("SOUND")
 	menu.settings_menu.close_menu()
 	menu._open_coop()
 	await _shot("coop")
