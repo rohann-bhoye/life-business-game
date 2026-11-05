@@ -398,7 +398,7 @@ func _bus_stop() -> void:
 	_box("BusStopRoof", Vector3(3.6, 0.1, 1.4), base + Vector3(0, 2.4, 0.2), Color(0.2, 0.45, 0.65))
 	_box("BusStopBack", Vector3(3.6, 1.8, 0.06), base + Vector3(0, 1.4, 0.85), Color(0.6, 0.78, 0.85))
 	for x in [-1.7, 1.7]: _box("BusStopPost%s" % x, Vector3(0.08, 2.4, 0.08), base + Vector3(x, 1.2, 0.8), Color(0.25, 0.27, 0.3))
-	_box("BusStopBench", Vector3(2.8, 0.1, 0.45), base + Vector3(0, 0.5, 0.5), Color(0.4, 0.42, 0.45), true)
+	town.street_prop("BusStopBench", town, "bench", base + Vector3(-0.8, 0.0, 0.45), PI, Vector3(1.6, 0.92, 0.62))
 	var sign := Label3D.new()
 	sign.text = "BUS STOP\nMarket - Station"
 	sign.position = base + Vector3(0, 2.0, 0.8)

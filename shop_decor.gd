@@ -103,6 +103,9 @@ func _indian_touches() -> void:
 	for z in [FRONT_Z - 0.05, 2.62]: _toran("Toran", Vector3(DOOR_X, DOOR_TOP, z), 1.9)
 	_rangoli(Vector3(DOOR_X, 0.126, 3.2))
 	_tulsi(Vector3(-4.45, 0.1, 2.95))
+	# A clay pot plant at the right end of the front, past the dustbins (assets/props/street).
+	var plant: Node3D = preload("res://neighbourhood.gd").street_prop("PotPlant", self, "pot_plant", Vector3(0.0, 0.158, 2.92))
+	plant.scale = Vector3.ONE * 0.85
 	_mandir(Vector3(ROOM_MAX_X - 0.02, 1.55, -1.3))
 
 ## Instanced spheres; each item is [Transform3D, Color].
@@ -356,10 +359,6 @@ func _counter_details(counter: Node3D) -> void:
 	for row in range(3):
 		for column in range(3):
 			HouseParts.box(st, Vector3(-0.31 + column * 0.03, top + 0.025, -0.285 + row * 0.03), Vector3(0.02, 0.006, 0.02), Color(0.75, 0.77, 0.8))
-	HouseParts.box(st, Vector3(0.05, top + 0.02, -0.26), Vector3(0.27, 0.04, 0.25), Color(0.85, 0.86, 0.88))
-	HouseParts.box(st, Vector3(0.05, top + 0.045, -0.24), Vector3(0.22, 0.01, 0.18), Color(0.7, 0.72, 0.75))
-	HouseParts.box(st, Vector3(0.05, top + 0.035, -0.375), Vector3(0.14, 0.03, 0.02), Color(0.08, 0.08, 0.09))
-	HouseParts.box(st, Vector3(0.05, top + 0.035, -0.387), Vector3(0.1, 0.018, 0.005), Color(0.3, 0.85, 0.45))
 	HouseParts.box(st, Vector3(0.3, top + 0.006, -0.3), Vector3(0.08, 0.012, 0.16), Color(0.06, 0.06, 0.07))
 	HouseParts.box(st, Vector3(0.3, top + 0.013, -0.3), Vector3(0.068, 0.002, 0.14), Color(0.2, 0.35, 0.55))
 	var details := MeshInstance3D.new()
@@ -367,6 +366,12 @@ func _counter_details(counter: Node3D) -> void:
 	details.mesh = st.commit()
 	details.material_override = HouseParts._material()
 	counter.add_child(details)
+	# The digital weighing scale (tools/blender/street_props.py): its reading and keys face
+	# the cashier (-z), the pole display faces the customer.
+	var weigher: Node3D = (load("res://assets/props/shop/weighing_scale.glb") as PackedScene).instantiate()
+	weigher.name = "WeighingScale"
+	weigher.position = Vector3(0.02, top, -0.17)
+	counter.add_child(weigher)
 
 func _paint_band() -> void:
 	var paint := _material(Color(0.93, 0.74, 0.38))

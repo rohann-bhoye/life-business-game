@@ -41,7 +41,6 @@ static func build(parent: Node3D, point: Vector3, direction: Vector3, label: Str
 	_board(st)
 	var mesh := MeshInstance3D.new()
 	mesh.name = "Barricade"
-	st.generate_tangents()
 	mesh.mesh = st.commit()
 	mesh.material_override = IndianHouse._material()
 	root.add_child(mesh)

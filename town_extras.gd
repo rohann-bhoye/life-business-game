@@ -175,11 +175,7 @@ func _street_furniture(lane_x: float) -> void:
 		if lane_x < 0.0 and spot[0] < 0.0 and spot[1] < 0.0: continue
 		var base := Vector3(lane_x + spot[0], GROUND, spot[1])
 		var face: float = spot[2]
-		# A bench: slatted seat and back on two concrete legs, facing the lane.
-		_box(base + Vector3(0, 0.45, 0), Vector3(0.5, 0.06, 1.6), WOOD)
-		_box(base + Vector3(-face * 0.22, 0.8, 0), Vector3(0.06, 0.5, 1.6), WOOD)
-		for z in [-0.65, 0.65]: _box(base + Vector3(0, 0.22, z), Vector3(0.45, 0.44, 0.12), Color(0.66, 0.66, 0.64))
-		# A green dustbin beside it.
-		var bin := base + Vector3(0, 0, 1.6)
-		IndianHouse.cylinder(st, bin, 0.28, 0.75, Color(0.14, 0.5, 0.26), 10)
-		IndianHouse.cylinder(st, bin + Vector3(0, 0.75, 0), 0.3, 0.07, Color(0.1, 0.38, 0.2), 10)
+		# A park bench facing the lane, and a green wheelie bin beside it (assets/props/street).
+		var tag := "%d_%d" % [roundi(base.x), roundi(base.z)]
+		town.street_prop("LaneBench" + tag, future, "bench", base, face * PI / 2.0, Vector3(1.6, 0.92, 0.62))
+		town.street_prop("LaneBin" + tag, future, "wheelie_bin", base + Vector3(0, 0, 1.6), face * PI / 2.0, Vector3(0.59, 1.07, 0.77))

@@ -155,9 +155,6 @@ func _stall(parent: Node3D, node_name: String, at: Vector3, sign: String, colour
 	label.position = Vector3(0, 1.95, 0.605)
 	stall.add_child(label)
 
+## A park bench (assets/props/street/bench.glb) facing +z.
 func _bench(parent: Node3D, at: Vector3) -> void:
-	var grey := Color(0.39, 0.43, 0.46)
-	town._box("BenchSeat", parent, Vector3(1.6, 0.1, 0.45), at + Vector3(0, 0.5, 0), grey, true)
-	town._box("BenchBack", parent, Vector3(1.6, 0.4, 0.07), at + Vector3(0, 0.78, -0.2), grey)
-	for leg in [-0.65, 0.65]:
-		town._box("BenchLeg", parent, Vector3(0.08, 0.45, 0.4), at + Vector3(leg, 0.25, 0), Color(0.15, 0.18, 0.19))
+	town.street_prop("Bench%d" % parent.get_child_count(), parent, "bench", at, 0.0, Vector3(1.6, 0.92, 0.62))

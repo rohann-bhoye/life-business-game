@@ -145,11 +145,9 @@ func _build_streets() -> void:
 		_box("RoadEdge%s" % z, self, Vector3(64, 0.008, 0.05), Vector3(0, 0.124, z), Color(0.83, 0.86, 0.83))
 	for stripe in range(7):
 		_box("Crossing%d" % stripe, self, Vector3(2.0, 0.008, 0.28), Vector3(4, 0.124, 4.8 + stripe * 0.7), Color(0.85, 0.87, 0.83))
+	# Park benches on the south pavement, facing the road.
 	for x in [-13.0, 13.0]:
-		_box("BenchSeat%s" % x, self, Vector3(1.8, 0.12, 0.45), Vector3(x, 0.65, 11.2), Color(0.39, 0.43, 0.46), true)
-		_box("BenchBack%s" % x, self, Vector3(1.8, 0.45, 0.08), Vector3(x, 0.9, 11.42), Color(0.39, 0.43, 0.46), true)
-		for leg in [-0.65, 0.65]:
-			_box("BenchLeg%s_%s" % [x, leg], self, Vector3(0.1, 0.5, 0.35), Vector3(x + leg, 0.35, 11.2), Color(0.15, 0.18, 0.19))
+		street_prop("Bench%s" % x, self, "bench", Vector3(x, StreetKit.PAVE_TOP, 11.05), PI, Vector3(1.6, 0.92, 0.62))
 	# Asphalt repairs and utility covers stop the road reading as one repeated strip.
 	for entry in [[-19.0, 6.0, 3.8, 1.1], [-6.0, 7.8, 2.7, 0.8], [11.5, 6.2, 4.2, 1.0], [24.0, 8.1, 2.2, 0.7]]:
 		_box("RoadPatch%s" % entry[0], self, Vector3(entry[2], 0.009, entry[3]), Vector3(entry[0], 0.128, entry[1]), Color(0.105, 0.115, 0.12))
@@ -167,13 +165,11 @@ func _build_streets() -> void:
 		add_child(cover)
 
 func _build_street_details() -> void:
-	for entry in [[-23.0, 3.1], [-8.5, 10.9], [8.5, 3.1], [23.0, 10.9]]:
-		var x: float = entry[0]
-		var z: float = entry[1]
-		_box("Planter%d" % get_child_count(), self, Vector3(0.75, 0.42, 0.75), Vector3(x, 0.32, z), Color(0.42, 0.38, 0.32))
-		for side in [-0.2, 0.2]: _cone("Shrub%d" % get_child_count(), self, 0.28, 0.08, 0.75, Vector3(x + side, 0.82, z), Color(0.18, 0.43, 0.22))
+	# Wooden planters along the pavements and green street bins (walk-through, as before).
+	for entry in [[-23.0, 3.1], [-8.5, 10.9], [9.3, 3.1], [23.0, 10.9]]:
+		street_prop("Planter%s" % entry[0], self, "planter", Vector3(entry[0], StreetKit.PAVE_TOP, entry[1]))
 	for entry in [[-17.0, 3.25], [17.0, 10.75]]:
-		_box("StreetBin%d" % get_child_count(), self, Vector3(0.48, 0.8, 0.48), Vector3(entry[0], 0.5, entry[1]), Color(0.12, 0.3, 0.29))
+		street_prop("StreetBin%s" % entry[0], self, "street_bin", Vector3(entry[0], StreetKit.PAVE_TOP, entry[1]))
 	for x in [-27.0, -2.0, 27.0]:
 		_box("Drain%d" % get_child_count(), self, Vector3(1.1, 0.025, 0.32), Vector3(x, 0.135, 4.18), Color(0.12, 0.15, 0.16))
 		for slot in range(5): _box("DrainSlot%d" % get_child_count(), self, Vector3(0.08, 0.01, 0.38), Vector3(x - 0.4 + slot * 0.2, 0.151, 4.18), Color(0.3, 0.33, 0.33))
@@ -201,20 +197,26 @@ func _fence(offset: Vector3, length: float, along_z: bool) -> void:
 	for index in range(ceili(length) + 1):
 		_box("Post%d" % index, fence, Vector3(0.13, 1.0, 0.13), Vector3(-length / 2 + index * length / ceili(length), 0.5, 0), color)
 
-func _cone(node_name: String, parent: Node3D, bottom: float, top: float, height: float, offset: Vector3, color: Color) -> MeshInstance3D:
-	var instance := MeshInstance3D.new()
-	instance.name = node_name
-	var mesh := CylinderMesh.new()
-	mesh.bottom_radius = bottom
-	mesh.top_radius = top
-	mesh.height = height
-	mesh.radial_segments = 7
-	mesh.rings = 1
-	mesh.material = _material(color)
-	instance.mesh = mesh
-	instance.position = offset
-	parent.add_child(instance)
-	return instance
+## A street prop from assets/props/street (tools/blender/street_props.py: real size, floor
+## centre origin, front toward +z), turned by `yaw`. A `solid` size adds a box collider
+## standing on `at`, turned with the prop.
+static func street_prop(node_name: String, parent: Node3D, model: String, at: Vector3, yaw := 0.0, solid := Vector3.ZERO) -> Node3D:
+	var prop: Node3D = (load("res://assets/props/street/%s.glb" % model) as PackedScene).instantiate()
+	prop.name = node_name
+	prop.position = at
+	prop.rotation.y = yaw
+	parent.add_child(prop)
+	if solid != Vector3.ZERO:
+		var body := StaticBody3D.new()
+		body.name = "Body"
+		var collision := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = solid
+		collision.shape = shape
+		collision.position.y = solid.y / 2.0
+		body.add_child(collision)
+		prop.add_child(body)
+	return prop
 
 ## All town trees as one MultiMesh of the Blender neem tree, each turned and sized
 ## a little differently.
@@ -238,7 +240,7 @@ func _batch_scenery() -> void:
 		if child is MeshInstance3D:
 			# Building windows are hidden behind the Kenney houses (_dress_buildings), so skip them.
 			if not child.visible: continue
-			for prefix in ["LaneMark", "Crossing", "RoadPatch", "Drain", "Bench"]:
+			for prefix in ["LaneMark", "Crossing", "RoadPatch", "Drain"]:
 				if child.name.begins_with(prefix): sources.append(child); break
 	preload("res://scenery_batch.gd").build(self, sources, "StreetBatch")
 

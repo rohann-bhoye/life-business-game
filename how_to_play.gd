@@ -23,6 +23,8 @@ const PAGES := [
 	{"picture": "tablet", "title": "Your shop PC", "text": "Press E at the PC on your desk: Shop Manager (money, bills, prices, marketing, goals), Wholesale, Staff and more. Talk to staff and customers with E; reply with 1-4.", "keys": ["E", "1-4"]},
 	{"picture": "grow", "title": "Grow the business", "text": "On the PC, APNA Builders sells shop expansions and makeovers, and Wholesale > Furniture sells more racks. Licences open more kinds of products. Hire Ramesh and Sunil on the Staff page.", "keys": ["E"]},
 	{"picture": "night", "title": "End of the day", "text": "The shop is open 08:00 - 20:00. After 20:00 go home and sleep (E at the bed) to start a new day and see your day report.", "keys": ["E", "ESC"]},
+	# CC BY models must credit their authors (CREDITS.md, assets/props/street/README.md).
+	{"picture": "shop", "title": "Credits", "text": "Made by the Bucketstudy team. Free models: Bench by Zsky, Planter & Bushes by J-Toastie and House plant by Poly by Google (CC BY 3.0, poly.pizza); Kenney, KayKit, Quaternius and Isa Lousberg (CC0).", "keys": []},
 ]
 var page := 0
 var card: Panel
