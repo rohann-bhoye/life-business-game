@@ -38,6 +38,12 @@ func _run() -> void:
 	menu.how_to_play.open()
 	await _shot("how_to_play")
 	menu.how_to_play.close()
+	# AI Test (debug builds only): the bot plays its test games, then the report shows.
+	if menu.ai_tester_screen != null:
+		menu.ai_tester_screen.open()
+		while menu.ai_tester_screen.running or menu.ai_tester_screen.report.is_empty(): await process_frame
+		await _shot("ai_test")
+		menu.ai_tester_screen.close()
 	root.size = Vector2i(640, 480)
 	for frame in range(4): await process_frame
 	menu._layout()

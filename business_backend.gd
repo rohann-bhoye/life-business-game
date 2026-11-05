@@ -1256,9 +1256,16 @@ func purchase_stock() -> bool:
 func sell_one_stock(customer_budget: int, agreed_price: int = -1) -> bool:
 	return sell_basket(1, customer_budget, agreed_price)
 
+## Most of one product a shopper carries to the till: customer.gd bulk shoppers (chai
+## stalls) take 5-7 and families up to 4. It was 3, so those baskets were scanned and then
+## refused ("Customer left without buying"); the AI Tester found it (2026-11-05).
+const MAX_BASKET_LINE := 7
+## Most lines in one mixed basket (main product + up to 2 extras).
+const MAX_BASKET_LINES := 3
+
 func sell_basket(quantity: int, customer_budget: int, agreed_price: int = -1, product := "bottle", rack_id := -1) -> bool:
 	if product not in Catalog.IDS: return false
-	if quantity < 1 or quantity > 3: return false
+	if quantity < 1 or quantity > MAX_BASKET_LINE: return false
 	if customer_budget < 0 or not shop_is_open():
 		return false
 	var retail := product_price(product)
@@ -1292,14 +1299,14 @@ func sell_basket(quantity: int, customer_budget: int, agreed_price: int = -1, pr
 ## {product, count (1-3), rack, price}. All-or-nothing: stock, money and racks
 ## only change if every line can be sold.
 func sell_mixed_basket(lines: Array, customer_budget: int) -> bool:
-	if lines.is_empty() or lines.size() > 3 or customer_budget < 0 or not shop_is_open(): return false
+	if lines.is_empty() or lines.size() > MAX_BASKET_LINES or customer_budget < 0 or not shop_is_open(): return false
 	var needed := {}
 	var total := 0
 	var units := 0
 	for line in lines:
 		var product = line.get("product")
 		var count := int(line.get("count", 0))
-		if product not in Catalog.IDS or count < 1 or count > 3: return false
+		if product not in Catalog.IDS or count < 1 or count > MAX_BASKET_LINE: return false
 		var retail := product_price(product)
 		var price := int(line.get("price", retail))
 		if price < 50 or price > retail or price % 10 != 0: return false
@@ -2064,6 +2071,25 @@ func _read_valid_save(path: String) -> Dictionary:
 			data.incoming_boxes.append({"product": data.pending_product, "amount": STOCK_AMOUNT})
 	return data if _is_valid_snapshot(data) else {}
 
+## "Basket of N items for ₹T" as sell_mixed_basket writes it: 2 to 3 x MAX_BASKET_LINE
+## items at up to Rs200 each, in steps of 10. (The old list only had 2-5 items up to
+## Rs1000, so a bigger basket made every save fail until the next sale.) Everything the
+## old list allowed (2-5 items, Rs100-1000) still passes, so old saves always load.
+static func _is_basket_visit(text: String) -> bool:
+	var head := "Basket of "
+	var middle := " items for %s" % String.chr(8377)
+	if not text.begins_with(head): return false
+	var rest := text.substr(head.length())
+	var cut := rest.find(middle)
+	if cut < 1: return false
+	var units_text := rest.left(cut)
+	var total_text := rest.substr(cut + middle.length())
+	if not units_text.is_valid_int() or not total_text.is_valid_int(): return false
+	var units := int(units_text)
+	var total := int(total_text)
+	if str(units) != units_text or str(total) != total_text: return false
+	return units >= 2 and units <= MAX_BASKET_LINE * MAX_BASKET_LINES and total >= 100 and total <= maxi(1000, 200 * units) and total % 10 == 0
+
 func _is_valid_snapshot(data: Dictionary) -> bool:
 	if not data.get("stock_collection_assigned", false) is bool: return false
 	var demo_data = data.get("demo_progress", DemoProgress.new().snapshot())
@@ -2287,11 +2313,7 @@ func _is_valid_snapshot(data: Dictionary) -> bool:
 	var allowed_visits: Array[String] = ["No customers yet", "Out of stock", "Price too high", "Offer refused", "Customer left"]
 	for sale_price in range(50, 201, 10):
 		allowed_visits.append("Bought for %s%d" % [String.chr(8377), sale_price])
-	# Mixed baskets: 2-5 items, Rs100-1000 in steps of 10.
-	for units in range(2, 6):
-		for total in range(100, 1001, 10):
-			allowed_visits.append("Basket of %d items for %s%d" % [units, String.chr(8377), total])
-	if data["last_visit"] not in allowed_visits:
+	if data["last_visit"] not in allowed_visits and not _is_basket_visit(data["last_visit"]):
 		return false
 	var duration = data.get("marketing_seconds_left")
 	if not (duration is int or duration is float) or not is_finite(float(duration)):

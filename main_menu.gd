@@ -17,6 +17,7 @@ var content: VBoxContainer
 var settings_menu: Panel
 var coop_menu: Panel
 var how_to_play: Control
+var ai_tester_screen: Control
 var confirmation: Panel
 var footer: Label
 var version_label: Label
@@ -127,6 +128,7 @@ func _ready() -> void:
 	version_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
 	version_label.add_theme_constant_override("shadow_offset_x", 1)
 	version_label.add_theme_constant_override("shadow_offset_y", 1)
+	_build_ai_tester_button()
 	how_to_play = preload("res://how_to_play.gd").new()
 	add_child(how_to_play)
 	settings_menu = SettingsMenu.new()
@@ -139,6 +141,9 @@ func _ready() -> void:
 	add_child(coop_menu)
 	coop_menu.closed.connect(func(): content.show())
 	_build_confirmation()
+	# The AI Test report screen sits above everything else in the lobby.
+	ai_tester_screen = preload("res://ai_tester_screen.gd").new()
+	add_child(ai_tester_screen)
 	content.minimum_size_changed.connect(_layout)
 	content.visibility_changed.connect(_layout)
 	get_viewport().size_changed.connect(_layout)
@@ -149,6 +154,20 @@ func _ready() -> void:
 		status_label.text = Coop.last_message
 		Coop.last_message = ""
 	_layout()
+
+## Small "AI Test" button in the top-right corner (outside the menu column, so the
+## lobby layout is unchanged). It opens ai_tester_screen.gd: a bot plays a few test
+## days on a throw-away shop and shows a report. It never touches real saves.
+## Developer tool: only in the editor / debug builds, never in the released demo.
+func _build_ai_tester_button() -> void:
+	if not OS.is_debug_build(): return
+	var tester := Button.new()
+	tester.name = "AiTestButton"
+	tester.text = "AI Test"
+	tester.focus_mode = Control.FOCUS_NONE
+	tester.pressed.connect(func(): ai_tester_screen.open())
+	add_child(tester)
+	tester.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 10)
 
 func _label(parent: Node, text: String, font_size: int) -> Label:
 	var label := Label.new()

@@ -20,3 +20,9 @@ addons/terrain_3d/bin/~*
 
 # Python bytecode from the Blender scripts
 __pycache__/
+
+# AI Tester report (tools/ai_tester_run.gd, AI Test screen)
+ai_test_report.md
+
+# Town layout export for Blender (tools/export_layout.gd), ~450 MB: never commit
+assets/layout/game_layout.glb

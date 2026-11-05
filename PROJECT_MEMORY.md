@@ -14,6 +14,35 @@ Latest feature: playable tomato farming, a Farm tablet tab/seed stall, three far
 expansions, tomato warehouse/shelf/checkout integration, a road-end Coming Next
 board and a local suggestion form. See Farming section below for controls and limits.
 
+## AI Tester bot (2026-11-05)
+
+- ai_tester.gd: a rule-based bot (NO AI service, no network, zero tokens) that plays a
+  throw-away Backend (save_path empty, so nothing is written) like a new game: orders,
+  delivers, shelves (stock worker when on shift), sells single/mixed baskets with the
+  same shopper types as customer.gd (quick/regular/family/bulk, budgets, extras, price
+  walkouts via buy_chance), loan, licences, upgrade/expansion/wing, racks (placed with a
+  10 cm, all-turns floor search), hires, marketing, sleeps. Four styles: balanced,
+  aggressive (prices 25% over MRP), lazy (stops restocking after day 1), story (buys the
+  shop from Seth Ramlal on day 1, rents the home). After each step it checks rules:
+  money/stock/bills never negative, popularity 0-100, rating 0-5, a refused sale changes
+  nothing, purchases charge the listed price, cash book adds up (start + sales + loan -
+  spending), clock/day report, counters never go down, the game's own
+  `_is_valid_snapshot`, and save -> load -> save gives the same JSON text. Ends with 120
+  random junk calls (stats in the report are taken before them).
+- Run: `godot --headless --path . --script tools/ai_tester_run.gd -- --days=10 --seed=1`
+  (~3-15 s; writes res://ai_test_report.md, git-ignored; exit code 1 on FAIL). In game:
+  "AI Test" button top-right of the main menu, debug builds only (ai_tester_screen.gd,
+  saves user://ai_test_report.md); tools/menus_preview.gd shoots it as menus_ai_test.png.
+  Test: tests/ai_tester_test.gd. NOT covered: 3D scene, walking, farm, export, dungeon, co-op.
+- First real run found a game bug, now fixed: bulk shoppers (5-7 of one product) and
+  family baskets with 4 were refused at the till (sell_basket / sell_mixed_basket allowed
+  3), and baskets of 6+ items or over Rs1000 failed the save check (last_visit list), so
+  saving stopped until the next small sale. Backend MAX_BASKET_LINE = 7,
+  MAX_BASKET_LINES = 3, `_is_basket_visit()` (still accepts all the old strings).
+- Seed 1, 10 days (after the fix): balanced Rs15,000 -> Rs21,230 (level 3+2, 4.0 stars,
+  popularity 96); story -> Rs13,630; aggressive (25% markup) loses ~40% of shoppers to
+  price walkouts, falls to 2.5 stars and popularity 0; lazy runs out of stock by day 2.
+
 ## Controls, G-Move Furniture, Talk Boxes, Shop Levels (2026-10-20)
 
 - Keys: Tab opens/closes the tablet (E no longer opens it in the physical shop; the
