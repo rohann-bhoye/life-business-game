@@ -10,6 +10,8 @@ const SHOTS := {
 	"street": [Vector3(3.0, 2.4, 11.6), Vector3(2.0, 1.6, 0.0)],
 	"angle": [Vector3(16.0, 7.0, 12.0), Vector3(1.0, 1.0, -4.0)],
 	"inside": [Vector3(-5.0, 1.8, 1.5), Vector3(5.0, 1.2, -6.0)],
+	"coolers": [Vector3(4.6, 1.9, 0.8), Vector3(5.0, 0.9, -10.0)],
+	"trolleys": [Vector3(2.6, 1.8, -3.0), Vector3(1.8, 0.6, 2.0)],
 	"top": [Vector3(2.0, 30.0, 8.0), Vector3(2.0, 0.0, -4.0)],
 }
 

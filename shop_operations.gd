@@ -579,6 +579,64 @@ func _build_wing(building: Node3D, wider: float, depth: float) -> void:
 			lamp.shadow_enabled = false
 			fixture.add_child(lamp)
 			z -= 6.0
+	_wing_fittings(lamps, room_wing)
+
+## Cooler header words for the wings' cooler rows, in placing order.
+const COOLER_WORDS := [["COLD DRINKS", "DAIRY"], ["FROZEN", "ICE CREAM", "COLD DRINKS"]]
+
+## The wings' fittings (tools/blender/build_wing_props.py) on the floor rack_store.gd keeps
+## for them (WING_FITTINGS), each with a collider; the coolers' lit headers say what is
+## inside. Decor for now: nothing is stocked or sold from them.
+func _wing_fittings(holder: Node3D, wing: int) -> void:
+	var Kenney := preload("res://kenney_assets.gd")
+	var cooler_row := 0
+	for entry in Store.WING_FITTINGS:
+		if int(entry[0]) > wing: continue
+		var area: Rect2 = entry[2]
+		var centre := Vector3(area.get_center().x, 0.106, area.get_center().y)
+		match entry[1]:
+			"trolleys":
+				Kenney.fit(holder, "Trolleys", "res://assets/props/wing/trolleys.glb", Vector3(2.0, 1.05, 0.76), centre)
+				_fitting_body(holder, centre, Vector3(2.0, 1.0, 0.76), 0.0)
+			"freezer":
+				Kenney.fit(holder, "Freezer", "res://assets/props/wing/freezer.glb", Vector3(1.8, 0.95, 0.85), centre, PI / 2)
+				_fitting_body(holder, centre, Vector3(1.8, 0.92, 0.85), PI / 2)
+			"coolers":
+				# A row of 1.5 m coolers along the area's long side, facing into the shop.
+				var along_x := area.size.x > area.size.y
+				var count := floori((area.size.x if along_x else area.size.y) / 1.52)
+				var yaw := 0.0 if along_x else -PI / 2
+				var words: Array = COOLER_WORDS[mini(cooler_row, COOLER_WORDS.size() - 1)]
+				cooler_row += 1
+				for index in range(count):
+					var offset := (index - (count - 1) / 2.0) * 1.53
+					var spot := centre + (Vector3(offset, 0, 0) if along_x else Vector3(0, 0, offset))
+					# 0.8 deep with the door handles, so the cooler keeps its real size.
+					var unit := Kenney.fit(holder, "Cooler", "res://assets/props/wing/cooler.glb", Vector3(1.5, 2.05, 0.8), spot, yaw)
+					_fitting_body(holder, spot, Vector3(1.5, 2.05, 0.7), yaw)
+					var label := Label3D.new()
+					label.name = "CoolerWords"
+					label.text = words[index % words.size()]
+					label.font_size = 56
+					label.pixel_size = 0.0028
+					label.outline_size = 0
+					label.modulate = Color(0.06, 0.24, 0.5)
+					label.double_sided = false
+					# On the lit header (1.88 m up, its face 0.38 m forward in the model), moved by the
+					# offset fit() gave the model; the unit faces its +z.
+					label.position = Vector3(0, 1.88, 0.395) + (unit.get_child(0) as Node3D).position
+					unit.add_child(label)
+
+func _fitting_body(holder: Node3D, centre: Vector3, size: Vector3, yaw: float) -> void:
+	var body := StaticBody3D.new()
+	body.name = "FittingBody"
+	body.position = centre + Vector3(0, size.y / 2.0, 0)
+	body.rotation.y = yaw
+	var shape := CollisionShape3D.new()
+	shape.shape = BoxShape3D.new()
+	shape.shape.size = size
+	body.add_child(shape)
+	holder.add_child(body)
 
 ## The left wall (any depth) with the doorway into the packing room: the mesh gets a
 ## hole and the collider is split into the parts behind, in front of and above it.

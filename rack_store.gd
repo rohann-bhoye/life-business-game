@@ -21,6 +21,16 @@ const MAX_WING := 2
 const RACKS_PER_WING := 4
 ## Grid cells east of x 0 the shopper paths cover (the widest wing, 0.25 m cells).
 const GRID_EAST := 34
+## The wings' fittings (shop_operations.gd _build_wing places the Blender models): [the wing
+## that brings them, what, floor (world x, z)]. Racks, the counter, the desk and shopper paths
+## keep clear of them.
+const WING_FITTINGS := [
+	[1, "trolleys", Rect2(0.8, 1.37, 2.0, 0.76)],
+	[1, "coolers", Rect2(0.1, -11.92, 3.05, 0.75)],
+	[2, "coolers", Rect2(7.54, -11.15, 0.8, 4.6)],
+	[2, "freezer", Rect2(5.475, -3.5, 0.85, 1.8)],
+	[2, "freezer", Rect2(5.475, -6.3, 0.85, 1.8)],
+]
 const ENTRY := Vector3(-3, 0.1, 1.65)
 ## The stock worker's back aisle and the doorway: nothing is ever built there.
 const RESERVED := [Rect2(-5.04, -7.42, 0.88, 9.84), Rect2(-3.9, 1.2, 1.8, 1.25)]
@@ -45,6 +55,13 @@ static func floor_rect(expansion_level: int, wing_level := 0) -> Rect2:
 
 static func rack_limit(expansion_level: int, wing_level := 0) -> int:
 	return BASE_RACKS + clampi(expansion_level, 0, MAX_EXPANSION) * RACKS_PER_EXPANSION + clampi(wing_level, 0, MAX_WING) * RACKS_PER_WING
+
+## The floor the built wings' fittings stand on.
+static func wing_fittings(wing_level: int) -> Array[Rect2]:
+	var areas: Array[Rect2] = []
+	for entry in WING_FITTINGS:
+		if int(entry[0]) <= wing_level: areas.append(entry[2])
+	return areas
 var grid: AStarGrid2D
 var grid_key := ""
 var last_added_slot := -1
@@ -184,6 +201,8 @@ static func geometry_error(layout: Array, fx: Dictionary = {}, strict_id := -1, 
 		if not floor_area.grow(-0.3).has_point(Vector2(service.x, service.z)): return "Turn the rack toward a clear aisle."
 		for reserved in blocked_areas(fx, int(record.id) == strict_id):
 			if area.intersects(reserved.grow(0.08)): return "Keep doors, queues and working aisles clear."
+		for fitting in wing_fittings(wing_level):
+			if area.intersects(fitting.grow(0.1)): return "Keep the coolers, freezers and trolleys clear."
 		for other in layout:
 			if other.id != record.id and area.grow(0.12).intersects(footprint(other)): return "Too close to another rack."
 	return ""
@@ -204,6 +223,7 @@ func _navigation(layout: Array, fx: Dictionary) -> AStarGrid2D:
 	var obstacles: Array = []
 	for fixture_name in FIXTURE_SIZE: obstacles.append(fixture_body(fixture_name, fx[fixture_name]))
 	for item in layout: obstacles.append(footprint(item))
+	obstacles.append_array(wing_fittings(wing))
 	var floor_area := floor_rect(expansion, wing)
 	for y in range(-50, 9):
 		for x in range(-23, GRID_EAST):
@@ -261,6 +281,8 @@ func fixture_error(fixture_name: String, candidate: Dictionary) -> String:
 	var floor_area := floor_rect(expansion, wing)
 	for key in bodies:
 		if not floor_area.encloses(bodies[key]): return "Keep it inside the shop."
+		for fitting in wing_fittings(wing):
+			if bodies[key].intersects(fitting.grow(0.1)): return "Keep it clear of the coolers, freezers and trolleys."
 		for reserved in RESERVED:
 			if bodies[key].intersects(reserved.grow(0.08)): return "Keep the door and the back aisle clear."
 	if bodies.counter.intersects(bodies.desk.grow(0.12)): return "Too close to the other furniture."

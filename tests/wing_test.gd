@@ -38,6 +38,13 @@ func _initialize() -> void:
 	state.popularity = 50.0
 	assert(state.build_wing() and state.shop_wing == 2 and state.wing_block_reason() == "Fully built")
 	assert(state.rack_limit() == RackStore.rack_limit(2, 2))
+	# The wings' coolers, freezers and trolley bay keep their floor: no rack on a freezer,
+	# but one in the open wing floor is fine.
+	var freezer: Rect2 = RackStore.wing_fittings(2)[3]
+	var on_freezer := {"id": 999, "x": freezer.get_center().x, "z": freezer.get_center().y, "turn": 0}
+	assert(state.racks.placement_error(on_freezer).begins_with("Keep the coolers"))
+	var open_floor := {"id": 999, "x": 2.0, "z": -5.0, "turn": 0}
+	assert(state.racks.placement_error(open_floor).is_empty(), "A rack fits in the open Side Wing floor")
 	var loaded = Backend.new()
 	loaded.restore(state.snapshot())
 	assert(loaded.shop_wing == 2 and loaded.racks.wing == 2)
