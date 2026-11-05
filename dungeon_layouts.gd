@@ -10,6 +10,11 @@ extends RefCounted
 #   m  glowing mushrooms      r  boulder               T  torch on a nearby wall
 #   S  monster spawn          b  boss                  B  boss chamber floor
 #   1-4  a page of Dada-ji's diary on a stand (dungeon_books.gd)
+# Surya Nagri (Floor 2) adds:
+#   ,  garden (grass and flowers)    P  carved pillar          q  broken pillar
+#   y  palm tree                     l  lantern post           h  stone elephant
+#   W  the Surya Chakra (needs the 3 x 3 cells round it open)  F  temple front on a wall
+#   B  is the inlaid boss court there; T  a lamp on the cliff
 const CELL := 4.0
 
 ## Jugnu Gufa, the firefly cave: the entry hall (south-west) leads up to a mushroom
@@ -34,5 +39,31 @@ const FLOOR_1 := [
 	"########################",
 ]
 
+## Surya Nagri, the lost sun city at the bottom of a canyon: you arrive in the south
+## hall, walk up between pillars into the plaza where the golden Surya Chakra turns,
+## a stone channel runs down the east side with three bridges to the palm garden and
+## the stone elephant, ruins and ore to the west, and the inlaid sun court (boss, chest,
+## the way down) behind the wheel in the north.
+const FLOOR_2 := [
+	"########################",
+	"##F..#BBBBFBBBB#.ww.F###",
+	"#....#BBBBBBBBC#.ww...##",
+	"#.q..#BBBbBBBBX#.ww.y.##",
+	"#..o.##BBBBBBB##.pp...##",
+	"#y...q##..P..##..ww..L.#",
+	"#..L....P...P....ww.y..#",
+	"##..l.........l..ww..h.#",
+	"#F...P...,,,...P.pp....#",
+	"#.q.....,,W,,....ww.l..#",
+	"#..o.P...,,,...P.ww.y..#",
+	"##..l.........l..ww..L.#",
+	"#..x....P...P....ww....#",
+	"###..q##.....##..pp..y##",
+	"###....#.....#...ww...##",
+	"####.T.#..E..#.T.ww.F###",
+	"####...........S.ww.####",
+	"########################",
+]
+
 static func rows(index: int) -> Array:
-	return [FLOOR_1][clampi(index, 0, 0)]
+	return [FLOOR_1, FLOOR_2][clampi(index, 0, 1)]

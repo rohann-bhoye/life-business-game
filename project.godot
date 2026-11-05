@@ -14,6 +14,7 @@ config/name="LifeBusinessGame"
 run/main_scene="res://main_menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
+config/project_settings_override="user://renderer.cfg"
 
 [display]
 
@@ -33,5 +34,4 @@ enabled=PackedStringArray("res://addons/terrain_3d/plugin.cfg")
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-
 occlusion_culling/use_occlusion_culling=true

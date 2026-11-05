@@ -20,3 +20,9 @@ No credit is required, but thank you:
 - Kenney (kenney.nl): buildings, characters, furniture, office, produce, products, UI and
   audio packs (licences in each `assets/*/kenney` folder)
 - KayKit by Kay Lousberg: furniture and restaurant packs (`assets/*/kaykit`)
+- Poly Haven (polyhaven.com), CC0 scans in Gufa Darwaza Floor 2 (Surya Nagri,
+  `assets/props/dungeon/floor2/scans`): models namaqualand_cliff_01, namaqualand_cliff_02,
+  rock_face_01, namaqualand_boulder_04, shrub_04, fern_02, brass_diya_lantern and
+  treasure_chest; textures red_sandstone_pavement, large_sandstone_blocks,
+  rabdentse_ruins_wall, sandstone_cracks and mossy_sandstone; sky
+  kloofendal_48d_partly_cloudy_puresky

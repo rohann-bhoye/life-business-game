@@ -42,6 +42,8 @@ func _ready() -> void:
 	get_tree().root.content_scale_size = Vector2i.ZERO
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	theme = make_theme()
+	# Highest crashed or froze this PC last time: back to High (it restarts the game).
+	if Settings.check_highest_trial(get_tree(), settings_path): return
 	var settings = Settings.new()
 	settings.load_file(settings_path)
 	settings.apply_global()

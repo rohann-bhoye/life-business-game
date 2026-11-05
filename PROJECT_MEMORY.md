@@ -14,6 +14,37 @@ Latest feature: playable tomato farming, a Farm tablet tab/seed stall, three far
 expansions, tomato warehouse/shelf/checkout integration, a road-end Coming Next
 board and a local suggestion form. See Farming section below for controls and limits.
 
+## Highest graphics and realistic Surya Nagri (2026-11-05)
+
+- Settings > Graphics > Quality is one dropdown: Auto, Low, Normal, High, Highest, Custom.
+  Highest = High + Cinematic (game_settings.gd `cinematic`): the Forward+ renderer, chosen
+  at start-up from user://renderer.cfg (project.godot application/config/
+  project_settings_override; game_settings.write_renderer). Switching restarts the game
+  after saving the shop. day_night.gd `_cinematic_effects`: SDFGI, SSAO, SSIL, SSR,
+  volumetric fog (sun shafts); sun shadows 4 splits.
+- Safety: Highest is disabled unless `can_run_cinematic()` (RTX, GTX 16xx/1070/1080, RX
+  5000+, Arc; never MX or built-in graphics). First starts on Highest are a trial
+  (user://highest_trial.cfg): a second start before 45 s of play falls back to High and
+  restarts. NEVER run Forward+ on the owner's MX110: it crashed the card and froze Windows.
+- Gufa Darwaza Floor 2 is Surya Nagri (was "Neelam Mahal"): canyon city, Rank C 18:00-02:00,
+  treasure key "shard" now named "Surya gem". Floor 1 stairs lead down when its gate time
+  is open; dungeon_world BUILT_FLOORS = 2 (Agni Mandir not built, the gate never opens to it).
+  The dungeon is still SEALED for players (ADMIN_CAN_ENTER false). No Floor 2 monsters yet
+  (_spawn_monsters returns for index > 0); wheel puzzle not done.
+- Kit: tools/blender/build_surya_nagri.py -> assets/props/dungeon/floor2 (rock cliffs
+  displaced with shared ledge heights LEDGES/BAND_BACK so pieces meet; corners only at real
+  corners; floor2_metal.png marks metal swatches). Layout dungeon_layouts.gd FLOOR_2.
+- Realistic look: assets/materials/real_detail*.gdshader keep the kit colour and add a
+  Poly Haven CC0 texture set triplanar (dungeon_floor.gd REAL table); Low uses
+  real_detail_low (one projection, no roughness map). Scans in floor2/scans (README,
+  tools/blender/import_surya_scans.py) placed by `_dress`: wide ones only on straight walls;
+  Low gets no scanned cliffs or shrubs. Sky: HDRI panorama via the floor profile "sky".
+- First visit: fly-over (dungeon_floor meta "flight", dungeon_world `_fly_over`, letterbox
+  bars, any key skips). tools/surya_views.gd shoots the fly-over and views with FPS
+  (SURYA_GRAPHICS=0..2; Compatibility only on the owner PC).
+- FPS on the MX110 (Compatibility): Low ~29, High ~7 (High is for stronger PCs). The
+  owner's own settings.cfg was Custom at max (4x MSAA, 100%, far shadows, full grass).
+
 ## AI Tester bot (2026-11-05)
 
 - ai_tester.gd: a rule-based bot (NO AI service, no network, zero tokens) that plays a

@@ -2,17 +2,23 @@ extends Panel
 
 # Settings for the lobby and the pause menu: Sound, Controls, Gameplay, Graphics and
 # Display.
-# Graphics has a preset (Auto, Low, Normal, High) with a line saying what it does,
-# and the options it sets underneath; changing any of them makes the preset Custom.
+# Graphics is one dropdown (Auto, Low, Normal, High, Highest, Custom) with a line saying
+# what it does, and the options it sets underneath; changing any of them makes it Custom.
+# Highest is High plus the Cinematic look (game_settings.gd cinematic, the Forward+
+# renderer): picking it, or leaving it, restarts the game after saving the shop.
 signal closed
 const Settings := preload("res://game_settings.gd")
 const Bazaar := preload("res://ui_bazaar.gd")
+## Rows of the Quality dropdown that are not a plain preset.
+const HIGHEST_ITEM := 4
+const CUSTOM_ITEM := 5
 const RENDER_SCALES := [0.5, 0.6, 0.75, 0.85, 1.0]
 const FPS_LIMITS := [30, 60, 120, 0]
 const PRESET_HELP := [
 	"Fastest: no shadows, light grass, 75% 3D resolution, no clouds, walkers or fog.",
 	"Balanced: short shadows, medium grass, full resolution, street life on.",
 	"Best look: far shadows, full grass, 4x smooth edges.",
+	"Cinematic: High plus real sunlight that bounces, fog with light shafts, soft shadows and reflections. Needs a strong graphics card (GTX 1660 / RTX or better). The game restarts to switch (your shop is saved first).",
 	"Your own mix of the options below.",
 ]
 var settings_path := "user://settings.cfg"
@@ -72,7 +78,7 @@ func _ready() -> void:
 	day_length = _choice("Day length", ["Fast (6 min)", "Normal (9 min)", "Relaxed (12 min)"])
 	_help("How long the shop day (8 AM to 8 PM) lasts in real time.")
 	_section("GRAPHICS")
-	graphics = _choice("Preset", ["Auto", "Low", "Normal", "High", "Custom"])
+	graphics = _choice("Quality", ["Auto", "Low", "Normal", "High", "Highest", "Custom"])
 	graphics.name = "GraphicsPreset"
 	graphics.item_selected.connect(_on_preset)
 	preset_help = _help("")
@@ -230,8 +236,12 @@ func open_menu(path: String) -> void:
 	music.value = settings.music_volume * 100
 	sensitivity.value = settings.sensitivity * 1000
 	fov.value = settings.fov
-	graphics.select(settings.graphics + 1)
+	graphics.select(_item_for(settings))
 	graphics.set_item_text(0, "Auto (%s)" % Settings.PRESET_NAMES[detected])
+	# Highest only on cards that can carry it (it froze an MX110 laptop).
+	var strong: bool = Settings.can_run_cinematic()
+	graphics.set_item_disabled(HIGHEST_ITEM, not strong)
+	graphics.set_item_text(HIGHEST_ITEM, "Highest" if strong else "Highest (needs GTX 1660 / RTX)")
 	_show_options(settings.options())
 	_update_help()
 	fullscreen.set_pressed_no_signal(settings.fullscreen)
@@ -263,11 +273,11 @@ func _show_options(chosen: Dictionary) -> void:
 	effects.set_pressed_no_signal(chosen.effects)
 
 func _on_preset(index: int) -> void:
-	if index <= Settings.CUSTOM: _show_options(Settings.PRESETS[detected if index == 0 else index - 1])
+	if index != CUSTOM_ITEM: _show_options(Settings.PRESETS[detected if index == 0 else mini(index - 1, 2)])
 	_update_help()
 
 func _make_custom() -> void:
-	graphics.select(Settings.CUSTOM + 1)
+	graphics.select(CUSTOM_ITEM)
 	_update_help()
 
 func _update_help() -> void:
@@ -277,11 +287,14 @@ func _update_help() -> void:
 
 func _apply() -> void:
 	var settings = Settings.new()
+	# Keep anything the menu does not show (this file may hold more than the rows).
+	settings.load_file(settings_path)
+	var was_cinematic: bool = settings.cinematic
 	settings.volume = volume.value / 100
 	settings.music_volume = music.value / 100
 	settings.sensitivity = sensitivity.value / 1000
 	settings.fov = fov.value
-	settings.graphics = graphics.selected - 1
+	settings.graphics = [-1, 0, 1, 2, 2, Settings.CUSTOM][graphics.selected]
 	settings.render_scale = RENDER_SCALES[render_scale.selected]
 	settings.shadows = shadows.selected
 	settings.grass = grass.selected
@@ -293,14 +306,40 @@ func _apply() -> void:
 	settings.show_fps = show_fps.button_pressed
 	settings.invert_y = invert.button_pressed
 	settings.day_length = day_length.selected
+	settings.cinematic = graphics.selected == HIGHEST_ITEM
+	# Restart only when the choice changed (a card that cannot run Forward+ falls back to
+	# Standard by itself; it must not restart on every Apply).
+	var restart: bool = settings.cinematic != was_cinematic
 	if not settings.save_file(settings_path):
 		status.text = "Could not save settings."
 		status.add_theme_color_override("font_color", Bazaar.RED_DEEP)
+		return
+	if restart:
+		_restart(settings)
 		return
 	settings.apply_global()
 	var player = get_tree().current_scene.get_node_or_null("Player")
 	if is_instance_valid(player): settings.apply_player(player)
 	close_menu()
+
+## The other look needs the other renderer: write it, save the shop, and start again.
+func _restart(settings) -> void:
+	if not settings.write_renderer():
+		status.text = "Could not switch to %s graphics (the renderer file was not written)." % ("Highest" if settings.cinematic else "normal")
+		status.add_theme_color_override("font_color", Bazaar.RED_DEEP)
+		return
+	var shop = get_tree().current_scene.get_node_or_null("Shop/ShopArea")
+	if shop != null and "business" in shop and shop.business != null: shop.business.save_progress()
+	if settings.cinematic: Settings.start_highest_trial()
+	else: Settings.finish_highest_trial()
+	status.text = "Restarting with %s graphics..." % ("Highest" if settings.cinematic else "normal")
+	OS.set_restart_on_exit(true)
+	get_tree().quit()
+
+## The dropdown row for these settings: Highest when the Cinematic look is on.
+func _item_for(settings) -> int:
+	if settings.cinematic: return HIGHEST_ITEM
+	return CUSTOM_ITEM if settings.graphics == Settings.CUSTOM else settings.graphics + 1
 
 func close_menu() -> void:
 	hide()

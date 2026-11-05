@@ -11,6 +11,14 @@ var interior_light: OmniLight3D
 var environment: Environment
 var sky_material: ProceduralSkyMaterial
 var low_quality := false
+## Cinematic look (game_settings.gd, Forward+ renderer): real global light (SDFGI), screen-space
+## ambient occlusion, indirect light and reflections, and volumetric fog that turns sunlight
+## into shafts. Off on the Standard look (GL Compatibility has none of these).
+var cinematic := false
+var town_sky: Sky
+var town_fog_sky := 1.0
+## Panorama skies for underground floors that open to the sky (by texture path).
+var skies := {}
 
 @onready var business = get_tree().current_scene.get_node("Shop/ShopArea").business
 @onready var sun: DirectionalLight3D = get_tree().current_scene.get_node("DirectionalLight3D")
@@ -21,6 +29,11 @@ func _ready() -> void:
 	environment = world.environment.duplicate(true)
 	world.environment = environment
 	sky_material = environment.sky.sky_material
+	town_sky = environment.sky
+	town_fog_sky = environment.fog_sky_affect
+	cinematic = preload("res://game_settings.gd").cinematic_running()
+	# 45 seconds of play on Highest without a crash: this PC can run it.
+	if cinematic: get_tree().create_timer(45.0).timeout.connect(func(): preload("res://game_settings.gd").finish_highest_trial())
 	moon = DirectionalLight3D.new()
 	moon.name = "Moonlight"
 	moon.rotation_degrees = Vector3(-45, 135, 0)
@@ -107,6 +120,47 @@ func _grade() -> void:
 	environment.adjustment_enabled = not low_quality
 	environment.adjustment_contrast = 1.07
 	environment.adjustment_saturation = 1.12
+	_cinematic_effects(underground)
+
+## What the Cinematic look adds, for the town or the floor `profile` underground.
+func _cinematic_effects(profile: Dictionary) -> void:
+	environment.ssao_enabled = cinematic
+	environment.ssil_enabled = cinematic
+	environment.ssr_enabled = cinematic
+	environment.sdfgi_enabled = cinematic
+	environment.volumetric_fog_enabled = cinematic
+	if not cinematic: return
+	environment.glow_enabled = true
+	environment.adjustment_enabled = true
+	environment.ssao_radius = 1.4
+	environment.ssao_intensity = 1.8
+	environment.ssil_intensity = 0.8
+	environment.ssr_max_steps = 48
+	environment.ssr_fade_out = 1.6
+	environment.sdfgi_use_occlusion = true
+	environment.sdfgi_cascades = 4
+	environment.sdfgi_min_cell_size = 0.25
+	environment.sdfgi_energy = 0.9
+	environment.volumetric_fog_anisotropy = 0.6
+	environment.volumetric_fog_length = 96.0
+	environment.volumetric_fog_gi_inject = 0.6
+	if profile.is_empty():
+		# Town: a thin morning haze the sun shines through.
+		environment.volumetric_fog_density = 0.006
+		environment.volumetric_fog_albedo = Color(0.9, 0.92, 0.95)
+	else:
+		environment.volumetric_fog_density = float(profile.get("volumetric", 0.02))
+		environment.volumetric_fog_albedo = profile.background
+
+func _sky(path: String) -> Sky:
+	if not skies.has(path):
+		var panorama := PanoramaSkyMaterial.new()
+		panorama.panorama = load(path)
+		var sky := Sky.new()
+		sky.sky_material = panorama
+		sky.radiance_size = Sky.RADIANCE_SIZE_256
+		skies[path] = sky
+	return skies[path]
 
 func _refresh() -> void:
 	_grade()
@@ -114,16 +168,35 @@ func _refresh() -> void:
 	sun.visible = underground.is_empty()
 	moon.visible = underground.is_empty()
 	if not underground.is_empty():
-		environment.background_mode = Environment.BG_COLOR
-		environment.background_color = underground.background
+		var sky_path: String = underground.get("sky", "")
+		if sky_path != "":
+			# A floor open to the sky (Surya Nagri): the panorama lights and reflects too.
+			environment.background_mode = Environment.BG_SKY
+			environment.sky = _sky(sky_path)
+			environment.background_energy_multiplier = float(underground.get("sky_energy", 1.0))
+			environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+			environment.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+			environment.ambient_light_sky_contribution = float(underground.get("sky_light", 0.8))
+		else:
+			environment.background_mode = Environment.BG_COLOR
+			environment.background_color = underground.background
+			environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+			environment.reflected_light_source = Environment.REFLECTION_SOURCE_BG
 		environment.ambient_light_color = underground.ambient
 		environment.ambient_light_energy = underground.ambient_energy
 		environment.fog_enabled = true
 		environment.fog_light_color = underground.background
 		environment.fog_light_energy = 1.0
 		environment.fog_density = underground.fog_density
+		environment.tonemap_exposure = float(underground.get("exposure", environment.tonemap_exposure))
+		# How much the haze hides the sky (an open canyon shows its sky above the rock).
+		environment.fog_sky_affect = float(underground.get("fog_sky", 1.0))
 		stars.visible = false
 		return
+	environment.sky = town_sky
+	environment.fog_sky_affect = town_fog_sky
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.reflected_light_source = Environment.REFLECTION_SOURCE_BG
 	environment.background_mode = Environment.BG_SKY
 	var hour: float = business.minutes_of_day / 60.0
 	var angle := (hour - 6.0) / 24.0 * TAU

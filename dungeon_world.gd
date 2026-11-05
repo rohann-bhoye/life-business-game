@@ -23,13 +23,16 @@ const UNDERGROUND_FAR := 150.0
 ## Floor, rank, open window in minutes of the day (end may pass midnight), the cave
 ## light, and on which days (every 7th for Agni Mandir).
 const FLOORS := [
-	{"name": "Jugnu Gufa", "rank": "E", "open": 360, "close": 1320, "every": 1, "treasure": "jar",
+	{"name": "Jugnu Gufa", "rank": "E", "open": 360, "close": 1320, "every": 1, "treasure": "jar", "tagline": "the firefly cave",
 		"background": Color(0.04, 0.06, 0.09), "ambient": Color(0.45, 0.58, 0.72), "ambient_energy": 0.6, "fog_density": 0.018},
-	{"name": "Neelam Mahal", "rank": "C", "open": 1080, "close": 120, "every": 1, "treasure": "shard",
-		"background": Color(0.05, 0.04, 0.11), "ambient": Color(0.55, 0.5, 0.9), "ambient_energy": 0.95, "fog_density": 0.016},
-	{"name": "Agni Mandir", "rank": "A", "open": 1200, "close": 240, "every": 7, "treasure": "coin",
+	{"name": "Surya Nagri", "rank": "C", "open": 1080, "close": 120, "every": 1, "treasure": "shard", "tagline": "the lost sun city",
+		"background": Color(0.74, 0.66, 0.56), "ambient": Color(0.92, 0.86, 0.78), "ambient_energy": 0.3, "fog_density": 0.0035,
+		"sky": "res://assets/props/dungeon/floor2/scans/sky/kloofendal_48d_partly_cloudy_puresky_2k.hdr", "sky_energy": 1.5, "sky_light": 0.4, "volumetric": 0.012, "exposure": 0.8, "fog_sky": 0.2},
+	{"name": "Agni Mandir", "rank": "A", "open": 1200, "close": 240, "every": 7, "treasure": "coin", "tagline": "the lava temple",
 		"background": Color(0.1, 0.04, 0.03), "ambient": Color(0.9, 0.55, 0.45), "ambient_energy": 0.95, "fog_density": 0.016},
 ]
+## Floors that are built (Agni Mandir comes later): the gate never opens to a missing one.
+const BUILT_FLOORS := 2
 
 var ops: Node
 var business
@@ -94,7 +97,7 @@ func _ready() -> void:
 func open_floors() -> Array[int]:
 	var result: Array[int] = []
 	var minute := int(business.minutes_of_day)
-	for index in range(FLOORS.size()):
+	for index in range(BUILT_FLOORS):
 		var entry: Dictionary = FLOORS[index]
 		var wraps: bool = entry.close < entry.open
 		var day: int = business.day
@@ -210,7 +213,7 @@ func _build_guild() -> void:
 	notice.name = "GateTimes"
 	notice.text = "DARWAZA TIMES
 Rank E  Jugnu Gufa  06:00-22:00
-Rank C  Neelam Mahal  18:00-02:00
+Rank C  Surya Nagri  18:00-02:00
 Rank A  Agni Mandir  every 7th night
            20:00-04:00"
 	notice.position = Vector3(-4.0, 1.45, 1.61)
@@ -301,6 +304,7 @@ func _build_fade() -> void:
 	monster_row[0].text = "Monsters left"
 	hud_monsters = monster_row[1]
 	_build_combat_hud(layer)
+	_build_letterbox(layer)
 
 ## A line of the trip card: [name, value] labels, the value gold on the right.
 func _stat_row(column: VBoxContainer) -> Array:
@@ -401,7 +405,7 @@ func _build_combat_hud(layer: CanvasLayer) -> void:
 	player_fill = _bar(player_root, Vector2(2, 28), 292, 12, Color(0.82, 0.16, 0.16))
 
 func _update_combat(delta: float) -> void:
-	var down := underground_floor >= 0
+	var down := underground_floor >= 0 and not flying_over
 	player_root.visible = down
 	if not down:
 		monster_root.visible = false
@@ -542,7 +546,11 @@ func hint() -> String:
 		if player.global_position.distance_to(exit_point) < REACH: return "E - climb back up to the town"
 		var found: String = floor_root.hint_at(floor_root.to_local(player.global_position))
 		if not found.is_empty(): return found
-		if _near_stairs(): return "The stairs down to Neelam Mahal (Rank C) open in a later update"
+		if _near_stairs():
+			if underground_floor == 0:
+				if 1 in open_floors(): return "E - go down the stairs to %s (Rank %s)" % [FLOORS[1].name, FLOORS[1].rank]
+				return "The stairs down to %s (Rank %s) open at 18:00" % [FLOORS[1].name, FLOORS[1].rank]
+			return "The way down to Agni Mandir (Rank A) opens in a later update"
 		return ""
 	if _near_guild():
 		if sealed(): return "Darwaza Guild: the counter opens in a later update"
@@ -581,6 +589,9 @@ func try_interact() -> bool:
 			finds[kind] = int(finds.get(kind, 0)) + count
 			_feedback("+%d %s (%d this trip)" % [count, preload("res://dungeon_store.gd").ITEMS[kind].name.to_lower(), finds[kind]])
 			_update_hud()
+			return true
+		if _near_stairs() and underground_floor == 0 and 1 in open_floors():
+			_descend(1)
 			return true
 		return _near_stairs()
 	if _near_guild():
@@ -632,16 +643,31 @@ func _enter(index: int) -> void:
 	var camera: Camera3D = player.camera
 	town_far = camera.far
 	camera.far = UNDERGROUND_FAR
-	var day_night = get_tree().current_scene.get_node_or_null("DayNight")
-	if day_night != null and day_night.has_method("set_underground"): day_night.set_underground(FLOORS[index])
 	audio = preload("res://dungeon_audio.gd").new()
 	add_child(audio)
 	if business.treasure.weapon != "":
 		lathi = _make_held(business.treasure.weapon)
 		player.camera.add_child(lathi)
-	floor_root = preload("res://dungeon_floor.gd").create(index, UNDER)
-	add_child(floor_root)
 	finds = {}
+	_build_floor(index)
+	hud.visible = true
+	get_tree().current_scene.get_node("Ui").set_meta("underground", true)
+	get_tree().current_scene.get_node("Ui").hud_money.visible = false
+	_update_hud()
+	await _fade_to(0.0)
+	await _first_look(index)
+	busy = false
+
+## Builds floor `index` far off the land, switches the light to it and puts the player on
+## its entry stone (used on the way in and on the stairs down).
+func _build_floor(index: int) -> void:
+	underground_floor = index
+	var day_night = get_tree().current_scene.get_node_or_null("DayNight")
+	if day_night != null and day_night.has_method("set_underground"): day_night.set_underground(FLOORS[index])
+	# Low gets the light version of a realistic floor (fewer scanned rocks and plants).
+	var light_version: bool = day_night == null or not ("low_quality" in day_night) or day_night.low_quality
+	floor_root = preload("res://dungeon_floor.gd").create(index, UNDER, light_version)
+	add_child(floor_root)
 	player_hp = PLAYER_MAX_HP
 	player_ratio = 1.0
 	target = null
@@ -649,14 +675,156 @@ func _enter(index: int) -> void:
 	player.global_position = UNDER + floor_root.get_meta("entry", Vector3(0, 1, 0))
 	player.velocity = Vector3.ZERO
 	player.rotation.y = floor_root.get_meta("facing", 0.0)
+	player.camera_pivot.rotation.x = 0.0
 	_spawn_monsters(index)
 	_feedback("%s - Rank %s. Find the treasure and keep away from the monsters!" % [FLOORS[index].name, FLOORS[index].rank])
-	hud.visible = true
-	get_tree().current_scene.get_node("Ui").set_meta("underground", true)
-	get_tree().current_scene.get_node("Ui").hud_money.visible = false
+
+## The stairs at the bottom of a floor: down to the next one (this trip's finds come
+## along), when that floor's gate time is open.
+func _descend(index: int) -> void:
+	busy = true
+	sound("pick")
+	await _fade_to(1.0)
+	if is_instance_valid(floor_root): floor_root.queue_free()
+	monsters.clear()
+	_build_floor(index)
 	_update_hud()
 	await _fade_to(0.0)
+	await _first_look(index)
 	busy = false
+
+# --- First look: a fly-over of a floor the first time you reach it ---------------------
+## Floors already flown over this session (until the trip's finds are banked, the save
+## still says the floor was never reached, so this keeps it to once).
+var flown := {}
+var flying_over := false
+var skip_flight := false
+var letterbox: Control
+var letterbox_title: Label
+var letterbox_line: Label
+const FLIGHT_SECONDS := 11.0
+
+func _first_look(index: int) -> void:
+	if flown.has(index) or int(business.treasure.deepest) > index or not floor_root.has_meta("flight"): return
+	flown[index] = true
+	await _fly_over(floor_root.get_meta("flight"), FLOORS[index])
+
+## Flies a camera along `path` ([[camera, looking at], ...] in the floor's space) at an even
+## speed, easing in and out, and lands in the player's eyes. Letterbox bars and the floor's
+## name show meanwhile; the player cannot move (the bars are a dungeon_panel). Any key or
+## click skips it.
+func _fly_over(path: Array, entry: Dictionary) -> void:
+	if path.size() < 2: return
+	flying_over = true
+	skip_flight = false
+	var points: Array[Vector3] = []
+	var looks: Array[Vector3] = []
+	for key in path:
+		points.append(floor_root.to_global(key[0]))
+		looks.append(floor_root.to_global(key[1]))
+	points[points.size() - 1] = player.camera.global_position
+	looks[looks.size() - 1] = player.camera.global_position - player.camera.global_basis.z * 12.0
+	var lengths: Array[float] = [0.0]
+	for k in range(1, points.size()): lengths.append(lengths[k - 1] + points[k - 1].distance_to(points[k]))
+	var camera := Camera3D.new()
+	camera.name = "FlyOverCamera"
+	camera.far = UNDERGROUND_FAR
+	camera.fov = player.camera.fov
+	floor_root.add_child(camera)
+	camera.global_position = points[0]
+	camera.look_at(looks[0], Vector3.UP)
+	camera.make_current()
+	_show_letterbox(entry)
+	var elapsed := 0.0
+	while elapsed < FLIGHT_SECONDS and not skip_flight and is_instance_valid(camera):
+		await get_tree().process_frame
+		if get_tree().paused: continue
+		elapsed += get_process_delta_time()
+		var along: float = smoothstep(0.0, 1.0, minf(1.0, elapsed / FLIGHT_SECONDS)) * lengths[lengths.size() - 1]
+		var k := 0
+		while k < points.size() - 2 and lengths[k + 1] < along: k += 1
+		var part: float = clampf((along - lengths[k]) / maxf(0.001, lengths[k + 1] - lengths[k]), 0.0, 1.0)
+		var before: Vector3 = points[maxi(k - 1, 0)]
+		var after: Vector3 = points[mini(k + 2, points.size() - 1)]
+		camera.global_position = points[k].cubic_interpolate(points[k + 1], before, after, part)
+		var look: Vector3 = looks[k].lerp(looks[k + 1], smoothstep(0.0, 1.0, part))
+		if not camera.global_position.is_equal_approx(look): camera.look_at(look, Vector3.UP)
+		_letterbox_text(elapsed)
+	player.camera.make_current()
+	if is_instance_valid(camera): camera.queue_free()
+	_hide_letterbox()
+	flying_over = false
+
+func _build_letterbox(layer: CanvasLayer) -> void:
+	letterbox = Control.new()
+	letterbox.name = "FlyOverBars"
+	letterbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	letterbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	letterbox.visible = false
+	letterbox.add_to_group("dungeon_panel")
+	layer.add_child(letterbox)
+	for top in [true, false]:
+		var bar := ColorRect.new()
+		bar.color = Color.BLACK
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bar.anchor_right = 1.0
+		bar.anchor_top = 0.0 if top else 0.885
+		bar.anchor_bottom = 0.115 if top else 1.0
+		letterbox.add_child(bar)
+	letterbox_title = Label.new()
+	letterbox_title.anchor_right = 1.0
+	letterbox_title.anchor_top = 0.62
+	letterbox_title.anchor_bottom = 0.74
+	letterbox_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	letterbox_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	letterbox_title.add_theme_font_override("font", preload("res://ui_bazaar.gd").name_font())
+	letterbox_title.add_theme_font_size_override("font_size", 64)
+	letterbox_title.add_theme_color_override("font_color", Color(1.0, 0.9, 0.62))
+	letterbox_title.add_theme_color_override("font_outline_color", Color(0.18, 0.1, 0.03))
+	letterbox_title.add_theme_constant_override("outline_size", 10)
+	letterbox.add_child(letterbox_title)
+	letterbox_line = Label.new()
+	letterbox_line.anchor_right = 1.0
+	letterbox_line.anchor_top = 0.74
+	letterbox_line.anchor_bottom = 0.8
+	letterbox_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	letterbox_line.add_theme_font_size_override("font_size", 20)
+	letterbox_line.add_theme_color_override("font_outline_color", Color.BLACK)
+	letterbox_line.add_theme_constant_override("outline_size", 6)
+	letterbox.add_child(letterbox_line)
+	var skip := Label.new()
+	skip.text = "Any key - skip"
+	skip.anchor_left = 0.75
+	skip.anchor_right = 0.98
+	skip.anchor_top = 0.93
+	skip.anchor_bottom = 0.98
+	skip.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	skip.add_theme_font_size_override("font_size", 14)
+	skip.modulate = Color(1, 1, 1, 0.6)
+	letterbox.add_child(skip)
+
+func _show_letterbox(entry: Dictionary) -> void:
+	letterbox_title.text = str(entry.get("name", "")).to_upper()
+	letterbox_line.text = "Rank %s  -  %s" % [entry.get("rank", ""), entry.get("tagline", "")]
+	letterbox_title.modulate.a = 0.0
+	letterbox_line.modulate.a = 0.0
+	letterbox.visible = true
+	hud.visible = false
+	var ui := get_tree().current_scene.get_node_or_null("Ui")
+	if ui != null: ui.visible = false
+
+## The name fades in a third of the way through and out again before landing.
+func _letterbox_text(elapsed: float) -> void:
+	var t := elapsed / FLIGHT_SECONDS
+	var alpha := smoothstep(0.22, 0.34, t) * (1.0 - smoothstep(0.72, 0.84, t))
+	letterbox_title.modulate.a = alpha
+	letterbox_line.modulate.a = alpha
+
+func _hide_letterbox() -> void:
+	letterbox.visible = false
+	hud.visible = underground_floor >= 0
+	var ui := get_tree().current_scene.get_node_or_null("Ui")
+	if ui != null: ui.visible = true
 
 func _leave() -> void:
 	busy = true
@@ -691,6 +859,8 @@ func _leave() -> void:
 ## S cells, Raja Jelly in the boss chamber, each at a level in its kind's range.
 func _spawn_monsters(_index: int) -> void:
 	monsters.clear()
+	# Surya Nagri's own monsters come in the next step; until then it is quiet.
+	if _index > 0: return
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var kinds := ["slime", "bat", "mushroom"]
@@ -805,6 +975,11 @@ func _take(index: int) -> void:
 	_feedback("You took the %s: %s. Left click swings it underground." % [WEAPONS[id].name, WEAPONS[id].note])
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Any key or click skips a fly-over.
+	if flying_over and ((event is InputEventKey and event.pressed and not event.echo) or (event is InputEventMouseButton and event.pressed)):
+		skip_flight = true
+		get_viewport().set_input_as_handled()
+		return
 	if underground_floor < 0 or busy or not swing_ready: return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if not is_instance_valid(lathi):

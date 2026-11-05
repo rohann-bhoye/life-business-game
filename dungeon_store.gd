@@ -6,7 +6,7 @@ extends RefCounted
 # income is always sold x price, which the save check adds to the money.
 const ITEMS := {
 	"jar": {"name": "Firefly jar", "price": 40},
-	"shard": {"name": "Crystal shard", "price": 120},
+	"shard": {"name": "Surya gem", "price": 120},
 	"coin": {"name": "Gold idol coin", "price": 300},
 	# Dropped by monsters (dungeon_world.gd monster_died).
 	"jelly": {"name": "Slime jelly", "price": 25},
