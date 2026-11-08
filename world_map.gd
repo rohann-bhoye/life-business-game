@@ -40,6 +40,8 @@ const PLACES := [
 	["Farm", "town", Vector2(100, -190), ""],
 	["Giant Police", "town", Vector2(-20, -185), ""],
 	["Cricket Ground", "town", Vector2(25, -40), ""],
+	["Sagar Point", "travel", Vector2(-6, 102), ""],
+	["Sagar Beach", "town", Vector2(-65, 110), ""],
 	# The five dungeons, from the Gufa Darwaza by the town out to the far corners of the land,
 	# the further the harder (DUNGEONS has their ranks).
 	["Sheesh Gufa", "darwaza", Vector2(-95, -232), ""],

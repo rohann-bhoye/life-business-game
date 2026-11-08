@@ -46,6 +46,10 @@ func build(neighbourhood: Node3D) -> void:
 	_welcome_gates()
 	# The north road, the Dholkar river and its bridge past the town hills.
 	preload("res://north_river.gd").new().build(self)
+	# The sea round the island and Sagar Point, the sea-view peak up the ghat road.
+	var sagar := preload("res://sagar_point.gd").new()
+	sagar.expansion = self
+	town.add_child(sagar)
 	# Kisan Gram, the farming village across the river, where the farm now stands.
 	preload("res://farm_village.gd").new().build(self)
 	# The school, the cricket ground and street furniture on the once empty land.
@@ -191,6 +195,11 @@ func _hill_forest() -> void:
 		if Vector2(x - LandShape.CAVE_X, z - LandShape.CAVE_Z).length() < 13.0: continue
 		if Vector2(x - LandShape.GUILD_X, z - LandShape.GUILD_Z).length() < 11.0: continue
 		if LandShape.VILLAGE.grow(2.0).has_point(Vector2(x, z)): continue
+		# Sagar Point's view stays open: no trees near the top, nor down its sea side.
+		var from_peak := Vector2(x, z) - LandShape.PEAK
+		if from_peak.length() < (48.0 if from_peak.y > -6.0 else 20.0) or Vector2(x, z).distance_to(LandShape.LIGHTHOUSE) < 6.0: continue
+		if LandShape.view_road_near(x, z).x < LandShape.VIEW_ROAD_HALF + 5.0: continue
+		if z > 94.0 and LandShape.BEACH.grow(3.0).has_point(Vector2(x, z)): continue
 		var height: float = data.get_height(Vector3(x, 0, z))
 		var steepness: float = absf(data.get_height(Vector3(x + 1.0, 0, z)) - height) + absf(data.get_height(Vector3(x, 0, z + 1.0)) - height)
 		if height < 0.6 or height > 40.0 or steepness > 2.3: continue

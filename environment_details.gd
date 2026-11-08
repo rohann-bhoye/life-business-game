@@ -117,6 +117,9 @@ func _physics_process(_delta: float) -> void:
 
 ## Is this ground one of the paved turning circles at the road ends (town_plan.gd)?
 func _on_turning_circle(x: float, z: float) -> bool:
+	# Sagar Beach's sand, and the ghat road up to Sagar Point with its kerb stones.
+	if z > 99.0 and x > -90.0 and x < -40.0: return true
+	if z > 55.0 and preload("res://land_shape.gd").view_road_near(x, z).x < preload("res://land_shape.gd").VIEW_ROAD_HALF + 0.7: return true
 	for turn in preload("res://town_plan.gd").TURNS:
 		if Vector2(x - turn[0].x, z - turn[0].z).length() < preload("res://town_plan.gd").TURN_RADIUS: return true
 	return false

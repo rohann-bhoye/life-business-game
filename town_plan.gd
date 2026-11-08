@@ -179,7 +179,8 @@ func _turnaround(centre: Vector3, label: String) -> void:
 	var paving := StandardMaterial3D.new()
 	paving.albedo_color = PAVING
 	# The road comes in from the town side; the North Road is wider than the lanes.
-	_kerb_ring(centre, -signf(centre.z), 2.75 if label == "NorthRoad" else LANE_W / 2.0)
+	# The West lane's south circle also opens south onto the ghat road up to Sagar Point.
+	_kerb_ring(centre, -signf(centre.z), 2.75 if label == "NorthRoad" else LANE_W / 2.0, 3.0 if label == "WestSouth" else 0.0)
 	var road := MeshInstance3D.new()
 	road.name = "Turn%sRoad" % label
 	var disc := CylinderMesh.new()
@@ -209,8 +210,9 @@ func _turnaround(centre: Vector3, label: String) -> void:
 
 ## The pavement round a turning circle: a flat ring from radius 7 to 8.4 with its kerb
 ## faces (it used to be a full disc that hid the asphalt), open where the road comes in
-## (`toward` is the road's side along z, `opening` its half width) so the asphalt runs on.
-func _kerb_ring(centre: Vector3, toward: float, opening: float) -> void:
+## (`toward` is the road's side along z, `opening` its half width) so the asphalt runs on;
+## `south_opening` opens a second mouth on the +z side.
+func _kerb_ring(centre: Vector3, toward: float, opening: float, south_opening := 0.0) -> void:
 	var inner := 7.0
 	var outer := 8.4
 	var low := Vector3(0, 0.1, 0)
@@ -219,7 +221,7 @@ func _kerb_ring(centre: Vector3, toward: float, opening: float) -> void:
 	var open := []
 	for index in range(segments):
 		var middle := (index + 0.5) * TAU / segments
-		open.append(sin(middle) * toward > 0.0 and absf(cos(middle)) * inner < opening)
+		open.append((sin(middle) * toward > 0.0 and absf(cos(middle)) * inner < opening) or (sin(middle) > 0.0 and absf(cos(middle)) * inner < south_opening))
 	for index in range(segments):
 		if open[index]: continue
 		var a0 := index * TAU / segments

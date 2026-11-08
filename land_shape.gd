@@ -43,6 +43,69 @@ const FARM_OFFSET := Vector3(100.0, 0.0, -190.0)
 ## not read the terrain back.
 var land_heights := PackedFloat32Array()
 
+## The island coast: the last COAST metres of land round every edge drop into the sea
+## (SEA_Y, the river's own level) down to SEA_BED, as cliffs under the hills and beaches
+## where the land is low. The sea (sagar_point.gd) covers everything past OCEAN_HOLE's
+## edge; inside it the land always stays above the water.
+const SEA_Y := WATER_Y
+const SEA_BED := -7.0
+const COAST := 14.0
+const OCEAN_HOLE := Rect2(-114.0, -242.0, 228.0, 354.0)
+## Sagar Point: the peak of the low south coast hills, a flat round top PEAK_H high with
+## the sea on three sides, reached by a ghat road (VIEW_ROAD control points, rising evenly)
+## from the West Colony lane's south turning circle.
+const PEAK := Vector2(-6.0, 102.0)
+const PEAK_H := 18.0
+const PLATEAU_R := 9.0
+const VIEW_ROAD := [Vector2(-52.0, 57.5), Vector2(-52.0, 66.0), Vector2(-47.0, 74.0), Vector2(-34.0, 77.0), Vector2(-14.0, 77.0), Vector2(8.0, 78.0), Vector2(26.0, 82.0), Vector2(34.0, 92.0), Vector2(28.0, 104.0), Vector2(14.0, 107.0), Vector2(1.0, 104.0)]
+const VIEW_ROAD_HALF := 3.0
+## Sagar Beach: a sandy cove west of the peak, the land sloping gently from the ghat road
+## (BEACH x range, from z BEACH.position.y) down into the sea, its waterline near z 117.
+const BEACH := Rect2(-88.0, 84.0, 46.0, 43.0)
+## The lighthouse on the south-east headland (sagar_point.gd), on a levelled pad.
+const LIGHTHOUSE := Vector2(62.0, 108.0)
+const VIEW_ROAD_START_Y := 0.111
+const VIEW_ROAD_BOX := Rect2(-66.0, 50.0, 114.0, 70.0)
+static var _view_road := PackedVector3Array()
+
+## The ghat road's middle line as points about 1 m apart (a Catmull-Rom curve through
+## VIEW_ROAD); y is the road surface, rising evenly from the town to the peak's top.
+static func view_road() -> PackedVector3Array:
+	if not _view_road.is_empty(): return _view_road
+	var flat: Array[Vector2] = []
+	for k in range(VIEW_ROAD.size() - 1):
+		var p0: Vector2 = VIEW_ROAD[maxi(k - 1, 0)]
+		var p1: Vector2 = VIEW_ROAD[k]
+		var p2: Vector2 = VIEW_ROAD[k + 1]
+		var p3: Vector2 = VIEW_ROAD[mini(k + 2, VIEW_ROAD.size() - 1)]
+		var steps := maxi(2, ceili(p1.distance_to(p2)))
+		for i in range(steps):
+			var t := float(i) / steps
+			flat.append(0.5 * (2.0 * p1 + (p2 - p0) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t * t + (3.0 * p1 - p0 - 3.0 * p2 + p3) * t * t * t))
+	flat.append(VIEW_ROAD[VIEW_ROAD.size() - 1])
+	var lengths := [0.0]
+	for i in range(1, flat.size()): lengths.append(lengths[i - 1] + flat[i].distance_to(flat[i - 1]))
+	var total: float = lengths[lengths.size() - 1]
+	for i in range(flat.size()):
+		var rise := clampf((lengths[i] - 5.0) / (total - 9.0), 0.0, 1.0)
+		_view_road.append(Vector3(flat[i].x, lerpf(VIEW_ROAD_START_Y, PEAK_H + 0.03, rise), flat[i].y))
+	return _view_road
+
+## Distance from (x, z) to the ghat road's middle line and the road's height there
+## (x = 1000 when far from it).
+static func view_road_near(x: float, z: float) -> Vector2:
+	if not VIEW_ROAD_BOX.has_point(Vector2(x, z)): return Vector2(1000.0, 0.0)
+	var road := view_road()
+	var best := Vector2(1000.0, 0.0)
+	var point := Vector3(x, 0.0, z)
+	for i in range(road.size() - 1):
+		var a := Vector3(road[i].x, 0.0, road[i].z)
+		var b := Vector3(road[i + 1].x, 0.0, road[i + 1].z)
+		var along := clampf((point - a).dot(b - a) / maxf((b - a).length_squared(), 0.0001), 0.0, 1.0)
+		var distance := point.distance_to(a + (b - a) * along)
+		if distance < best.x: best = Vector2(distance, lerpf(road[i].y, road[i + 1].y, along))
+	return best
+
 func _land_index(x: int, z: int) -> int:
 	return (clampi(z, NORTH_EDGE, 127) - NORTH_EDGE) * 256 + clampi(x, -128, 127) + 128
 
@@ -56,6 +119,7 @@ func shape(data) -> void:
 	_lower_valley(data)
 	_cave_ground(data)
 	_village_ground(data)
+	_view_road_ground(data)
 	_paint_land(data)
 	data.calc_height_range(true)
 	# All maps of all regions, with fresh mipmaps (distant land reads those; new
@@ -71,20 +135,29 @@ func _land_height(x: float, z: float, mass: FastNoiseLite, ridges: FastNoiseLite
 	var ridge := 1.0 - absf(ridges.get_noise_2d(x, z))
 	ridge *= ridge
 	var body := mass.get_noise_2d(x, z) * 0.5 + 0.5
-	# The last 12 m before the end of the land slope down behind the outer crest, so
-	# the edge (where Terrain3D blends towards its blank white colour) is never on
-	# the skyline seen from the town.
 	var edge := minf(minf(x + 128.0, 127.0 - x), minf(z - NORTH_EDGE, 127.0 - z))
 	var to_river := z - river_z(x)
 	var height := smoothstep(0.0, 0.35, t) * (1.5 + bumps * 7.0) + smoothstep(0.25, 1.0, t) * (body * 32.0 + ridge * 15.0 + bumps * 5.0)
 	if to_river > 0.0:
 		# The town hills slope down to the river over their last 45 m.
 		height *= smoothstep(8.0, 50.0, to_river)
+		# South of the airport the hills sink to low coast hills under Sagar Point's peak.
+		height *= lerpf(1.0, 0.32, smoothstep(64.0, 92.0, z))
+		var peak := PEAK_H * (1.0 - smoothstep(PLATEAU_R, PLATEAU_R + 40.0, Vector2(x, z).distance_to(PEAK)))
+		height = maxf(height, peak * smoothstep(0.0, 10.0, out))
 	else:
 		# North bank: a low meadow (the giant policeman's) rising to far mountains.
 		var far := smoothstep(-185.0, -240.0, z)
 		height = 1.0 + bumps * 5.0 + far * (body * 30.0 + ridge * 14.0)
-	height = 0.08 + height * smoothstep(0.0, 12.0, edge)
+	# The island coast: the last COAST metres (wavy, for bays and headlands) fall into the sea.
+	var wavy := rolling.get_noise_2d(x * 1.7 + 300.0, z * 1.7) * 0.5 + 0.5
+	height = lerpf(SEA_BED, 0.08 + height, smoothstep(0.0, COAST, edge * (0.75 + 0.5 * wavy)))
+	# Sagar Beach: a gentle grassy slope down to the sand, then the sand into the sea.
+	var beach_side := maxf(BEACH.position.x - x, x - BEACH.end.x)
+	var beach := (1.0 - smoothstep(0.0, 12.0, beach_side)) * smoothstep(BEACH.position.y - 8.0, BEACH.position.y + 2.0, z)
+	if beach > 0.0:
+		var shore_height := lerpf(3.0, 0.8, smoothstep(BEACH.position.y + 2.0, 104.0, z)) - maxf(z - 104.0, 0.0) * 0.3 + bumps * 0.25
+		height = lerpf(height, shore_height, beach)
 	# The road pass from the market street through the hills to the bridge and on.
 	var road := (1.0 - smoothstep(6.0, 30.0, absf(x - NORTH_ROAD_X))) * smoothstep(NORTH_ROAD_END - 12.0, NORTH_ROAD_END, z)
 	if z < FLAT_TOWN.position.y: height = lerpf(height, 0.08, road)
@@ -161,6 +234,25 @@ func _village_ground(data) -> void:
 			land_heights[index] = lerpf(land_heights[index], VILLAGE_FLOOR, 1.0 - smoothstep(0.0, 12.0, away))
 			data.set_height(Vector3(x, 0, z), land_heights[index])
 
+## Cuts and fills the hill along the ghat road (level across, blending back over 7 m each
+## side) and levels Sagar Point's round top and the lighthouse's pad.
+func _view_road_ground(data) -> void:
+	var pad := maxf(land_heights[_land_index(int(LIGHTHOUSE.x), int(LIGHTHOUSE.y))], 1.5)
+	for z in range(int(LIGHTHOUSE.y) - 9, int(LIGHTHOUSE.y) + 10):
+		for x in range(int(LIGHTHOUSE.x) - 9, int(LIGHTHOUSE.x) + 10):
+			var index := _land_index(x, z)
+			land_heights[index] = lerpf(land_heights[index], pad, 1.0 - smoothstep(4.0, 8.0, Vector2(x, z).distance_to(LIGHTHOUSE)))
+			data.set_height(Vector3(x, 0, z), land_heights[index])
+	for z in range(int(VIEW_ROAD_BOX.position.y), int(VIEW_ROAD_BOX.end.y)):
+		for x in range(int(VIEW_ROAD_BOX.position.x), int(VIEW_ROAD_BOX.end.x)):
+			var index := _land_index(x, z)
+			var height := land_heights[index]
+			var near := view_road_near(x, z)
+			height = lerpf(height, near.y - 0.03, 1.0 - smoothstep(VIEW_ROAD_HALF + 0.8, VIEW_ROAD_HALF + 7.0, near.x))
+			height = lerpf(height, PEAK_H, 1.0 - smoothstep(PLATEAU_R, PLATEAU_R + 3.0, Vector2(x, z).distance_to(PEAK)))
+			land_heights[index] = height
+			data.set_height(Vector3(x, 0, z), height)
+
 ## The village footpath: from the Main Road's west end past the guild office, up to the cave
 ## plaza. Painted into the land colours so it follows the ground. Each point is x, z.
 const PATH := [Vector2(-73.0, 3.0), Vector2(-72.5, -4.0), Vector2(-72.0, -12.0), Vector2(-71.0, -22.0), Vector2(-71.5, -30.0), Vector2(-80.0, -31.0), Vector2(-87.5, -30.0)]
@@ -204,8 +296,17 @@ func _paint_land(data) -> void:
 			colour = colour.lerp(forest, smoothstep(2.0, 9.0, height) * 0.8)
 			colour = colour.lerp(rock, clampf(smoothstep(26.0, 40.0, height) + smoothstep(1.3, 2.4, _steepness(x, z)), 0.0, 0.85))
 			colour = colour.lerp(snow, smoothstep(44.0, 52.0, height))
-			# Wet mud and sand down the river banks.
-			colour = colour.lerp(Color(0.42, 0.37, 0.28) / 0.92, 1.0 - smoothstep(WATER_Y - 0.5, WATER_Y + 1.6, height))
+			# Golden beach sand where the coast is low (wet and darker at the water), wet mud
+			# and sand down the river banks.
+			var edge := minf(minf(x + 128.0, 127.0 - x), minf(z - NORTH_EDGE, 127.0 - z))
+			var shore := maxf(1.0 - smoothstep(16.0, 24.0, edge), smoothstep(95.0, 101.0, z) * (1.0 - smoothstep(-1.0, 3.0, maxf(BEACH.position.x - x, x - BEACH.end.x))))
+			var sand := Color(0.86, 0.76, 0.55).lerp(Color(0.62, 0.53, 0.38), 1.0 - smoothstep(SEA_Y - 0.2, SEA_Y + 0.7, height)) / 0.92
+			colour = colour.lerp(sand, shore * (1.0 - smoothstep(0.4, 2.6, height)) * (1.0 - smoothstep(1.6, 2.6, _steepness(x, z))))
+			colour = colour.lerp(Color(0.42, 0.37, 0.28) / 0.92, (1.0 - shore) * (1.0 - smoothstep(WATER_Y - 0.5, WATER_Y + 1.6, height)))
+			# Sagar Point: gravel shoulders along the ghat road, stone paving on the top.
+			var near := view_road_near(x, z)
+			colour = colour.lerp(Color(0.5, 0.45, 0.37) / 0.92, 1.0 - smoothstep(VIEW_ROAD_HALF + 0.4, VIEW_ROAD_HALF + 1.8, near.x))
+			colour = colour.lerp(Color(0.64, 0.6, 0.52) / 0.92, 1.0 - smoothstep(PLATEAU_R - 0.5, PLATEAU_R + 0.5, Vector2(x, z).distance_to(PEAK)))
 			# Packed earth footpath, stone paving round the cave and in front of the guild.
 			var earth := Color(0.55, 0.46, 0.32) / 0.92
 			var stone := Color(0.58, 0.57, 0.53) / 0.92

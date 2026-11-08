@@ -68,14 +68,14 @@ func _banks(bridge_x: float) -> StaticBody3D:
 				body.add_child(piece)
 	return body
 
-## The water: one strip along the river's middle line, from one end of the land to
-## the other, its edges tucked under the banks.
+## The water: one strip along the river's middle line, across the land to where the
+## sea begins (LandShape.OCEAN_HOLE), its edges tucked under the banks.
 func _river() -> MeshInstance3D:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_normal(Vector3.UP)
-	for step in range(64):
-		var x0 := -128.0 + step * 4.0
+	for step in range(57):
+		var x0 := LandShape.OCEAN_HOLE.position.x + step * 4.0
 		var x1 := x0 + 4.0
 		var z0 := LandShape.river_z(x0)
 		var z1 := LandShape.river_z(x1)
