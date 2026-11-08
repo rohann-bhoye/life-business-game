@@ -213,6 +213,9 @@ func apply_graphics(world: Node) -> void:
 	if is_instance_valid(neighbourhood) and neighbourhood.has_method("set_quality"): neighbourhood.set_quality(quality)
 	var day_night = world.get_node_or_null("DayNight")
 	if is_instance_valid(day_night) and day_night.has_method("set_quality"): day_night.set_quality(quality)
+	var sagar = world.get_node_or_null("Neighbourhood/SagarPoint")
+	if sagar == null: sagar = world.find_child("SagarPoint", true, false)
+	if is_instance_valid(sagar) and sagar.has_method("set_quality"): sagar.set_quality(quality)
 	apply_gameplay(world)
 
 ## How fast the in-game clock runs (Settings > Gameplay > Day length).

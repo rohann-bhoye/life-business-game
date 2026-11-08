@@ -3,7 +3,8 @@ extends SceneTree
 # Screenshots of Sagar Point, the ghat road and the sea round the island. Run with a window:
 #   Godot --path . --script res://tools/sagar_views.gd
 # SAGAR_GRAPHICS picks the graphics level (default 0, Low, as on the owner's PC).
-# Pictures go to SAGAR_VIEWS_OUT (a folder) or user://sagar_views.
+# Pictures go to SAGAR_VIEWS_OUT (a folder) or user://sagar_views. SAGAR_FPS=1 also prints
+# the frame rate at each view (vsync off, 3 s); SAGAR_NO_OCEAN=1 hides the sea to compare.
 const SHOTS := {
 	"s1_top_sea": [Vector3(-6.0, 19.7, 107.5), Vector3(-6.0, 9.0, 190.0)],
 	"s2_top_lighthouse": [Vector3(-8.0, 19.8, 101.0), Vector3(62.0, 6.0, 118.0)],
@@ -51,6 +52,10 @@ func _run() -> void:
 	world.add_child(camera)
 	camera.current = true
 	camera.fov = 62
+	if OS.get_environment("SAGAR_NO_OCEAN") == "1": world.find_child("Ocean", true, false).visible = false
+	if OS.get_environment("SAGAR_FPS") == "1":
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+		Engine.max_fps = 0
 	for frame in range(20): await process_frame
 	var only := OS.get_environment("SAGAR_VIEWS_ONLY")
 	for name in SHOTS:
@@ -58,4 +63,14 @@ func _run() -> void:
 		camera.global_position = SHOTS[name][0]
 		camera.look_at(SHOTS[name][1])
 		await _save(folder, name)
+		if OS.get_environment("SAGAR_FPS") == "1": await _fps(name)
 	quit()
+
+func _fps(name: String) -> void:
+	for frame in range(30): await process_frame
+	var start := Time.get_ticks_usec()
+	var frames := 0
+	while Time.get_ticks_usec() - start < 3000000:
+		await process_frame
+		frames += 1
+	print("FPS %s %.1f" % [name, frames / ((Time.get_ticks_usec() - start) / 1000000.0)])

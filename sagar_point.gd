@@ -23,7 +23,9 @@ extends Node3D
 const LandShape := preload("res://land_shape.gd")
 const IndianHouse := preload("res://indian_house.gd")
 const Neighbourhood := preload("res://neighbourhood.gd")
-const OCEAN_SHADER := preload("res://assets/materials/ocean.gdshader")
+## The sea shader for each graphics tier (0 Low, 1 Normal, 2 High): set_quality picks one
+## (Normal and High add the clear shallows and caustics).
+const OCEAN_SHADERS := [preload("res://assets/materials/ocean.gdshader"), preload("res://assets/materials/ocean_high.gdshader"), preload("res://assets/materials/ocean_high.gdshader")]
 
 ## Fishing boats: [z of its lane, speed along x (m/s), start x, hull colour].
 const BOATS := [[168.0, 2.2, -150.0, Color(0.1, 0.32, 0.62)], [245.0, -1.6, 260.0, Color(0.72, 0.16, 0.12)], [370.0, 1.3, 500.0, Color(0.1, 0.5, 0.45)], [-340.0, -1.8, 0.0, Color(0.85, 0.55, 0.1)]]
@@ -36,6 +38,7 @@ var sky_material: Material
 var beam: Node3D
 var boats: Array[Node3D] = []
 var since_sky := 1.0
+var ocean_textures := []
 var land_data
 var player: Node3D
 var crabs: Array[Node3D] = []
@@ -77,6 +80,14 @@ func _process(delta: float) -> void:
 	_move_crabs(delta)
 	since_sky += delta
 	if since_sky >= 0.5: _refresh_sky()
+
+## Graphics tier (game_settings.gd apply_graphics): 0 Low, 1 Normal, 2 High.
+func set_quality(quality: int) -> void:
+	if ocean_material == null: return
+	ocean_material.shader = OCEAN_SHADERS[clampi(quality, 0, 2)]
+	ocean_material.set_shader_parameter("ripples", ocean_textures[0])
+	ocean_material.set_shader_parameter("foam_noise", ocean_textures[1])
+	_refresh_sky()
 
 func _refresh_sky() -> void:
 	since_sky = 0.0
@@ -168,9 +179,10 @@ func _ocean(data) -> MeshInstance3D:
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	ocean_material = ShaderMaterial.new()
-	ocean_material.shader = OCEAN_SHADER
-	ocean_material.set_shader_parameter("ripples", _noise_texture(true, 0.018, 41))
-	ocean_material.set_shader_parameter("foam_noise", _noise_texture(false, 0.03, 43))
+	ocean_material.shader = OCEAN_SHADERS[0]
+	ocean_textures = [_noise_texture(true, 0.018, 41), _noise_texture(false, 0.03, 43)]
+	ocean_material.set_shader_parameter("ripples", ocean_textures[0])
+	ocean_material.set_shader_parameter("foam_noise", ocean_textures[1])
 	var sea := MeshInstance3D.new()
 	sea.name = "Ocean"
 	sea.mesh = mesh
